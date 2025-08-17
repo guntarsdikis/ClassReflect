@@ -2,12 +2,14 @@ import json
 import boto3
 import logging
 from datetime import datetime, timedelta
+import time
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 ec2 = boto3.client('ec2')
 sqs = boto3.client('sqs')
+ssm = boto3.client('ssm')
 
 # Configuration
 QUEUE_URL = 'https://sqs.eu-west-2.amazonaws.com/573524060586/classreflect-processing-queue'
@@ -68,6 +70,41 @@ def lambda_handler(event, context):
         if has_messages:
             if instance_state in ['pending', 'running']:
                 logger.info("Whisper processing instance already running")
+                
+                # Check if processor is actually running and start it if not
+                if instance_state == 'running':
+                    try:
+                        logger.info("Checking if processor is running...")
+                        check_response = ssm.send_command(
+                            InstanceIds=[WHISPER_INSTANCE_ID],
+                            DocumentName="AWS-RunShellScript",
+                            Parameters={
+                                'commands': ['pgrep -f processor.py || echo "NOT_RUNNING"']
+                            }
+                        )
+                        
+                        # If processor not running, start it
+                        time.sleep(2)
+                        logger.info("Starting processor to ensure it's running...")
+                        ssm.send_command(
+                            InstanceIds=[WHISPER_INSTANCE_ID],
+                            DocumentName="AWS-RunShellScript",
+                            Parameters={
+                                'commands': [
+                                    'if ! pgrep -f processor.py > /dev/null; then',
+                                    '  cd /opt/whisper',
+                                    '  aws s3 cp s3://classreflect-audio-files-573524060586/scripts/processor-fixed.py processor.py --region eu-west-2',
+                                    '  nohup python3.11 processor.py > /tmp/processor.log 2>&1 &',
+                                    '  echo "Processor started"',
+                                    'else',
+                                    '  echo "Processor already running"',
+                                    'fi'
+                                ]
+                            }
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to check/start processor: {e}")
+                
                 return {
                     'statusCode': 200,
                     'body': json.dumps('Processing instance already running')
@@ -75,9 +112,38 @@ def lambda_handler(event, context):
             elif instance_state == 'stopped':
                 logger.info(f"Starting Whisper instance {WHISPER_INSTANCE_ID}")
                 ec2.start_instances(InstanceIds=[WHISPER_INSTANCE_ID])
+                
+                # Wait for instance to be running
+                logger.info("Waiting for instance to be running...")
+                waiter = ec2.get_waiter('instance_running')
+                waiter.wait(InstanceIds=[WHISPER_INSTANCE_ID])
+                
+                # Wait a bit more for SSM agent to be ready
+                time.sleep(10)
+                
+                # Start the processor via SSM
+                try:
+                    logger.info("Starting processor via SSM...")
+                    response = ssm.send_command(
+                        InstanceIds=[WHISPER_INSTANCE_ID],
+                        DocumentName="AWS-RunShellScript",
+                        Parameters={
+                            'commands': [
+                                'cd /opt/whisper',
+                                'pkill -f processor.py || true',
+                                'aws s3 cp s3://classreflect-audio-files-573524060586/scripts/processor-fixed.py processor.py --region eu-west-2',
+                                'nohup python3.11 processor.py > /tmp/processor.log 2>&1 &',
+                                'echo "Processor started at $(date)"'
+                            ]
+                        }
+                    )
+                    logger.info(f"SSM command sent: {response['Command']['CommandId']}")
+                except Exception as e:
+                    logger.error(f"Failed to start processor via SSM: {e}")
+                
                 return {
                     'statusCode': 200,
-                    'body': json.dumps(f'Started Whisper instance {WHISPER_INSTANCE_ID}')
+                    'body': json.dumps(f'Started Whisper instance {WHISPER_INSTANCE_ID} and processor')
                 }
         
         # Instance is in unexpected state (stopping, terminated, etc.)

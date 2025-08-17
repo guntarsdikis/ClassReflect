@@ -82,7 +82,8 @@
       "Bash(aws ec2 start-instances:*)",
       "Bash(aws events list-rules:*)",
       "Bash(npm run docker:build:*)",
-      "Bash(npm run docker:push:*)"
+      "Bash(npm run docker:push:*)",
+      "mcp__sequential-thinking__sequentialthinking"
     ],
     "deny": [],
     "ask": []

@@ -166,9 +166,9 @@ const UploadPage: React.FC = () => {
               <div className="file-info">
                 <div className="file-icon">🎵</div>
                 <div className="file-details">
-                  <p className="file-name">{file.name}</p>
+                  <p className="file-name">{file?.name || 'Unknown file'}</p>
                   <p className="file-size">
-                    {(file.size / (1024 * 1024)).toFixed(2)} MB
+                    {file ? (file.size / (1024 * 1024)).toFixed(2) : '0'} MB
                   </p>
                 </div>
               </div>

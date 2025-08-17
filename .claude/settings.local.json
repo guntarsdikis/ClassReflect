@@ -11,7 +11,14 @@
       "Bash(aws ssm start-session:*)",
       "Bash(ssh:*)",
       "Bash(aws rds describe-db-clusters:*)",
-      "Bash(aws rds describe-db-instances:*)"
+      "Bash(aws rds describe-db-instances:*)",
+      "Bash(aws ec2 describe-snapshots:*)",
+      "Bash(aws iam attach-role-policy:*)",
+      "Bash(aws iam create-instance-profile:*)",
+      "Bash(aws iam add-role-to-instance-profile:*)",
+      "Bash(aws ec2 associate-iam-instance-profile:*)",
+      "Bash(curl:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

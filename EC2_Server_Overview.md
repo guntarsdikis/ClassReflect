@@ -42,15 +42,18 @@ ssh -i /Users/guntarsdikis/websites/EC2/GDWD2-new.pem ec2-user@ec2-3-9-156-34.eu
 - **Volume ID**: vol-0f230ff418469c75d
 - **Size**: 8 GB (GP2)
 - **Mount Point**: /dev/xvda
-- **Current Usage**: 5.1GB used (63% full)
+- **Current Usage**: 3.3GB used (42% full)
+- **Snapshot**: snap-0bf991ed89c836d9e (Created Aug 17, 2025)
 
 ### Security Group Configuration
 - **Group Name**: default
+- **SSM Session Manager**: Enabled ✅ (No SSH port needed)
 - **Open Ports**:
   - All traffic (0.0.0.0/0) - WARNING: Very permissive
-  - Port 443 (HTTPS)
-  - Port 3306 (MySQL/MariaDB)
-  - Port 10000 (Webmin/Custom service)
+  - Port 80 (HTTP) - Required for websites
+  - Port 443 (HTTPS) - Required for SSL websites
+  - Port 3306 (MySQL) - Can be removed (no local MySQL)
+  - Port 10000 (Webmin) - Can be removed (access via SSM port forwarding)
 
 ## Server Software Stack
 
@@ -89,13 +92,15 @@ ssh -i /Users/guntarsdikis/websites/EC2/GDWD2-new.pem ec2-user@ec2-3-9-156-34.eu
 
 ## Hosted Domains and SSL Certificates
 
-### 1. Eladoreruffles
+### 1. Eladoreruffles ⚠️ (MAINTENANCE MODE)
 - **Primary Domain**: eladoreruffles.gdwd.co.uk
 - **Aliases**: eladoreruffles.com, www.eladoreruffles.com
+- **Status**: Showing maintenance page (site disabled but preserved)
 - **SSL Certificate**: Let's Encrypt
-- **Expiry Date**: October 14, 2025 (58 days remaining)
-- **Document Root**: /var/www/eladoreruffles_codeigniter
+- **Expiry Date**: October 14, 2025
+- **Original Location**: /var/www/eladoreruffles_codeigniter (583MB)
 - **Framework**: CodeIgniter
+- **Backup Config**: /etc/httpd/conf.d/eladoreruffles*.backup
 
 ### 2. Lusiic
 - **Primary Domain**: lusiic.gdwd.co.uk
@@ -188,6 +193,56 @@ sudo certbot renew --dry-run  # Test renewal
 sudo certbot renew            # Actual renewal
 ```
 
+## Additional Services
+
+### Webmin Control Panel
+- **Version**: 2.303
+- **Port**: 10000 (listening)
+- **Status**: Active and running
+- **Access via SSM**: `aws ssm start-session --target i-0a025c505616127d2 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["10000"],"localPortNumber":["10000"]}' --region eu-west-2`
+- **Then browse**: https://localhost:10000
+
+## SSM Session Manager Access
+
+### Status
+- **SSM Status**: Online ✅
+- **IAM Role**: EC2-SSM-Role attached
+- **Agent Version**: 3.3.2958.0
+
+### Connect Without SSH Keys
+```bash
+# Basic connection (replaces SSH)
+aws ssm start-session --target i-0a025c505616127d2 --region eu-west-2
+
+# Via AWS Console
+# Go to EC2 → Select instance → Connect → Session Manager
+```
+
+### Port Forwarding Examples
+```bash
+# Access Webmin
+aws ssm start-session --target i-0a025c505616127d2 \
+    --document-name AWS-StartPortForwardingSession \
+    --parameters '{"portNumber":["10000"],"localPortNumber":["10000"]}' \
+    --region eu-west-2
+
+# Access Aurora Database
+aws ssm start-session --target i-0a025c505616127d2 \
+    --document-name AWS-StartPortForwardingSessionToRemoteHost \
+    --parameters '{"host":["gdwd.cluster-cjjl7f5jormj.eu-west-2.rds.amazonaws.com"],"portNumber":["3306"],"localPortNumber":["3306"]}' \
+    --region eu-west-2
+```
+
+### Run Remote Commands
+```bash
+# Execute commands without connecting
+aws ssm send-command \
+    --instance-ids i-0a025c505616127d2 \
+    --document-name "AWS-RunShellScript" \
+    --parameters 'commands=["df -h","free -m"]' \
+    --region eu-west-2
+```
+
 ## Common Management Commands
 
 ### Service Management
@@ -232,10 +287,10 @@ sudo tail -f /etc/httpd/logs/access_log
 
 ### Critical
 1. **Restrict Security Group**: Currently allows all traffic (0.0.0.0/0)
-   - Limit SSH (port 22) to your IP only
-   - Port 3306 in security group can be removed (no local MySQL)
-   - Keep only necessary ports open (80, 443)
-   - Port 10000 - verify if needed (possibly Webmin)
+   - With SSM enabled, SSH port 22 can be closed entirely
+   - Port 3306 can be removed (no local MySQL, Aurora accessed via SSM)
+   - Port 10000 can be removed (Webmin accessible via SSM port forwarding)
+   - Keep only ports 80 and 443 open for web traffic
 
 ### Important
 2. **SSL Certificate Renewal**: Certificates expire in ~2 months
@@ -279,10 +334,28 @@ aws ec2 stop-instances --instance-ids i-0a025c505616127d2 --region eu-west-2
 aws ec2 start-instances --instance-ids i-0a025c505616127d2 --region eu-west-2
 ```
 
+## System Maintenance
+
+### Automatic Cleanup Configured
+- **Weekly Script**: `/etc/cron.weekly/cleanup-logs`
+  - Removes journal logs older than 7 days
+  - Deletes Apache logs older than 14 days
+  - Cleans compressed cron logs older than 7 days
+  - Clears yum cache
+- **Journal Limits**: Max 100MB, 1 week retention
+
+### Recent Changes (August 17, 2025)
+1. **Disk Cleanup**: Reduced usage from 63% to 42%
+2. **SSM Session Manager**: Configured and active
+3. **Eladoreruffles Website**: Set to maintenance mode
+4. **Automatic Log Rotation**: Configured
+5. **EBS Snapshot**: Created backup (snap-0bf991ed89c836d9e)
+
 ## Notes
-- SSM Session Manager is not configured (TargetNotConnected)
-- No CloudWatch monitoring appears to be configured
-- Consider implementing monitoring and alerting for production use
+- SSM Session Manager is now configured and active ✅
+- Webmin is installed and accessible via SSM port forwarding
+- Migration backups have been removed to free space
+- Consider implementing CloudWatch monitoring for production use
 
 ---
 *Generated on: August 17, 2025*

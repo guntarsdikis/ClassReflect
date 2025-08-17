@@ -1,0 +1,17 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "api.classreflect.gdwd.co.uk",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "classreflect-api-alb-288350651.eu-west-2.elb.amazonaws.com"
+          }
+        ]
+      }
+    }
+  ]
+}

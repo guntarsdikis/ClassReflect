@@ -1,5 +1,8 @@
 # ClassReflect Deployment Status
 
+**Last Updated**: August 17, 2025
+**Deployment Status**: ✅ LIVE AND OPERATIONAL
+
 ## ✅ Completed Infrastructure Components
 
 ### 1. ECR Repository
@@ -23,51 +26,86 @@
 - **Status**: ✅ Created (no services deployed yet)
 
 ### 5. Application Code
-- **Frontend**: React/TypeScript app created
+- **Frontend**: React/TypeScript app with ClassReflect UI
 - **Backend**: Node.js/Express API with Docker support
+- **GitHub**: https://github.com/guntarsdikis/ClassReflect
 - **Status**: ✅ Code ready, Docker image in ECR
 
-## 🔄 Pending Tasks
+### 6. AWS Amplify
+- **App ID**: `d19wjd0is4gto9`
+- **Default URL**: https://d19wjd0is4gto9.amplifyapp.com
+- **Custom Domain**: classreflect.gdwd.co.uk (DNS configured)
+- **GitHub Integration**: ✅ Connected for auto-deployment
+- **Status**: ✅ Created, builds in progress
 
-### 1. Networking Infrastructure
-- [ ] Create VPC with public/private subnets
-- [ ] Set up NAT Gateways
-- [ ] Configure Security Groups
+### 7. VPC and Networking
+- **VPC ID**: `vpc-0c29c119c36a19975`
+- **Public Subnets**: `subnet-07bbe2b58ee439c84`, `subnet-0e0d76253bf51c798`
+- **Private Subnets**: `subnet-0d615a8c60dc298b9`, `subnet-0bbbe0c95fccd075f`
+- **Internet Gateway**: `igw-002a52d88eeeddc42`
+- **ALB Security Group**: `sg-08ee6bd8d9ec5df10`
+- **ECS Security Group**: `sg-0ac7d6fc98eae5f91`
+- **Status**: ✅ Created
 
-### 2. ECS Service Deployment
-- [ ] Create Task Definition
-- [ ] Deploy ECS Service with Fargate
-- [ ] Configure Application Load Balancer
+### 8. Application Load Balancer
+- **ALB ARN**: `arn:aws:elasticloadbalancing:eu-west-2:573524060586:loadbalancer/app/classreflect-api-alb/e2bf58e6c4b47fa5`
+- **ALB DNS**: `classreflect-api-alb-288350651.eu-west-2.elb.amazonaws.com`
+- **Target Group**: `classreflect-api-tg`
+- **Status**: ✅ Created and configured
 
-### 3. AWS Amplify Setup
-- [ ] Create GitHub repository
-- [ ] Connect Amplify to GitHub
-- [ ] Configure custom domain
+### 9. ECS Fargate Service
+- **Service Name**: `classreflect-api-service`
+- **Task Definition**: `classreflect-api:1`
+- **CPU/Memory**: 256 CPU units, 512 MB
+- **Status**: ✅ Deployed and running
 
-### 4. DNS Configuration
-- [ ] Create Route53 records for classreflect.gdwd.co.uk
-- [ ] Create Route53 records for api.classreflect.gdwd.co.uk
+### 10. DNS Configuration
+- **Frontend**: `classreflect.gdwd.co.uk` → AWS Amplify CloudFront
+- **API**: `api.classreflect.gdwd.co.uk` → ALB
+- **Status**: ✅ Both DNS records configured
 
-### 5. Database Setup
-- [ ] Create ClassReflect schema in Aurora MySQL
-- [ ] Set up connection pooling
+## 🎯 Live Application URLs
 
-## Next Steps
+### Production Endpoints
+- **Frontend**: https://classreflect.gdwd.co.uk ✅ LIVE
+- **Frontend (Amplify)**: https://main.d19wjd0is4gto9.amplifyapp.com ✅ LIVE
+- **API**: http://api.classreflect.gdwd.co.uk ✅ DEPLOYED
+- **API (ALB)**: http://classreflect-api-alb-288350651.eu-west-2.elb.amazonaws.com ✅ DEPLOYED
 
-1. **Create GitHub Repository**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin https://github.com/YOUR_USERNAME/ClassReflect.git
-   git push -u origin main
-   ```
+## 🔄 Remaining Configuration Tasks
 
-2. **Deploy VPC and Networking** (using AWS Console or CLI)
+### 1. Database Setup (Aurora MySQL)
+- [ ] Create ClassReflect database schema
+- [ ] Set up database credentials in AWS Secrets Manager
+- [ ] Update ECS task with database credentials
+- [ ] Test database connectivity
 
-3. **Create ECS Task Definition and Service**
+### 2. SSL/HTTPS Configuration
+- [ ] Request SSL certificate for api.classreflect.gdwd.co.uk
+- [ ] Configure HTTPS listener on ALB
+- [ ] Update frontend to use HTTPS API endpoint
 
-4. **Set up AWS Amplify** with GitHub integration
+### 3. Monitoring & Operations
+- [ ] Configure CloudWatch alarms
+- [ ] Set up application logging
+- [ ] Create backup procedures
+- [ ] Document operational runbooks
+
+## Deployment Summary
+
+### Infrastructure Created
+- ✅ **GitHub Repository**: https://github.com/guntarsdikis/ClassReflect
+- ✅ **AWS Amplify**: Auto-deployment from GitHub configured
+- ✅ **VPC & Networking**: Complete with public/private subnets
+- ✅ **ECS Fargate**: Backend API running in containers
+- ✅ **Application Load Balancer**: Routing traffic to ECS tasks
+- ✅ **S3 & SQS**: Storage and queue infrastructure ready
+- ✅ **DNS Configuration**: Both frontend and API domains configured
+
+### Auto-Deployment Pipeline
+Every `git push` to main branch triggers:
+1. **Frontend**: Automatic build and deployment via AWS Amplify
+2. **Backend**: Manual deployment needed (update ECR image)
 
 ## Access Information
 

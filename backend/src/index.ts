@@ -1,6 +1,13 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { initializeDatabase } from './database';
+
+// Import routes
+import uploadRoutes from './routes/upload';
+import jobsRoutes from './routes/jobs';
+import schoolsRoutes from './routes/schools';
+import teachersRoutes from './routes/teachers';
 
 dotenv.config();
 
@@ -26,10 +33,39 @@ app.get('/health', (req: Request, res: Response) => {
 app.get('/', (req: Request, res: Response) => {
   res.json({ 
     message: 'ClassReflect API',
-    version: '1.0.0'
+    version: '1.0.0',
+    endpoints: {
+      upload: '/api/upload',
+      jobs: '/api/jobs',
+      schools: '/api/schools',
+      teachers: '/api/teachers'
+    }
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// API Routes
+app.use('/api/upload', uploadRoutes);
+app.use('/api/jobs', jobsRoutes);
+app.use('/api/schools', schoolsRoutes);
+app.use('/api/teachers', teachersRoutes);
+
+// Error handling middleware
+app.use((err: any, req: Request, res: Response, next: any) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error'
+  });
+});
+
+// Initialize database connection
+initializeDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}).catch(error => {
+  console.error('Failed to initialize:', error);
+  // Start server anyway for health checks
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} (without database)`);
+  });
 });

@@ -54,7 +54,10 @@
       "Bash(aws ecs list-tasks:*)",
       "Bash(aws logs tail:*)",
       "Bash(aws ecs update-service:*)",
-      "Bash(aws ecs describe-tasks:*)"
+      "Bash(aws ecs describe-tasks:*)",
+      "Bash(mysql:*)",
+      "Bash(aws elbv2 describe-load-balancers:*)",
+      "Bash(aws ecs stop-task:*)"
     ],
     "deny": [],
     "ask": []

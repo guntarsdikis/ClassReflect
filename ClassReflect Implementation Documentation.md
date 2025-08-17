@@ -2,48 +2,74 @@
 
 **Project**: Classroom Audio Analysis Platform  
 **Target Domain**: classreflect.gdwd.co.uk  
-**Infrastructure**: AWS eu-west-2  
+**Infrastructure**: AWS eu-west-2 (100% SERVERLESS - NO EC2 USAGE)  
 **Frontend**: AWS Amplify (React/TypeScript)
 **Backend**: ECS Fargate with Node.js API (smallest task size: 0.25 vCPU, 0.5 GB)
-**Database**: Existing Aurora MySQL cluster
+**Database**: Existing Aurora MySQL cluster (separate from EC2)
 **Storage**: S3 for audio files
-**Objective**: Modern serverless architecture for classroom audio analysis
+**IMPORTANT**: EC2 server (t3.small) is NOT used for ClassReflect
+**Objective**: Modern serverless architecture - completely independent from existing EC2 infrastructure
+
+---
+
+## ClassReflect Architecture Overview
+
+### Components:
+1. **Frontend**: AWS Amplify (React app)
+2. **API**: ECS Fargate (Node.js container) 
+3. **Processing**: On-demand t3.xlarge instances (auto-start/stop)
+4. **Database**: Aurora MySQL (existing cluster)
+5. **Storage**: S3 buckets
+6. **Queue**: SQS for job management
+
+### Data Flow:
+```
+User → Amplify → ECS API → S3/SQS → t3.xlarge (on-demand) → Aurora
+                                         ↓
+                                   Auto-terminate
+```
+
+### Cost Model:
+- **Amplify**: ~$1/month (static hosting)
+- **ECS Fargate**: ~$5/month (API container)
+- **t3.xlarge**: ~$0.02 per 45-min audio file (on-demand only)
+- **Total**: ~$10/month + $0.02 per recording
 
 ---
 
 ## Phase 1: Infrastructure Preparation
 
-### Task 1.1: Domain and SSL Configuration
-- **Objective**: Set up new subdomain with secure access
+### Task 1.1: Domain and SSL Configuration (Serverless)
+- **Objective**: Set up new subdomain for serverless application
 - **Deliverables**:
-  - DNS A record: classreflect.gdwd.co.uk → 3.9.156.34
-  - SSL certificate generated and installed for new subdomain
-  - Apache virtual host configured for classreflect.gdwd.co.uk
-  - Certificate auto-renewal verified
-- **Success Criteria**: HTTPS access working at classreflect.gdwd.co.uk
+  - DNS CNAME: classreflect.gdwd.co.uk → AWS Amplify endpoint
+  - DNS CNAME: api.classreflect.gdwd.co.uk → ALB endpoint  
+  - SSL certificates managed automatically by AWS services
+  - NO Apache/EC2 configuration (ClassReflect is serverless)
+- **Success Criteria**: HTTPS access working via AWS Amplify
 
-### Task 1.2: Disk Space Optimization ✅ COMPLETED
-- **Objective**: Free up storage space on t3.small for new services
-- **Previous State**: 5.1GB/8GB used (63% full)
-- **Current State**: 3.3GB/8GB used (42% full)
-- **Actions Completed**:
-  - ✅ Cleaned old Apache and system logs
-  - ✅ Set up automated weekly log cleanup (/etc/cron.weekly/cleanup-logs)
-  - ✅ Configured journal size limits (100MB max)
-  - ✅ Removed migration backups
-- **Success Criteria**: ✅ 4.7GB free space available
+### Task 1.2: Infrastructure Decision ✅ COMPLETED
+- **Objective**: Determine infrastructure approach
+- **Decision**: SERVERLESS ONLY (no EC2 usage)
+- **Reason**: EC2 runs Amazon Linux 2 (incompatible with modern Node.js)
+- **Architecture**:
+  - Frontend: AWS Amplify (no server management)
+  - Backend: ECS Fargate (containerized, serverless)
+  - Database: Aurora MySQL (managed service)
+  - Storage: S3 (object storage)
+- **Note**: EC2 maintenance completed but server NOT used for ClassReflect
 
-### Task 1.3: Security Group Hardening 🔄 IN PROGRESS
-- **Objective**: Improve security while maintaining functionality
-- **Current Issue**: Wide open security group (0.0.0.0/0)
-- **SSM Enabled**: ✅ AWS Session Manager configured (no SSH needed)
-- **Required Changes**:
-  - Remove SSH (port 22) - use SSM instead
-  - Keep HTTP/HTTPS (80/443) open for web traffic
-  - Remove port 3306 (MySQL) - no local database
-  - Remove port 10000 (Webmin) - access via SSM port forwarding
-  - API port 3001 will be proxied through Apache (no direct exposure)
-- **Success Criteria**: Only ports 80/443 open to public
+### Task 1.3: Security Architecture (Serverless)
+- **Objective**: Design secure serverless infrastructure
+- **ClassReflect Security** (No EC2 involvement):
+  - ECS Fargate: Runs in private subnet with ALB
+  - AWS Amplify: Built-in DDoS protection via CloudFront
+  - API Gateway: Rate limiting and throttling
+  - No SSH/ports to manage (serverless)
+- **EC2 Security** (Separate - for existing sites only):
+  - EC2 security improvements benefit existing sites
+  - NOT related to ClassReflect implementation
+- **Success Criteria**: Secure serverless architecture deployed
 
 ### Task 1.4: Database Schema Extension
 - **Objective**: Extend existing Aurora MySQL for ClassReflect
@@ -114,27 +140,50 @@
 
 ---
 
-## Phase 3: Processing Infrastructure
+## Phase 3: Processing Infrastructure (On-Demand EC2)
 
-### Task 3.1: Custom AMI Creation
-- **Objective**: Create optimized AMI for audio processing
+### Task 3.1: Custom AMI Creation for Whisper Processing
+- **Objective**: Create optimized AMI for on-demand audio processing
+- **Instance Type**: t3.xlarge (4 vCPU, 16GB RAM) - CPU-only
 - **Requirements**:
-  - Launch temporary t3.large instance for AMI preparation
-  - Install OpenAI Whisper with all dependencies
-  - Install Node.js and required processing libraries
-  - Configure AWS CLI for database and S3 access
-  - Implement auto-shutdown mechanism
-- **Success Criteria**: AMI launches and processes test audio successfully
+  - Create AMI with OpenAI Whisper pre-installed (large model)
+  - Python 3.10+ with PyTorch CPU version
+  - ffmpeg for audio processing
+  - Configure auto-termination after job completion
+  - Boot time optimization (under 1 minute)
+- **Performance Specs**:
+  - 45-minute audio: ~6-8 minutes processing
+  - Cost: $0.166/hour = ~$0.02 per recording
+  - 16GB RAM handles large Whisper model smoothly
+- **Auto-scaling Logic**:
+  - ECS Fargate monitors SQS queue
+  - Launches t3.xlarge instance when jobs exist
+  - Processes audio with Whisper (CPU-optimized)
+  - Auto-terminates when queue is empty
+- **Success Criteria**: <10 min processing for 45-min audio, auto-termination
 
-### Task 3.2: Processing Application Development
-- **Objective**: Create automated audio analysis pipeline
-- **Core Functions**:
-  - Download audio files from S3
-  - Convert audio to text using OpenAI Whisper
-  - Analyze transcript using ChatGPT API with custom criteria
-  - Save results to Aurora MySQL database
-  - Clean up temporary files and auto-terminate instance
-- **Success Criteria**: Complete workflow from audio to analysis results
+### Task 3.2: On-Demand Processing Workflow
+- **Objective**: Create serverless orchestration with on-demand CPU processing
+- **Workflow**:
+  1. User uploads audio → S3 (via ECS Fargate API)
+  2. Job added to SQS queue with metadata
+  3. ECS Fargate checks queue every 30 seconds
+  4. If jobs exist → Launch t3.xlarge instance from AMI
+  5. t3.xlarge processes with Whisper (large model) → Saves transcript
+  6. Sends transcript to ChatGPT API for analysis
+  7. Saves results to Aurora MySQL
+  8. Checks for more jobs → Process or terminate
+- **Cost Optimization**:
+  - t3.xlarge: $0.166/hour (CPU-only, no GPU waste)
+  - 45-min audio: 6-8 minutes = ~$0.02 cost
+  - Auto-terminates after last job
+  - Batch processing: Multiple files per instance launch
+- **Why t3.xlarge is Perfect**:
+  - ✅ 16GB RAM handles large Whisper model
+  - ✅ 4 vCPUs for parallel processing
+  - ✅ No GPU overhead for audio-only
+  - ✅ 90% cheaper than GPU instances
+- **Success Criteria**: <$0.03 per recording, zero idle time
 
 ### Task 3.3: IAM Security Configuration
 - **Objective**: Set up least-privilege access controls
@@ -286,13 +335,24 @@
   - Monthly estimate: ~$2-5 for light usage
   - Auto-scaling: Scale to zero when not in use
 - **AWS Amplify**: Free tier covers most usage
-- **Processing Cost**: Under $0.10 per audio analysis
-- **Total Monthly**: Under $20 for moderate usage
-- **Budget Monitoring**: CloudWatch billing alerts
+- **Whisper Processing (t3.xlarge)**:
+  - Instance: $0.166/hour (on-demand pricing)
+  - 45-min audio: ~8 minutes processing = ~$0.022
+  - Spot instances: ~$0.05/hour (70% savings possible)
+- **Total Costs per Recording**:
+  - Whisper transcription: ~$0.02
+  - ChatGPT analysis: ~$0.01
+  - S3/Data transfer: ~$0.001
+  - **Total: ~$0.03 per 45-minute recording**
+- **Monthly Estimates**:
+  - Base infrastructure: ~$10
+  - 100 recordings: ~$3
+  - 500 recordings: ~$15
+  - **Total: $10-25/month for typical usage**
 - **Cost Optimization**: 
-  - Fargate Spot instances (70% savings)
-  - Scale to zero during idle times
-  - S3 lifecycle policies for audio cleanup
+  - Use Spot instances for 70% savings
+  - Batch process multiple files per instance
+  - Auto-delete S3 files after 30 days
 
 ### User Experience Standards
 - **Ease of Use**: Upload to results in under 3 clicks
@@ -332,23 +392,23 @@
 
 ## Infrastructure Status Update (August 17, 2025)
 
-### Architecture Decision
-- ❌ **EC2 Node.js**: Amazon Linux 2 incompatible with modern Node.js versions
-- ✅ **ECS Fargate**: Selected for backend API hosting
-- ✅ **AWS Amplify**: Frontend hosting solution
-- ✅ **Aurora MySQL**: Existing database ready for ClassReflect schema
+### IMPORTANT: ClassReflect is 100% Serverless
+- ❌ **EC2 Server**: NOT USED for ClassReflect
+- ✅ **ECS Fargate**: Serverless container platform for API
+- ✅ **AWS Amplify**: Serverless frontend hosting
+- ✅ **Aurora MySQL**: Managed database service
+- ✅ **S3**: Serverless object storage
 
-### Completed EC2 Preparations
-- ✅ **Disk Space**: Cleaned from 63% to 42% usage
-- ✅ **SSM Session Manager**: Configured for secure access
-- ✅ **Automatic Maintenance**: Weekly log cleanup
-- ✅ **Old Site Management**: eladoreruffles.gdwd.co.uk in maintenance mode
+### EC2 Server Status (Existing Sites Only)
+- **Purpose**: Hosts lusiic, onizglitiba, phpmyadmin ONLY
+- **ClassReflect**: Zero components on EC2
+- **Updates**: Server maintained but irrelevant to ClassReflect
 
-### Next Steps for ClassReflect
-- **Backend**: Set up ECS Fargate cluster and service
-- **Frontend**: Initialize AWS Amplify project
-- **Database**: Create ClassReflect schema in Aurora
-- **Domains**: Configure api.classreflect.gdwd.co.uk and classreflect.gdwd.co.uk
+### ClassReflect Next Steps (Serverless)
+- **ECS Fargate**: Deploy containerized Node.js API
+- **AWS Amplify**: Deploy React frontend
+- **Aurora**: Create ClassReflect database schema
+- **Route53**: Configure DNS (no Apache involved)
 
 ---
 

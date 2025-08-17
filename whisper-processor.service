@@ -1,0 +1,16 @@
+[Unit]
+Description=Whisper Audio Processing Service
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/whisper
+ExecStart=/usr/bin/python3.11 /opt/whisper/processor.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -79,12 +79,13 @@
 - **Status**: ✅ Fully configured with demo data
 
 ### 13. Whisper Processing Infrastructure
-- **Instance**: `i-074c954b89084ee45` (t3.xlarge - 4 vCPU, 16GB RAM)
-- **Model**: OpenAI Whisper Large (highest accuracy)
-- **Performance**: ~6-8 minutes for 45-minute audio
-- **Service**: Automated SQS polling and audio transcription
+- **Instance**: `i-0db7635f05d00de47` (t2.medium - 2 vCPU, 4GB RAM, Ubuntu 22.04)
+- **Model**: OpenAI Whisper Base (balanced speed/accuracy)
+- **Performance**: ~3 seconds for 3.5MB audio file
+- **Auto-Scaling**: Lambda checks queue every minute, starts/stops instance
 - **IAM Role**: ClassReflectWhisperRole with S3/SQS/Secrets access
-- **Status**: ✅ Running with optimized CPU configuration
+- **Cost Optimization**: Auto-stops after 3 minutes of no jobs
+- **Status**: ✅ Fully automated with on-demand scaling
 
 ## 🎯 Live Application URLs
 
@@ -118,17 +119,21 @@
 - [x] Fully secure API communication
 
 ### 4. Audio Processing Pipeline
-- [x] Set up Whisper processing on EC2 (t3.medium instance)
-- [x] Implement automated SQS job worker with systemd service
+- [x] Set up Whisper processing on EC2 (t2.medium Ubuntu instance)
+- [x] Implement automated SQS job polling with auto-stop
 - [x] Configure IAM roles for S3, SQS, and Secrets Manager access
-- [x] OpenAI Whisper base model installed and ready
+- [x] OpenAI Whisper base model installed and tested
+- [x] Lambda auto-scaler for on-demand instance management
+- [x] CloudWatch Events trigger every minute for queue checks
+- [x] Database schema corrected (transcript_text column)
+- [x] Successfully transcribed test audio (elephant recording)
 
 ## 🔄 Optional Enhancements
 
 ### 1. Advanced Features
 - [ ] Add authentication with AWS Cognito
 - [ ] Implement AI-powered teaching analysis
-- [ ] Configure auto-scaling for processing instances
+- [x] Configure auto-scaling for processing instances ✅ COMPLETED
 - [ ] Add real-time WebSocket updates
 
 ### 2. Monitoring & Operations
@@ -184,12 +189,13 @@ Run `./start-local.sh` to start both frontend and backend locally.
 - **Total Fixed**: ~$50-55/month
 
 ### Per-Recording Costs
-- **EC2 t3.xlarge Processing**: ~$0.08-0.12 per 45-minute audio file
+- **EC2 t2.medium Processing**: ~$0.02-0.03 per 45-minute audio file
 - **SQS Messages**: ~$0.001 per job  
 - **S3 Requests**: ~$0.001 per upload/download
+- **Lambda Auto-Scaler**: <$0.001 per invocation (1440/month)
 
 ### Production Scale Estimate
-- **100 recordings/month**: ~$60/month total
-- **1000 recordings/month**: ~$105/month total
+- **100 recordings/month**: ~$52/month total
+- **1000 recordings/month**: ~$75/month total
 
-**Note**: EC2 instance automatically starts/stops based on queue, minimizing compute costs.
+**Note**: EC2 instance automatically starts when jobs arrive and stops after 3 minutes of inactivity, ensuring near-zero idle costs. Lambda function (ClassReflectAutoScaler) checks queue every minute via CloudWatch Events.

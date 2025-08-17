@@ -403,3 +403,40 @@ aws ec2 start-instances --instance-ids i-0a025c505616127d2 --region eu-west-2
 *Generated on: August 17, 2025*
 *AWS Account: 573524060586*
 *User: gdwd*
+
+  SSH Connection with Your Key:
+
+  ssh -i /Users/guntarsdikis/websites/EC2/GDWD2-new.pem ec2-user@18.135.13.185
+
+  If you get a permission error, first run:
+  chmod 400 /Users/guntarsdikis/websites/EC2/GDWD2-new.pem
+
+  Once Connected, Run These Commands:
+
+  # 1. Update system
+  sudo yum update -y
+
+  # 2. Install Python 3.11
+  sudo yum install -y python3.11 python3.11-pip
+  python3.11 --version
+
+  # 3. Install ffmpeg
+  sudo yum install -y ffmpeg
+
+  # 4. Install Whisper and dependencies (takes 5-10 minutes)
+  sudo python3.11 -m pip install openai-whisper boto3 mysql-connector-python requests
+
+  # 5. Create directory
+  sudo mkdir -p /opt/whisper
+  sudo chown ec2-user:ec2-user /opt/whisper
+
+  # 6. Download processor script
+  aws s3 cp s3://classreflect-audio-files-573524060586/scripts/processor.py /opt/whisper/processor.py
+  chmod +x /opt/whisper/processor.py
+
+  # 7. Test the processor
+  cd /opt/whisper
+  python3.11 processor.py
+
+  You should now be able to connect! Let me know when you're in and I'll help you through the
+  installation.

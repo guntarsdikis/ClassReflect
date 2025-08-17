@@ -22,14 +22,15 @@ def lambda_handler(event, context):
     """
     
     try:
-        # Check SQS queue for messages
-        response = sqs.receive_message(
+        # Check SQS queue for messages (without consuming them)
+        response = sqs.get_queue_attributes(
             QueueUrl=QUEUE_URL,
-            MaxNumberOfMessages=1,
-            WaitTimeSeconds=1
+            AttributeNames=['ApproximateNumberOfMessages']
         )
         
-        messages = response.get('Messages', [])
+        message_count = int(response['Attributes']['ApproximateNumberOfMessages'])
+        has_messages = message_count > 0
+        logger.info(f"Queue has {message_count} messages")
         
         # Get the current state of the Whisper instance
         instance_response = ec2.describe_instances(
@@ -46,7 +47,7 @@ def lambda_handler(event, context):
         instance_state = instance_response['Reservations'][0]['Instances'][0]['State']['Name']
         logger.info(f"Whisper instance {WHISPER_INSTANCE_ID} is {instance_state}")
         
-        if not messages:
+        if not has_messages:
             logger.info("No messages in queue.")
             
             # Stop the instance if it's running and no jobs
@@ -64,21 +65,20 @@ def lambda_handler(event, context):
                 }
         
         # Messages exist - ensure instance is running
-        if instance_state in ['pending', 'running']:
-            logger.info("Whisper processing instance already running")
-            return {
-                'statusCode': 200,
-                'body': json.dumps('Processing instance already running')
-            }
-        
-        # Start the stopped instance
-        if instance_state == 'stopped':
-            logger.info(f"Starting Whisper instance {WHISPER_INSTANCE_ID}")
-            ec2.start_instances(InstanceIds=[WHISPER_INSTANCE_ID])
-            return {
-                'statusCode': 200,
-                'body': json.dumps(f'Started Whisper instance {WHISPER_INSTANCE_ID}')
-            }
+        if has_messages:
+            if instance_state in ['pending', 'running']:
+                logger.info("Whisper processing instance already running")
+                return {
+                    'statusCode': 200,
+                    'body': json.dumps('Processing instance already running')
+                }
+            elif instance_state == 'stopped':
+                logger.info(f"Starting Whisper instance {WHISPER_INSTANCE_ID}")
+                ec2.start_instances(InstanceIds=[WHISPER_INSTANCE_ID])
+                return {
+                    'statusCode': 200,
+                    'body': json.dumps(f'Started Whisper instance {WHISPER_INSTANCE_ID}')
+                }
         
         # Instance is in unexpected state (stopping, terminated, etc.)
         logger.warning(f"Instance in unexpected state: {instance_state}")

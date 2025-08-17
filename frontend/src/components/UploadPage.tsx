@@ -9,6 +9,7 @@ const UploadPage: React.FC = () => {
   const [uploadComplete, setUploadComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [autoUpload, setAutoUpload] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // For demo purposes, using hardcoded teacher/school IDs
@@ -19,9 +20,17 @@ const UploadPage: React.FC = () => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      const validTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/x-m4a'];
-      if (!validTypes.includes(selectedFile.type)) {
-        setError('Please select a valid audio file (MP3, WAV, or M4A)');
+      // Accept common audio formats including those without proper MIME types
+      const validExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.aac', '.ogg', '.wma'];
+      const fileName = selectedFile.name.toLowerCase();
+      const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+      
+      // Check by MIME type or file extension
+      const validTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/x-m4a', 'audio/m4a', 'audio/mp4', 'audio/x-wav', 'audio/ogg', 'audio/aac'];
+      const hasValidType = validTypes.includes(selectedFile.type) || selectedFile.type === '';
+      
+      if (!hasValidExtension && !hasValidType) {
+        setError('Please select a valid audio file (MP3, WAV, M4A, AAC, OGG)');
         return;
       }
       if (selectedFile.size > 500 * 1024 * 1024) {
@@ -31,17 +40,34 @@ const UploadPage: React.FC = () => {
       setFile(selectedFile);
       setError(null);
       setUploadComplete(false);
+      setJobId(null);
+      setUploadProgress(0);
+      
+      // Auto-upload if enabled
+      if (autoUpload) {
+        setTimeout(() => {
+          handleUpload(selectedFile);
+        }, 500);
+      }
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const handleUpload = async (fileToUpload?: File) => {
+    const uploadFile = fileToUpload || file;
+    if (!uploadFile) {
+      setError('Please select a file first');
+      return;
+    }
+    if (uploading) {
+      return; // Prevent double-clicks
+    }
 
     setUploading(true);
     setError(null);
+    setUploadProgress(0);
     
     const formData = new FormData();
-    formData.append('audio', file);
+    formData.append('audio', uploadFile);
     formData.append('teacherId', teacherId.toString());
     formData.append('schoolId', schoolId.toString());
 
@@ -94,21 +120,38 @@ const UploadPage: React.FC = () => {
       <div className="card">
         <h1 className="card-title">Upload Classroom Recording</h1>
         
+        <div className="upload-settings">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={autoUpload}
+              onChange={(e) => setAutoUpload(e.target.checked)}
+            />
+            <span>Auto-upload when file is selected</span>
+          </label>
+        </div>
+        
         <div 
-          className={`upload-area ${file ? 'has-file' : ''}`}
+          className={`upload-area ${file ? 'has-file' : ''} ${uploading ? 'uploading' : ''}`}
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={(e) => {
+            // Only trigger file selection if clicking the empty area, not buttons
+            if (!file && e.target === e.currentTarget) {
+              fileInputRef.current?.click();
+            }
+          }}
         >
           <input
             ref={fileInputRef}
             type="file"
-            accept="audio/mp3,audio/mpeg,audio/wav,audio/x-m4a"
+            accept="audio/*,.mp3,.wav,.m4a,.mp4,.aac,.ogg,.wma"
             onChange={handleFileSelect}
             style={{ display: 'none' }}
+            disabled={uploading}
           />
           
-          {!file ? (
+          {!file && !uploading && !uploadComplete ? (
             <>
               <div className="upload-icon">📁</div>
               <p className="upload-text">
@@ -130,9 +173,32 @@ const UploadPage: React.FC = () => {
                 </div>
               </div>
               {!uploading && !uploadComplete && (
-                <button className="btn btn-primary" onClick={handleUpload}>
-                  Upload and Analyze
-                </button>
+                <div className="file-actions">
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUpload();
+                    }}
+                    disabled={uploading}
+                  >
+                    Upload and Analyze
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFile(null);
+                      setError(null);
+                      setUploadProgress(0);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                  >
+                    Change File
+                  </button>
+                </div>
               )}
             </>
           )}
@@ -159,6 +225,20 @@ const UploadPage: React.FC = () => {
               <p className="job-id">Job ID: <code>{jobId}</code></p>
             )}
             <p>You can check the results page to track progress.</p>
+            <button 
+              className="btn btn-primary"
+              onClick={() => {
+                setFile(null);
+                setUploadComplete(false);
+                setUploadProgress(0);
+                setJobId(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+            >
+              Upload Another File
+            </button>
           </div>
         )}
 

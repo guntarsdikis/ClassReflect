@@ -2,8 +2,12 @@
 
 **Project**: Classroom Audio Analysis Platform  
 **Target Domain**: classreflect.gdwd.co.uk  
-**Infrastructure**: AWS eu-west-2, existing t3.small server  
-**Objective**: Add AI-powered classroom audio analysis without disrupting existing websites
+**Infrastructure**: AWS eu-west-2  
+**Frontend**: AWS Amplify (React/TypeScript)
+**Backend**: ECS Fargate with Node.js API (smallest task size: 0.25 vCPU, 0.5 GB)
+**Database**: Existing Aurora MySQL cluster
+**Storage**: S3 for audio files
+**Objective**: Modern serverless architecture for classroom audio analysis
 
 ---
 
@@ -18,26 +22,28 @@
   - Certificate auto-renewal verified
 - **Success Criteria**: HTTPS access working at classreflect.gdwd.co.uk
 
-### Task 1.2: Disk Space Optimization
+### Task 1.2: Disk Space Optimization ✅ COMPLETED
 - **Objective**: Free up storage space on t3.small for new services
-- **Current State**: 5.1GB/8GB used (63% full)
-- **Target State**: <50% disk usage
-- **Actions Required**:
-  - Clean Apache logs older than 30 days
-  - Set up automated log rotation for all virtual hosts
-  - Remove unnecessary files from existing websites
-  - Archive old backup files
-- **Success Criteria**: At least 1GB free space available
+- **Previous State**: 5.1GB/8GB used (63% full)
+- **Current State**: 3.3GB/8GB used (42% full)
+- **Actions Completed**:
+  - ✅ Cleaned old Apache and system logs
+  - ✅ Set up automated weekly log cleanup (/etc/cron.weekly/cleanup-logs)
+  - ✅ Configured journal size limits (100MB max)
+  - ✅ Removed migration backups
+- **Success Criteria**: ✅ 4.7GB free space available
 
-### Task 1.3: Security Group Hardening
+### Task 1.3: Security Group Hardening 🔄 IN PROGRESS
 - **Objective**: Improve security while maintaining functionality
 - **Current Issue**: Wide open security group (0.0.0.0/0)
+- **SSM Enabled**: ✅ AWS Session Manager configured (no SSH needed)
 - **Required Changes**:
-  - Restrict SSH (port 22) to specific IP addresses only
+  - Remove SSH (port 22) - use SSM instead
   - Keep HTTP/HTTPS (80/443) open for web traffic
-  - Add controlled access for API port 3001
-  - Remove unnecessary open ports
-- **Success Criteria**: Security scan shows only required ports open
+  - Remove port 3306 (MySQL) - no local database
+  - Remove port 10000 (Webmin) - access via SSM port forwarding
+  - API port 3001 will be proxied through Apache (no direct exposure)
+- **Success Criteria**: Only ports 80/443 open to public
 
 ### Task 1.4: Database Schema Extension
 - **Objective**: Extend existing Aurora MySQL for ClassReflect
@@ -53,17 +59,22 @@
 
 ---
 
-## Phase 2: Backend API Development
+## Phase 2: Backend API Development (ECS Fargate)
 
-### Task 2.1: Node.js Environment Setup
-- **Objective**: Install Node.js runtime alongside existing Apache/PHP services
+### Task 2.1: ECS Fargate Setup
+- **Objective**: Deploy containerized Node.js API on ECS Fargate
 - **Requirements**:
-  - Node.js 18.x installation
-  - PM2 process manager for service management
-  - Application directory structure at /var/www/classreflect-api/
-  - Proper file permissions and ownership
-- **Constraints**: Must not interfere with existing website functionality
-- **Success Criteria**: Node.js running independently on port 3001
+  - Create ECS cluster in eu-west-2
+  - Use Fargate Spot for cost optimization (up to 70% savings)
+  - Task definition: 0.25 vCPU, 0.5 GB memory (smallest/cheapest)
+  - Node.js 22 with Express.js in Docker container
+  - Application Load Balancer for HTTPS termination
+- **Benefits**:
+  - No server management required
+  - Auto-scaling capabilities
+  - Modern Node.js versions supported
+  - Independent from EC2 server
+- **Success Criteria**: API accessible via ALB endpoint
 
 ### Task 2.2: API Application Architecture
 - **Objective**: Create REST API for ClassReflect functionality
@@ -76,22 +87,30 @@
 - **Success Criteria**: API responds to health checks and basic endpoints
 
 ### Task 2.3: AWS Services Integration
-- **Objective**: Connect API to AWS services for processing pipeline
+- **Objective**: Connect ECS API to AWS services for processing pipeline
 - **Required Integrations**:
   - S3 service for temporary audio file storage
   - SQS queue for job management and processing triggers
-  - EC2 management for auto-spawning processing instances
-  - IAM roles and permissions configuration
+  - ECS Task Role with permissions for S3, SQS, Aurora
+  - Secrets Manager for database credentials
+  - CloudWatch for logging and monitoring
+- **Architecture Benefits**:
+  - Fully managed container service
+  - Automatic scaling based on load
+  - No infrastructure management
 - **Success Criteria**: API can upload files to S3 and trigger processing
 
-### Task 2.4: Apache Reverse Proxy Setup
-- **Objective**: Route API requests through existing Apache server
+### Task 2.4: API Gateway and Domain Configuration
+- **Objective**: Expose ECS API through custom domain
 - **Configuration Requirements**:
-  - Proxy /api/* requests to Node.js on port 3001
-  - Handle large file uploads without timeouts
-  - Maintain proper headers for CORS and authentication
-  - Separate logging for API requests
-- **Success Criteria**: API accessible via https://classreflect.gdwd.co.uk/api/
+  - Application Load Balancer with SSL certificate
+  - Route53 for api.classreflect.gdwd.co.uk subdomain
+  - CORS configuration for Amplify frontend
+  - Health check endpoint for ECS tasks
+- **Endpoints**:
+  - Production: https://api.classreflect.gdwd.co.uk
+  - Alternative: Direct ALB endpoint as backup
+- **Success Criteria**: API accessible via HTTPS with custom domain
 
 ---
 
@@ -136,16 +155,23 @@
 
 ---
 
-## Phase 4: Frontend Development
+## Phase 4: Frontend Development (AWS Amplify)
 
 ### Task 4.1: AWS Amplify Setup
 - **Objective**: Create and deploy React frontend application
+- **Architecture Decision**: Frontend hosted separately on AWS Amplify (not on EC2)
 - **Requirements**:
-  - Initialize React application for ClassReflect
-  - Configure AWS Amplify hosting
+  - Initialize React application with TypeScript
+  - Configure AWS Amplify hosting with GitHub integration
   - Set up custom domain: classreflect.gdwd.co.uk
-  - Configure SSL certificates in Amplify
-- **Success Criteria**: Frontend accessible at target domain
+  - Configure SSL certificates in Amplify (automatic)
+  - Set up CI/CD pipeline for automatic deployments
+- **Benefits of Amplify**:
+  - Automatic scaling and CDN distribution
+  - Built-in CI/CD from GitHub
+  - Separate from backend server (better performance)
+  - Free tier covers most usage
+- **Success Criteria**: Frontend accessible at https://classreflect.gdwd.co.uk
 
 ### Task 4.2: User Interface Development
 - **Objective**: Create intuitive interfaces for teachers and admins
@@ -170,13 +196,17 @@
 - **Success Criteria**: Users can authenticate and access role-appropriate features
 
 ### Task 4.4: API Integration and Real-time Updates
-- **Objective**: Connect frontend to backend services
+- **Objective**: Connect Amplify frontend to EC2 backend API
+- **Configuration**:
+  - API endpoint: https://classreflect.gdwd.co.uk/api/
+  - CORS configuration for Amplify domain
+  - Environment variables in Amplify for API URLs
 - **Features**:
   - File upload with progress tracking
-  - Automatic polling for job status updates
+  - WebSocket or polling for job status updates
   - Error handling and user feedback
   - Responsive design for mobile and desktop
-- **Success Criteria**: Seamless user experience from upload to results
+- **Success Criteria**: Seamless communication between Amplify frontend and EC2 backend
 
 ---
 
@@ -218,12 +248,20 @@
 ### Task 5.4: Production Deployment
 - **Objective**: Deploy ClassReflect to production environment
 - **Deployment Steps**:
-  - Deploy backend API to production t3.small
-  - Deploy frontend to AWS Amplify
-  - Configure production environment variables
-  - Set up monitoring and alerting
-  - Execute end-to-end testing in production
-- **Rollback Plan**: Ability to disable ClassReflect without affecting existing sites
+  - Deploy Docker container to Amazon ECR
+  - Create ECS Fargate service with auto-scaling
+  - Deploy React frontend to AWS Amplify
+  - Configure Amplify environment variables (API_URL: api.classreflect.gdwd.co.uk)
+  - Set up CloudWatch monitoring and alarms
+  - Configure Route53 for both frontend and API domains
+- **Architecture Benefits**:
+  - Fully serverless backend (no EC2 management)
+  - Independent scaling for frontend and backend
+  - Cost-effective with Fargate Spot instances
+  - Zero-downtime deployments with ECS blue/green
+- **Rollback Plan**: 
+  - Frontend: Amplify instant rollback
+  - Backend: ECS automatic rollback on health check failure
 - **Success Criteria**: Full system operational with monitoring active
 
 ---
@@ -243,10 +281,18 @@
 - **File Security**: Automatic deletion of audio files after 24 hours
 
 ### Cost Management
+- **ECS Fargate Costs**: 
+  - Fargate Spot: ~$0.003/hour (0.25 vCPU, 0.5GB)
+  - Monthly estimate: ~$2-5 for light usage
+  - Auto-scaling: Scale to zero when not in use
+- **AWS Amplify**: Free tier covers most usage
 - **Processing Cost**: Under $0.10 per audio analysis
-- **Monthly Infrastructure**: Additional costs under $50/month
-- **Budget Monitoring**: Automated alerts at 80% of monthly budget
-- **Cost Optimization**: Auto-termination of unused resources
+- **Total Monthly**: Under $20 for moderate usage
+- **Budget Monitoring**: CloudWatch billing alerts
+- **Cost Optimization**: 
+  - Fargate Spot instances (70% savings)
+  - Scale to zero during idle times
+  - S3 lifecycle policies for audio cleanup
 
 ### User Experience Standards
 - **Ease of Use**: Upload to results in under 3 clicks
@@ -281,6 +327,28 @@
 - **School Adoption**: Positive feedback from pilot schools
 - **Scalability Proof**: System handles growth without degradation
 - **ROI Demonstration**: Clear value proposition for schools
+
+---
+
+## Infrastructure Status Update (August 17, 2025)
+
+### Architecture Decision
+- ❌ **EC2 Node.js**: Amazon Linux 2 incompatible with modern Node.js versions
+- ✅ **ECS Fargate**: Selected for backend API hosting
+- ✅ **AWS Amplify**: Frontend hosting solution
+- ✅ **Aurora MySQL**: Existing database ready for ClassReflect schema
+
+### Completed EC2 Preparations
+- ✅ **Disk Space**: Cleaned from 63% to 42% usage
+- ✅ **SSM Session Manager**: Configured for secure access
+- ✅ **Automatic Maintenance**: Weekly log cleanup
+- ✅ **Old Site Management**: eladoreruffles.gdwd.co.uk in maintenance mode
+
+### Next Steps for ClassReflect
+- **Backend**: Set up ECS Fargate cluster and service
+- **Frontend**: Initialize AWS Amplify project
+- **Database**: Create ClassReflect schema in Aurora
+- **Domains**: Configure api.classreflect.gdwd.co.uk and classreflect.gdwd.co.uk
 
 ---
 

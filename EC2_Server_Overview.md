@@ -198,9 +198,51 @@ sudo certbot renew            # Actual renewal
 ### Webmin Control Panel
 - **Version**: 2.303
 - **Port**: 10000 (listening)
-- **Status**: Active and running
-- **Access via SSM**: `aws ssm start-session --target i-0a025c505616127d2 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["10000"],"localPortNumber":["10000"]}' --region eu-west-2`
-- **Then browse**: https://localhost:10000
+- **Status**: Active and running ✅
+- **Username**: root
+- **Password**: YourNewPassword123 (changed Aug 17, 2025)
+
+#### Access Methods
+
+**Method 1: SSM Port Forwarding (Recommended)**
+```bash
+aws ssm start-session \
+    --target i-0a025c505616127d2 \
+    --document-name AWS-StartPortForwardingSession \
+    --parameters '{"portNumber":["10000"],"localPortNumber":["10000"]}' \
+    --region eu-west-2
+# Then browse to: http://localhost:10000
+```
+
+**Method 2: SSH Tunnel**
+```bash
+ssh -i /Users/guntarsdikis/websites/EC2/GDWD2-new.pem \
+    -L 10000:localhost:10000 \
+    ec2-user@3.9.156.34
+# Then browse to: http://localhost:10000
+```
+
+#### Common Webmin Tasks
+- **System Info**: Dashboard with CPU, memory, disk usage
+- **File Manager**: Tools → File Manager
+- **Service Management**: Servers → Apache Webserver
+- **User Management**: System → Users and Groups
+- **Backup**: System → Filesystem Backup
+
+#### Webmin Management
+```bash
+# Change Webmin password
+sudo /usr/libexec/webmin/changepass.pl /etc/webmin root newpassword
+
+# Restart Webmin
+sudo systemctl restart webmin
+
+# Check status
+sudo systemctl status webmin
+
+# View logs
+sudo tail -f /var/webmin/miniserv.log
+```
 
 ## SSM Session Manager Access
 

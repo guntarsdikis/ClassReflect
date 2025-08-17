@@ -23,7 +23,19 @@
       "Bash(mv:*)",
       "Bash(npm init:*)",
       "Bash(npm install:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(aws s3api create-bucket:*)",
+      "Bash(aws s3api put-bucket-versioning:*)",
+      "Bash(terraform:*)",
+      "Bash(aws ecr create-repository:*)",
+      "Bash(npm run build:*)",
+      "Bash(docker build:*)",
+      "Bash(docker tag:*)",
+      "Bash(docker push:*)",
+      "Bash(aws s3api put-bucket-encryption:*)",
+      "Bash(aws sqs create-queue:*)",
+      "Bash(aws ecs create-cluster:*)",
+      "Bash(aws amplify create-app:*)"
     ],
     "deny": [],
     "ask": []

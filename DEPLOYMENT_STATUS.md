@@ -55,9 +55,10 @@
 
 ### 9. ECS Fargate Service
 - **Service Name**: `classreflect-api-service`
-- **Task Definition**: `classreflect-api:1`
+- **Task Definition**: `classreflect-api:2`
 - **CPU/Memory**: 256 CPU units, 512 MB
-- **Status**: ✅ Deployed and running
+- **Database**: Connected to Aurora MySQL via Secrets Manager
+- **Status**: ✅ Deployed and running with database connectivity
 
 ### 10. DNS Configuration
 - **Frontend**: `classreflect.gdwd.co.uk` → AWS Amplify CloudFront
@@ -75,10 +76,11 @@
 ## 🔄 Remaining Configuration Tasks
 
 ### 1. Database Setup (Aurora MySQL)
-- [ ] Create ClassReflect database schema
-- [ ] Set up database credentials in AWS Secrets Manager
-- [ ] Update ECS task with database credentials
-- [ ] Test database connectivity
+- [x] Create ClassReflect database schema
+- [x] Set up database credentials in AWS Secrets Manager  
+- [x] Update ECS task with database credentials
+- [x] Fix Docker architecture issue (Apple Silicon → AMD64)
+- [x] Backend successfully connected to Aurora MySQL
 
 ### 2. SSL/HTTPS Configuration
 - [ ] Request SSL certificate for api.classreflect.gdwd.co.uk

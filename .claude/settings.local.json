@@ -51,7 +51,10 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(aws ecs describe-services:*)",
-      "Bash(aws ecs list-tasks:*)"
+      "Bash(aws ecs list-tasks:*)",
+      "Bash(aws logs tail:*)",
+      "Bash(aws ecs update-service:*)",
+      "Bash(aws ecs describe-tasks:*)"
     ],
     "deny": [],
     "ask": []

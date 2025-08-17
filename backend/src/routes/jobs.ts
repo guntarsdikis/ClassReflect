@@ -13,7 +13,7 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
     let query = `
       SELECT 
         aj.*,
-        t.name as teacher_name,
+        CONCAT(IFNULL(t.first_name, ''), ' ', IFNULL(t.last_name, '')) as teacher_name,
         s.name as school_name,
         tr.transcript_text as transcript_content,
         tr.word_count,
@@ -55,10 +55,10 @@ router.get('/:jobId', async (req: Request, res: Response) => {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT 
         aj.*,
-        t.name as teacher_name,
+        CONCAT(IFNULL(t.first_name, ''), ' ', IFNULL(t.last_name, '')) as teacher_name,
         t.email as teacher_email,
         s.name as school_name,
-        tr.content as transcript_content,
+        tr.transcript_text as transcript_content,
         tr.word_count,
         ar.score,
         ar.feedback

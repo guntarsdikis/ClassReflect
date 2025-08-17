@@ -60,7 +60,9 @@
       "Bash(aws ecs stop-task:*)",
       "Bash(aws acm request-certificate:*)",
       "Bash(aws acm describe-certificate:*)",
-      "Bash(aws elbv2 describe-target-groups:*)"
+      "Bash(aws elbv2 describe-target-groups:*)",
+      "Bash(aws ec2 describe-key-pairs:*)",
+      "Bash(aws ec2 run-instances:*)"
     ],
     "deny": [],
     "ask": []

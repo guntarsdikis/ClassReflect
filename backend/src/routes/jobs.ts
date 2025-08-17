@@ -14,10 +14,14 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
       SELECT 
         aj.*,
         t.name as teacher_name,
-        s.name as school_name
+        s.name as school_name,
+        tr.transcript_text as transcript_content,
+        tr.word_count,
+        tr.confidence_score
       FROM audio_jobs aj
       JOIN teachers t ON aj.teacher_id = t.id
       JOIN schools s ON aj.school_id = s.id
+      LEFT JOIN transcripts tr ON aj.id = tr.job_id
       WHERE aj.teacher_id = ?
     `;
     

@@ -80,7 +80,9 @@
       "Bash(aws ec2 modify-instance-attribute:*)",
       "Bash(aws s3 cp:*)",
       "Bash(aws ec2 start-instances:*)",
-      "Bash(aws events list-rules:*)"
+      "Bash(aws events list-rules:*)",
+      "Bash(npm run docker:build:*)",
+      "Bash(npm run docker:push:*)"
     ],
     "deny": [],
     "ask": []

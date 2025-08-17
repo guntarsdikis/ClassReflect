@@ -62,7 +62,11 @@
       "Bash(aws acm describe-certificate:*)",
       "Bash(aws elbv2 describe-target-groups:*)",
       "Bash(aws ec2 describe-key-pairs:*)",
-      "Bash(aws ec2 run-instances:*)"
+      "Bash(aws ec2 run-instances:*)",
+      "Bash(zip:*)",
+      "Bash(aws lambda invoke:*)",
+      "Bash(cat:*)",
+      "Bash(aws lambda update-function-code:*)"
     ],
     "deny": [],
     "ask": []

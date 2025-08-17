@@ -10,6 +10,9 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
     const { teacherId } = req.params;
     const { status, limit = '50', offset = '0' } = req.query;
 
+    // Debug logging
+    console.log('Request params:', { teacherId, status, limit, offset });
+
     // Ensure we have valid numbers for limit and offset
     const limitNum = parseInt(limit as string, 10) || 50;
     const offsetNum = parseInt(offset as string, 10) || 0;
@@ -19,7 +22,8 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid teacher ID' });
     }
 
-    let query = `
+    // Use query instead of execute to avoid prepared statement issues
+    let queryStr = `
       SELECT 
         aj.*,
         t.first_name,
@@ -32,20 +36,18 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
       JOIN teachers t ON aj.teacher_id = t.id
       JOIN schools s ON aj.school_id = s.id
       LEFT JOIN transcripts tr ON aj.id = tr.job_id
-      WHERE aj.teacher_id = ?
+      WHERE aj.teacher_id = ${pool.escape(teacherIdNum)}
     `;
-    
-    const params: any[] = [teacherIdNum];
 
     if (status) {
-      query += ' AND aj.status = ?';
-      params.push(status);
+      queryStr += ` AND aj.status = ${pool.escape(status)}`;
     }
 
-    query += ' ORDER BY aj.created_at DESC LIMIT ? OFFSET ?';
-    params.push(limitNum, offsetNum);
+    queryStr += ` ORDER BY aj.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
 
-    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    console.log('Executing query:', queryStr);
+    
+    const [rows] = await pool.query<RowDataPacket[]>(queryStr);
 
     // Format the response to include teacher_name
     const formattedRows = rows.map((row: any) => ({

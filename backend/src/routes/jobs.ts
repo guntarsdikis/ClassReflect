@@ -8,12 +8,22 @@ const router = Router();
 router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
   try {
     const { teacherId } = req.params;
-    const { status, limit = 50, offset = 0 } = req.query;
+    const { status, limit = '50', offset = '0' } = req.query;
+
+    // Ensure we have valid numbers for limit and offset
+    const limitNum = parseInt(limit as string, 10) || 50;
+    const offsetNum = parseInt(offset as string, 10) || 0;
+    const teacherIdNum = parseInt(teacherId, 10);
+
+    if (isNaN(teacherIdNum)) {
+      return res.status(400).json({ error: 'Invalid teacher ID' });
+    }
 
     let query = `
       SELECT 
         aj.*,
-        CONCAT(IFNULL(t.first_name, ''), ' ', IFNULL(t.last_name, '')) as teacher_name,
+        t.first_name,
+        t.last_name,
         s.name as school_name,
         tr.transcript_text as transcript_content,
         tr.word_count,
@@ -25,7 +35,7 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
       WHERE aj.teacher_id = ?
     `;
     
-    const params: any[] = [teacherId];
+    const params: any[] = [teacherIdNum];
 
     if (status) {
       query += ' AND aj.status = ?';
@@ -33,13 +43,19 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
     }
 
     query += ' ORDER BY aj.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit as string), parseInt(offset as string));
+    params.push(limitNum, offsetNum);
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
 
+    // Format the response to include teacher_name
+    const formattedRows = rows.map((row: any) => ({
+      ...row,
+      teacher_name: `${row.first_name || ''} ${row.last_name || ''}`.trim()
+    }));
+
     res.json({
-      jobs: rows,
-      count: rows.length
+      jobs: formattedRows,
+      count: formattedRows.length
     });
   } catch (error) {
     console.error('Error fetching jobs:', error);
@@ -55,7 +71,8 @@ router.get('/:jobId', async (req: Request, res: Response) => {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT 
         aj.*,
-        CONCAT(IFNULL(t.first_name, ''), ' ', IFNULL(t.last_name, '')) as teacher_name,
+        t.first_name,
+        t.last_name,
         t.email as teacher_email,
         s.name as school_name,
         tr.transcript_text as transcript_content,
@@ -75,7 +92,13 @@ router.get('/:jobId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    res.json(rows[0]);
+    // Format the response to include teacher_name
+    const formattedRow = {
+      ...rows[0],
+      teacher_name: `${rows[0].first_name || ''} ${rows[0].last_name || ''}`.trim()
+    };
+
+    res.json(formattedRow);
   } catch (error) {
     console.error('Error fetching job:', error);
     res.status(500).json({ error: 'Failed to fetch job details' });

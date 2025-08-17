@@ -15,10 +15,14 @@ sudo yum install -y unzip
 unzip awscliv2.zip
 sudo ./aws/install
 
-# Install Python packages
+# Install Python packages optimized for CPU processing
 sudo python3.11 -m pip install --upgrade pip
 sudo python3.11 -m pip install openai-whisper torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-sudo python3.11 -m pip install boto3 mysql-connector-python
+sudo python3.11 -m pip install boto3 mysql-connector-python faster-whisper
+
+# Optimize for t3.xlarge performance
+echo 'export OMP_NUM_THREADS=4' >> /home/ec2-user/.bashrc
+echo 'export MKL_NUM_THREADS=4' >> /home/ec2-user/.bashrc
 
 # Create whisper processing directory
 sudo mkdir -p /opt/whisper
@@ -49,10 +53,10 @@ class WhisperProcessor:
         self.sqs_client = boto3.client('sqs')
         self.secrets_client = boto3.client('secretsmanager')
         
-        # Load Whisper model
-        logger.info("Loading Whisper model...")
-        self.model = whisper.load_model("base")
-        logger.info("Whisper model loaded successfully")
+        # Load Whisper model (large model for better accuracy on t3.xlarge)
+        logger.info("Loading Whisper large model...")
+        self.model = whisper.load_model("large")
+        logger.info("Whisper large model loaded successfully")
         
         # Get database credentials
         self.db_config = self._get_db_credentials()

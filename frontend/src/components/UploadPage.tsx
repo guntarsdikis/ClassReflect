@@ -8,7 +8,13 @@ const UploadPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // For demo purposes, using hardcoded teacher/school IDs
+  // In production, these would come from authentication
+  const teacherId = 1;
+  const schoolId = 1;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -36,10 +42,12 @@ const UploadPage: React.FC = () => {
     
     const formData = new FormData();
     formData.append('audio', file);
+    formData.append('teacherId', teacherId.toString());
+    formData.append('schoolId', schoolId.toString());
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/upload`,
+        `${process.env.REACT_APP_API_URL}/api/upload/direct`,
         formData,
         {
           headers: {
@@ -57,13 +65,14 @@ const UploadPage: React.FC = () => {
       setUploadComplete(true);
       setUploading(false);
       setUploadProgress(100);
+      setJobId(response.data.jobId);
       
       // Store job ID for tracking
       if (response.data.jobId) {
         localStorage.setItem('lastJobId', response.data.jobId);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Upload failed. Please try again.');
+      setError(err.response?.data?.error || 'Upload failed. Please try again.');
       setUploading(false);
       setUploadProgress(0);
     }
@@ -146,6 +155,9 @@ const UploadPage: React.FC = () => {
             <div className="success-icon">✅</div>
             <h3>Upload Successful!</h3>
             <p>Your audio is being processed. This typically takes 5-10 minutes.</p>
+            {jobId && (
+              <p className="job-id">Job ID: <code>{jobId}</code></p>
+            )}
             <p>You can check the results page to track progress.</p>
           </div>
         )}

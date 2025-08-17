@@ -137,26 +137,28 @@ User → Amplify → ECS API → S3/SQS → t3.xlarge (on-demand) → Aurora
   - ✅ Database connectivity via mysql2 driver
   - ✅ Connection pool configured for Aurora MySQL
   - ✅ Environment variables managed via Secrets Manager
-  - ⏳ File upload handling (max 500MB, formats: mp3, wav, m4a)
-  - ⏳ Database connection pool to Aurora MySQL
+  - ✅ File upload handling (max 500MB, formats: mp3, wav, m4a)
+  - ✅ S3 integration for audio file storage
+  - ✅ SQS integration for job queue management
+  - ✅ Complete API endpoints: /upload, /jobs, /schools, /teachers
   - ⏳ JWT authentication integration with AWS Cognito
   - ⏳ Request validation and security middleware
-- **Success Criteria**: ✅ API responds to health checks and basic endpoints
-- **Status**: Basic API deployed and accessible
+- **Success Criteria**: ✅ API responds to health checks and file uploads
+- **Status**: Full API deployed with file upload capabilities
 
-### Task 2.3: AWS Services Integration
+### Task 2.3: AWS Services Integration ✅ COMPLETED
 - **Objective**: Connect ECS API to AWS services for processing pipeline
-- **Required Integrations**:
-  - S3 service for temporary audio file storage
-  - SQS queue for job management and processing triggers
-  - ECS Task Role with permissions for S3, SQS, Aurora
-  - Secrets Manager for database credentials
-  - CloudWatch for logging and monitoring
+- **Completed Integrations**:
+  - ✅ S3 service for audio file storage (direct upload & pre-signed URLs)
+  - ✅ SQS queue for job management and processing triggers
+  - ✅ ECS Task Role with permissions for S3, SQS, Aurora
+  - ✅ Secrets Manager for database credentials
+  - ✅ CloudWatch for logging and monitoring
 - **Architecture Benefits**:
   - Fully managed container service
   - Automatic scaling based on load
   - No infrastructure management
-- **Success Criteria**: API can upload files to S3 and trigger processing
+- **Success Criteria**: ✅ API can upload files to S3 and trigger processing
 
 ### Task 2.4: API Gateway and Domain Configuration
 - **Objective**: Expose ECS API through custom domain
@@ -169,6 +171,25 @@ User → Amplify → ECS API → S3/SQS → t3.xlarge (on-demand) → Aurora
   - Production: https://api.classreflect.gdwd.co.uk
   - Alternative: Direct ALB endpoint as backup
 - **Success Criteria**: API accessible via HTTPS with custom domain
+
+## Phase 2.5: Frontend-Backend Integration ✅ COMPLETED
+
+### Task 2.5: Frontend API Integration ✅ COMPLETED
+- **Objective**: Connect React frontend to ECS API for file uploads
+- **Completed Components**:
+  - ✅ Updated UploadPage.tsx to use backend API endpoints
+  - ✅ Added teacher/school ID parameters for demo
+  - ✅ Configured production environment variables (.env.production)
+  - ✅ Updated ResultsPage.tsx to display real job data from API
+  - ✅ Added proper error handling and progress tracking
+  - ✅ Integrated job status polling (10-second intervals)
+- **API Endpoints Used**:
+  - ✅ POST /api/upload/direct - Direct file upload with progress
+  - ✅ GET /api/jobs/teacher/{id} - Fetch teacher's jobs
+  - ✅ Job status tracking: pending → uploading → queued → processing → completed
+- **Demo Data**: Added test school and teacher to database
+- **Success Criteria**: ✅ Frontend can upload files and track job status
+- **Status**: Full integration complete, ready for production deployment
 
 ---
 

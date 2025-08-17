@@ -4,22 +4,26 @@ import './ResultsPage.css';
 
 interface Job {
   id: string;
-  fileName: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  createdAt: string;
-  completedAt?: string;
-  transcript?: string;
-  analysis?: {
-    strengths: string[];
-    improvements: string[];
-    score: number;
-  };
+  file_name: string;
+  status: 'pending' | 'uploading' | 'queued' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+  processing_completed_at?: string;
+  teacher_name?: string;
+  school_name?: string;
+  transcript_content?: string;
+  score?: number;
+  feedback?: string;
+  error_message?: string;
 }
 
 const ResultsPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  
+  // For demo purposes, using hardcoded teacher ID
+  // In production, this would come from authentication
+  const teacherId = 1;
 
   useEffect(() => {
     fetchJobs();
@@ -29,44 +33,11 @@ const ResultsPage: React.FC = () => {
 
   const fetchJobs = async () => {
     try {
-      // Mock data for demonstration
-      const mockJobs: Job[] = [
-        {
-          id: '1',
-          fileName: 'classroom_session_monday.mp3',
-          status: 'completed',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-          completedAt: new Date().toISOString(),
-          transcript: 'Sample transcript of the classroom session...',
-          analysis: {
-            strengths: [
-              'Clear communication and instruction',
-              'Good student engagement techniques',
-              'Effective use of questioning'
-            ],
-            improvements: [
-              'Could increase wait time after questions',
-              'Consider more varied teaching methods',
-              'Encourage more student-to-student interaction'
-            ],
-            score: 82
-          }
-        },
-        {
-          id: '2',
-          fileName: 'classroom_session_tuesday.mp3',
-          status: 'processing',
-          createdAt: new Date(Date.now() - 600000).toISOString()
-        },
-        {
-          id: '3',
-          fileName: 'classroom_session_wednesday.mp3',
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        }
-      ];
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/jobs/teacher/${teacherId}`
+      );
       
-      setJobs(mockJobs);
+      setJobs(response.data.jobs || []);
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
@@ -78,6 +49,8 @@ const ResultsPage: React.FC = () => {
     switch (status) {
       case 'completed': return '✅';
       case 'processing': return '⏳';
+      case 'queued': return '⏳';
+      case 'uploading': return '📤';
       case 'pending': return '📋';
       case 'failed': return '❌';
       default: return '❓';
@@ -88,6 +61,8 @@ const ResultsPage: React.FC = () => {
     switch (status) {
       case 'completed': return 'status-completed';
       case 'processing': return 'status-processing';
+      case 'queued': return 'status-processing';
+      case 'uploading': return 'status-processing';
       case 'pending': return 'status-pending';
       case 'failed': return 'status-failed';
       default: return '';
@@ -123,8 +98,8 @@ const ResultsPage: React.FC = () => {
               >
                 <div className="job-header">
                   <div className="job-info">
-                    <h3>{job.fileName}</h3>
-                    <p className="job-date">{formatDate(job.createdAt)}</p>
+                    <h3>{job.file_name}</h3>
+                    <p className="job-date">{formatDate(job.created_at)}</p>
                   </div>
                   <div className={`job-status ${getStatusColor(job.status)}`}>
                     <span className="status-icon">{getStatusIcon(job.status)}</span>
@@ -132,10 +107,10 @@ const ResultsPage: React.FC = () => {
                   </div>
                 </div>
                 
-                {job.status === 'completed' && job.analysis && (
+                {job.status === 'completed' && job.score && (
                   <div className="job-score">
                     <div className="score-circle">
-                      <span className="score-value">{job.analysis.score}</span>
+                      <span className="score-value">{job.score}</span>
                       <span className="score-label">Score</span>
                     </div>
                   </div>
@@ -146,34 +121,57 @@ const ResultsPage: React.FC = () => {
         )}
       </div>
 
-      {selectedJob && selectedJob.status === 'completed' && selectedJob.analysis && (
+      {selectedJob && selectedJob.status === 'completed' && (
         <div className="card analysis-detail">
-          <h2 className="card-title">Detailed Analysis</h2>
+          <h2 className="card-title">Job Details</h2>
           
           <div className="analysis-section">
-            <h3>📈 Teaching Strengths</h3>
-            <ul className="analysis-list">
-              {selectedJob.analysis.strengths.map((strength, index) => (
-                <li key={index}>{strength}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="analysis-section">
-            <h3>💡 Areas for Improvement</h3>
-            <ul className="analysis-list">
-              {selectedJob.analysis.improvements.map((improvement, index) => (
-                <li key={index}>{improvement}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="analysis-section">
-            <h3>📝 Transcript Preview</h3>
-            <div className="transcript-preview">
-              {selectedJob.transcript?.substring(0, 500)}...
+            <h3>📊 Job Information</h3>
+            <div className="job-details">
+              <p><strong>File:</strong> {selectedJob.file_name}</p>
+              <p><strong>Created:</strong> {formatDate(selectedJob.created_at)}</p>
+              {selectedJob.processing_completed_at && (
+                <p><strong>Completed:</strong> {formatDate(selectedJob.processing_completed_at)}</p>
+              )}
+              {selectedJob.score && (
+                <p><strong>Score:</strong> {selectedJob.score}/100</p>
+              )}
             </div>
-            <button className="btn btn-secondary">Download Full Transcript</button>
+          </div>
+
+          {selectedJob.feedback && (
+            <div className="analysis-section">
+              <h3>💡 Feedback</h3>
+              <div className="feedback-content">
+                {selectedJob.feedback}
+              </div>
+            </div>
+          )}
+
+          {selectedJob.transcript_content && (
+            <div className="analysis-section">
+              <h3>📝 Transcript</h3>
+              <div className="transcript-preview">
+                {selectedJob.transcript_content.substring(0, 1000)}
+                {selectedJob.transcript_content.length > 1000 && '...'}
+              </div>
+            </div>
+          )}
+
+          {selectedJob.status === 'completed' && !selectedJob.transcript_content && (
+            <div className="analysis-section">
+              <p className="note">Processing completed but no transcript available yet. This might be added after Whisper processing is implemented.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedJob && selectedJob.status === 'failed' && selectedJob.error_message && (
+        <div className="card error-detail">
+          <h2 className="card-title">Error Details</h2>
+          <div className="error-content">
+            <p><strong>Error:</strong> {selectedJob.error_message}</p>
+            <p>Please try uploading the file again or contact support if the problem persists.</p>
           </div>
         </div>
       )}

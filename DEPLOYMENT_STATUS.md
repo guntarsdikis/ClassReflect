@@ -81,13 +81,27 @@
 - [x] Update ECS task with database credentials
 - [x] Fix Docker architecture issue (Apple Silicon → AMD64)
 - [x] Backend successfully connected to Aurora MySQL
+- [x] Demo school and teacher data added
 
-### 2. SSL/HTTPS Configuration
+### 2. Frontend-Backend Integration
+- [x] Implement file upload API endpoints (S3, SQS integration)
+- [x] Connect frontend upload page to backend API
+- [x] Add job tracking and status display
+- [x] Configure production environment variables
+- [x] Update ResultsPage to display real job data
+
+### 3. SSL/HTTPS Configuration
 - [ ] Request SSL certificate for api.classreflect.gdwd.co.uk
 - [ ] Configure HTTPS listener on ALB
 - [ ] Update frontend to use HTTPS API endpoint
 
-### 3. Monitoring & Operations
+### 4. Audio Processing Pipeline
+- [ ] Set up Whisper processing on EC2
+- [ ] Implement SQS job worker
+- [ ] Configure auto-scaling for processing instances
+- [ ] Add AI-powered analysis features
+
+### 5. Monitoring & Operations
 - [ ] Configure CloudWatch alarms
 - [ ] Set up application logging
 - [ ] Create backup procedures

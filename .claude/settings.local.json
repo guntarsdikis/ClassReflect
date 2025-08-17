@@ -18,7 +18,12 @@
       "Bash(aws iam add-role-to-instance-profile:*)",
       "Bash(aws ec2 associate-iam-instance-profile:*)",
       "Bash(curl:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

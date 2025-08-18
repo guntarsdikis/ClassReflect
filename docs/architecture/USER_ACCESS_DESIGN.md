@@ -3,74 +3,163 @@
 ## Table of Contents
 1. [Overview](#overview)
 2. [User Roles & Permissions](#user-roles--permissions)
-3. [Authentication Architecture](#authentication-architecture)
-4. [Analysis Templates System](#analysis-templates-system)
-5. [Upload Workflows](#upload-workflows)
-6. [Database Schema](#database-schema)
-7. [API Endpoints](#api-endpoints)
-8. [User Interface Specifications](#user-interface-specifications)
-9. [Security Considerations](#security-considerations)
-10. [Implementation Roadmap](#implementation-roadmap)
+3. [User Management Flow](#user-management-flow)
+4. [Authentication Architecture](#authentication-architecture)
+5. [Analysis Templates System](#analysis-templates-system)
+6. [Upload Workflows](#upload-workflows)
+7. [Database Schema](#database-schema)
+8. [API Endpoints](#api-endpoints)
+9. [User Interface Specifications](#user-interface-specifications)
+10. [Security Considerations](#security-considerations)
+11. [Implementation Roadmap](#implementation-roadmap)
 
 ## Overview
 
-ClassReflect implements a multi-tenant architecture where schools are completely isolated from each other, with role-based access control within each school. The system supports hierarchical user management with customizable analysis templates for different educational contexts.
+ClassReflect implements a controlled, invitation-only multi-tenant architecture with hierarchical user management. There is no self-registration - all accounts are created through a top-down provisioning model starting from Super Admin → School → Teachers.
 
 ### Core Principles
+- **Controlled Access**: No public registration - all accounts provisioned by administrators
+- **Hierarchical Management**: Super Admin creates schools, schools manage their teachers
 - **Data Isolation**: Complete separation between schools
-- **Role-Based Access**: Granular permissions based on user role
-- **Template Flexibility**: Customizable analysis criteria per curriculum
-- **Audit Trail**: All actions tracked for compliance
-- **Privacy First**: FERPA/GDPR compliant design
+- **Role-Based Permissions**: Teachers have view-only access, managers control uploads and criteria
+- **Audit Trail**: All administrative actions tracked for compliance
+- **Privacy First**: FERPA/GDPR compliant design with controlled data access
 
 ## User Roles & Permissions
 
 ### 1. Teacher Role
-**Purpose**: Classroom-level access for individual educators
+**Purpose**: View-only access to personal teaching feedback and recommendations
 
 **Permissions**:
-- ✅ Upload own recordings
-- ✅ View own analysis results
+- ✅ View own analysis results and feedback
+- ✅ View recommendations for improvement
 - ✅ Track personal progress over time
-- ✅ Select from available templates
-- ✅ View own historical data
-- ✅ Export own reports
+- ✅ View own historical data and trends
+- ✅ Download/export own reports
+- ✅ View assigned learning resources
+- ❌ Upload recordings
 - ❌ View other teachers' data
-- ❌ Modify templates
+- ❌ Modify analysis criteria
 - ❌ Access school settings
+- ❌ Create or invite users
 
 **Database Scope**: `WHERE teacher_id = current_user_id AND school_id = current_school_id`
 
 ### 2. School Manager Role
-**Purpose**: School-level administration and oversight
+**Purpose**: School-level administration, uploads, and criteria management
 
 **Permissions**:
-- ✅ All Teacher permissions
 - ✅ Upload recordings for any teacher
+- ✅ Set evaluation criteria per recording
+- ✅ Configure analysis templates and parameters
+- ✅ Create and manage teacher accounts
 - ✅ View all teachers' data in school
-- ✅ Create/modify school templates
-- ✅ Set analysis parameters per recording
-- ✅ Manage teacher accounts
+- ✅ Generate school-wide reports
+- ✅ Set default evaluation criteria
+- ✅ Manage curriculum-based templates
+- ✅ Assign recordings to teachers
 - ✅ View school-wide analytics
-- ✅ Export school reports
-- ✅ Configure default settings
+- ✅ Export all school data
 - ❌ Access other schools' data
-- ❌ Modify global templates
+- ❌ Create schools
+- ❌ Modify platform settings
 
 **Database Scope**: `WHERE school_id = current_school_id`
 
-### 3. Super Admin Role (Future)
-**Purpose**: Platform-level administration
+### 3. Super Admin Role
+**Purpose**: Platform-level administration and school provisioning
 
 **Permissions**:
-- ✅ All School Manager permissions
-- ✅ Access all schools
-- ✅ Create global templates
-- ✅ Platform analytics
-- ✅ User management across schools
-- ✅ System configuration
+- ✅ Create new schools
+- ✅ Create initial school manager accounts
+- ✅ Access all schools' data
+- ✅ Configure global templates
+- ✅ Platform-wide analytics
+- ✅ Manage subscription and billing
+- ✅ System configuration and settings
+- ✅ Audit all platform activities
+- ✅ Suspend/activate schools
+- ✅ Technical support access
 
 **Database Scope**: No restrictions
+
+## User Management Flow
+
+### Account Creation Hierarchy
+
+```
+Super Admin
+    ↓ Creates
+School Account + Initial School Manager
+    ↓ Creates
+Teacher Accounts
+```
+
+### 1. School Provisioning (Super Admin)
+
+**Process**:
+1. Super Admin logs into platform admin panel
+2. Creates new school with:
+   - School name and details
+   - Subscription tier and limits
+   - Initial school manager account
+3. System generates:
+   - School ID (UUID)
+   - Temporary password for school manager
+4. Email sent to school manager with:
+   - Login credentials
+   - Setup instructions
+   - Password reset link
+
+**No Self-Service**: Schools cannot sign up themselves - must be provisioned by ClassReflect team.
+
+### 2. Teacher Account Creation (School Manager)
+
+**Process**:
+1. School Manager logs into school dashboard
+2. Navigates to "Teacher Management"
+3. Creates teacher account with:
+   - Email address
+   - Name and subjects
+   - Grade levels
+   - Initial permissions (view-only by default)
+4. System generates:
+   - Teacher ID (UUID)
+   - Temporary password
+5. Email sent to teacher with:
+   - Welcome message
+   - Login credentials
+   - Password reset link
+   - Basic usage guide
+
+**Bulk Creation Option**:
+- Upload CSV with teacher details
+- System validates and creates accounts
+- Batch email notifications sent
+
+### 3. Account Activation Flow
+
+```
+New User Receives Email
+    ↓
+Clicks Activation Link
+    ↓
+Sets New Password
+    ↓
+Completes Profile (optional)
+    ↓
+Accesses Dashboard
+```
+
+### 4. No Public Registration
+
+**Important**: The system has no public registration endpoints. All accounts must be created through the administrative hierarchy:
+
+- ❌ No "Sign Up" button on login page
+- ❌ No self-service school registration
+- ❌ No teacher self-registration
+- ✅ Only "Login" and "Forgot Password" options
+- ✅ All accounts pre-provisioned by administrators
 
 ## Authentication Architecture
 
@@ -268,45 +357,65 @@ School Templates (Customized)
 
 ## Upload Workflows
 
-### Teacher Upload Flow
+**Important**: Only School Managers can upload recordings. Teachers have view-only access to their results.
 
-```
-1. Teacher Login
-   └── Dashboard Display
-       └── "Upload Recording" Button
-           └── Upload Modal
-               ├── File Selection
-               ├── Auto-filled Class Info
-               ├── Optional Template Override
-               └── Submit
-                   ├── File → S3
-                   ├── Job → SQS
-                   ├── Status → "Processing"
-                   └── Dashboard Update
-```
-
-### School Manager Upload Flow
+### School Manager Upload Flow (Primary)
 
 ```
 1. School Manager Login
    └── Dashboard Display
-       └── "Upload for Teacher" Button
-           └── Enhanced Upload Modal
-               ├── Teacher Selection (Required)
-               ├── File Selection
-               ├── Template Selection (Required)
-               ├── Custom Variables
-               │   ├── Class Size
-               │   ├── Learning Objectives
-               │   ├── Special Considerations
-               │   └── Session Type
+       └── "Upload Recording" Button
+           └── Upload Configuration Modal
+               ├── Step 1: Teacher Selection (Required)
+               │   └── Select target teacher for this recording
+               ├── Step 2: Recording Details
+               │   ├── File Selection (audio/video)
+               │   ├── Class/Subject identification
+               │   ├── Date and time of recording
+               │   └── Session duration
+               ├── Step 3: Evaluation Criteria (Required)
+               │   ├── Select Base Template
+               │   │   ├── Curriculum-aligned templates
+               │   │   ├── Grade-specific templates
+               │   │   └── Custom school templates
+               │   ├── Customize Evaluation Parameters
+               │   │   ├── Focus areas (engagement, clarity, etc.)
+               │   │   ├── Weight adjustments
+               │   │   ├── Special considerations
+               │   │   └── Expected outcomes
+               │   └── Additional Context
+               │       ├── Class size and composition
+               │       ├── Learning objectives
+               │       ├── Lesson type (intro/review/assessment)
+               │       └── Student demographics (ESL, special needs)
                └── Submit
-                   ├── Validation
-                   ├── File → S3
-                   ├── Job → SQS with metadata
-                   ├── Audit Log Entry
-                   └── Notification to Teacher
+                   ├── Validation of all fields
+                   ├── File → S3 with metadata
+                   ├── Job → SQS with full criteria
+                   ├── Database entry with evaluation settings
+                   ├── Audit log of upload and criteria
+                   └── Email notification to teacher
 ```
+
+### Evaluation Criteria Configuration
+
+When uploading, School Managers must define:
+
+1. **Base Analysis Template**
+   - Curriculum standard (Common Core, State Standards, IB, etc.)
+   - Subject and grade level
+   - Pedagogical approach
+
+2. **Custom Parameters per Recording**
+   - Specific learning objectives for this lesson
+   - Areas of focus for evaluation
+   - Context-specific adjustments
+   - Special student needs considerations
+
+3. **Scoring Weights**
+   - Adjust importance of different evaluation categories
+   - Set minimum thresholds for recommendations
+   - Define success criteria
 
 ### Bulk Upload Flow (School Manager)
 
@@ -485,26 +594,68 @@ CREATE INDEX idx_audit_resource ON audit_log(resource_type, resource_id);
 // Headers: Authorization: Bearer <token>
 // Returns: UserProfile
 
+// --- School Manager Endpoints ---
+
 // GET /api/users/teachers (School Manager only)
 // Headers: Authorization: Bearer <token>
-// Returns: Teacher[]
+// Returns: Teacher[] // Only teachers in their school
 
-// POST /api/users/invite (School Manager only)
+// POST /api/users/teachers (School Manager only)
+// Creates new teacher account in their school
 {
   email: string;
-  role: 'teacher' | 'school_manager';
   firstName: string;
   lastName: string;
-  subjects?: string[];
-  grades?: string[];
+  subjects: string[];
+  grades: string[];
+  sendInviteEmail?: boolean; // Default: true
 }
-// Returns: { invitationId: string }
+// Returns: { teacherId: string, temporaryPassword: string }
 
-// PUT /api/users/:id (School Manager only)
+// PUT /api/users/teachers/:id (School Manager only)
 {
   subjects?: string[];
   grades?: string[];
   isActive?: boolean;
+}
+// Returns: { success: boolean }
+
+// POST /api/users/teachers/bulk (School Manager only)
+// Bulk create teacher accounts
+{
+  teachers: Array<{
+    email: string;
+    firstName: string;
+    lastName: string;
+    subjects: string[];
+    grades: string[];
+  }>;
+}
+// Returns: { created: number, failed: number, results: BulkResult[] }
+
+// --- Super Admin Endpoints ---
+
+// POST /api/admin/schools (Super Admin only)
+// Creates new school with initial manager
+{
+  schoolName: string;
+  domain: string;
+  subscriptionTier: 'basic' | 'professional' | 'enterprise';
+  managerEmail: string;
+  managerFirstName: string;
+  managerLastName: string;
+}
+// Returns: { schoolId: string, managerId: string }
+
+// GET /api/admin/schools (Super Admin only)
+// Returns: School[] // All schools in platform
+
+// PUT /api/admin/schools/:id (Super Admin only)
+{
+  subscriptionTier?: string;
+  isActive?: boolean;
+  maxTeachers?: number;
+  maxMonthlyUploads?: number;
 }
 // Returns: { success: boolean }
 ```
@@ -547,34 +698,56 @@ CREATE INDEX idx_audit_resource ON audit_log(resource_type, resource_id);
 // Returns: { assignmentId: string }
 ```
 
-### Upload Endpoints
+### Upload Endpoints (School Manager Only)
 
 ```typescript
-// POST /api/upload/recording
+// POST /api/upload/recording (School Manager only)
+// Single recording upload with evaluation criteria
 // Headers: Authorization: Bearer <token>
 // Form Data:
-//   - file: Audio file
-//   - templateId?: string
-//   - metadata?: JSON string
-// Returns: { jobId: string, status: string }
-
-// POST /api/upload/for-teacher (School Manager only)
-// Form Data:
-//   - file: Audio file
+//   - file: Audio/video file
 //   - teacherId: string (required)
-//   - templateId: string (required)
-//   - classSize?: number
-//   - subject?: string
-//   - grade?: string
-//   - learningObjectives?: string
-//   - specialConsiderations?: string
-//   - customVariables?: JSON string
+//   - evaluationCriteria: JSON string (required) containing:
+//     {
+//       templateId: string;
+//       customWeights: {
+//         engagement: number;
+//         clarity: number;
+//         management: number;
+//         assessment: number;
+//       };
+//       focusAreas: string[];
+//       learningObjectives: string;
+//       lessonType: 'introduction' | 'practice' | 'review' | 'assessment';
+//       contextualFactors: {
+//         classSize: number;
+//         eslStudents: number;
+//         specialNeeds: number;
+//         timeOfDay: string;
+//       };
+//       expectedOutcomes: string[];
+//       specialConsiderations: string;
+//     }
+//   - metadata: JSON string with recording details
 // Returns: { jobId: string, status: string }
 
 // POST /api/upload/bulk (School Manager only)
+// Bulk upload with individual criteria per recording
 // Form Data:
-//   - csv: CSV file with bulk upload data
-// Returns: { batchId: string, totalJobs: number }
+//   - files: Multiple audio/video files
+//   - criteriaMapping: JSON string mapping filenames to:
+//     {
+//       [filename]: {
+//         teacherId: string;
+//         evaluationCriteria: CriteriaObject;
+//       }
+//     }
+// Returns: { batchId: string, jobs: JobStatus[] }
+
+// GET /api/upload/templates (School Manager only)
+// Get available evaluation templates for upload
+// Query params: ?grade=3&subject=math&curriculum=common-core
+// Returns: Template[]
 ```
 
 ### Analytics Endpoints
@@ -618,7 +791,7 @@ CREATE INDEX idx_audit_resource ON audit_log(resource_type, resource_id);
 └─────────────────────────────────────────┘
 ```
 
-### Teacher Dashboard
+### Teacher Dashboard (View-Only)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -626,22 +799,25 @@ CREATE INDEX idx_audit_resource ON audit_log(resource_type, resource_id);
 │                │  Lincoln Elementary School               │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│  [📤 Upload Recording]  [📊 View Progress]  [⚙️ Settings] │
+│  [📊 My Progress]  [📈 Analytics]  [📥 Export]  [⚙️ Profile] │
 │                                                          │
 │  ┌─────────────────────────────────────────────────┐   │
-│  │  Recent Recordings                               │   │
+│  │  My Recent Evaluations                          │   │
 │  ├─────────────────────────────────────────────────┤   │
 │  │  📁 Math Class - Grade 3        Oct 25, 2024    │   │
+│  │     Uploaded by: Admin M. Roberts               │   │
 │  │     Status: ✅ Analyzed                         │   │
-│  │     Score: 85/100  [View Details]              │   │
+│  │     Score: 85/100  [View Feedback]             │   │
 │  │                                                 │   │
 │  │  📁 Science Lab - Grade 4       Oct 24, 2024    │   │
+│  │     Uploaded by: Admin M. Roberts               │   │
 │  │     Status: ⏳ Processing (45%)                 │   │
 │  │     Estimated: 5 minutes remaining              │   │
 │  │                                                 │   │
 │  │  📁 Reading Circle - Grade 3    Oct 23, 2024    │   │
+│  │     Uploaded by: Admin M. Roberts               │   │
 │  │     Status: ✅ Analyzed                         │   │
-│  │     Score: 92/100  [View Details]              │   │
+│  │     Score: 92/100  [View Feedback]             │   │
 │  └─────────────────────────────────────────────────┘   │
 │                                                          │
 │  ┌─────────────────────────────────────────────────┐   │
@@ -660,12 +836,12 @@ CREATE INDEX idx_audit_resource ON audit_log(resource_type, resource_id);
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  ClassReflect  │  Admin: Michael Roberts                │
+│  ClassReflect  │  School Admin: Michael Roberts          │
 │                │  Lincoln Elementary School               │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│  [📤 Upload for Teacher] [👥 Manage Teachers]           │
-│  [📋 Manage Templates] [📊 School Analytics]            │
+│  [📤 Upload Recording] [📋 Evaluation Criteria]         │
+│  [👥 Manage Teachers] [📊 School Analytics]             │
 │                                                          │
 │  ┌─────────────────────────────────────────────────┐   │
 │  │  School Overview                                 │   │
@@ -701,52 +877,67 @@ CREATE INDEX idx_audit_resource ON audit_log(resource_type, resource_id);
 └──────────────────────────────────────────────────────────┘
 ```
 
-### Upload Modal (School Manager)
+### Upload Modal with Evaluation Criteria (School Manager)
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Upload Recording for Teacher                        │
+│  Upload Recording & Set Evaluation Criteria          │
 ├──────────────────────────────────────────────────────┤
 │                                                       │
-│  Select Teacher: *                                   │
+│  STEP 1: Recording Details                           │
+│  ─────────────────────────                           │
+│  Teacher: * [▼ Sarah Johnson - Grade 3         ]     │
+│  Subject:   [▼ Mathematics    ]  Grade: [▼ 3   ]     │
+│  Date/Time: [Oct 25, 2024 10:30 AM            ]      │
+│                                                       │
+│  Audio/Video File: *                                 │
 │  ┌─────────────────────────────────────────────┐    │
-│  │ ▼ Sarah Johnson - Grade 3                   │    │
+│  │  📎 math-class-oct25.mp4 (45:32)            │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                       │
-│  Class Information:                                  │
-│  Subject: [Mathematics    ▼]  Grade: [3      ▼]    │
-│  Class Size: [25        ]                           │
-│                                                       │
-│  Analysis Template: *                                │
+│  STEP 2: Evaluation Criteria Configuration *         │
+│  ─────────────────────────────────────────           │
+│  Base Template:                                      │
 │  ┌─────────────────────────────────────────────┐    │
-│  │ ○ School Default                             │    │
-│  │ ● Elementary Math Standard                   │    │
-│  │ ○ Custom Math with Focus on Problem Solving  │    │
-│  │ ○ [+ Create New Template]                    │    │
+│  │ ● Common Core Math Grade 3                  │    │
+│  │ ○ State Standards Math Elementary           │    │
+│  │ ○ Custom School Template                    │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                       │
-│  Session Type:                                       │
-│  [●] New Concept  [ ] Review  [ ] Assessment        │
+│  Evaluation Focus Areas: (Adjust weights)            │
+│  Student Engagement:        [████████░░] 40%         │
+│  Instruction Clarity:       [██████░░░░] 30%         │
+│  Classroom Management:      [████░░░░░░] 20%         │
+│  Learning Assessment:       [██░░░░░░░░] 10%         │
 │                                                       │
-│  Learning Objectives:                                │
+│  Lesson Context:                                     │
+│  Type: [●] Introduction [ ] Practice [ ] Review      │
+│  Class Size: [25]  ESL: [5]  Special Needs: [2]     │
+│                                                       │
+│  Learning Objectives: *                              │
 │  ┌─────────────────────────────────────────────┐    │
-│  │ Introduction to fractions and their         │    │
-│  │ real-world applications                      │    │
+│  │ Students will understand fractions as       │    │
+│  │ parts of a whole and apply to real-world    │    │
+│  │ problems involving pizza and sharing        │    │
+│  └─────────────────────────────────────────────┘    │
+│                                                       │
+│  Expected Outcomes: (What defines success?)          │
+│  ┌─────────────────────────────────────────────┐    │
+│  │ • 80% student participation                 │    │
+│  │ • Clear understanding checks every 5 min    │    │
+│  │ • Differentiated instruction for ESL        │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                       │
 │  Special Considerations:                             │
 │  ┌─────────────────────────────────────────────┐    │
-│  │ 5 ESL students, 2 IEP students              │    │
+│  │ First lesson after fall break, may need     │    │
+│  │ extra engagement strategies                  │    │
 │  └─────────────────────────────────────────────┘    │
 │                                                       │
-│  Audio File:                                         │
-│  ┌─────────────────────────────────────────────┐    │
-│  │  📎 Drag file here or click to browse       │    │
-│  └─────────────────────────────────────────────┘    │
+│  [✓] Notify teacher when evaluation is complete      │
+│  [✓] Save these criteria as template for future      │
 │                                                       │
-│  [ ] Notify teacher when analysis is complete        │
-│                                                       │
-│         [Cancel]            [Upload Recording]       │
+│      [Cancel]     [Save Draft]     [Submit]          │
 │                                                       │
 └──────────────────────────────────────────────────────┘
 ```
@@ -785,6 +976,77 @@ CREATE INDEX idx_audit_resource ON audit_log(resource_type, resource_id);
 │  Questions/10min: [5]                               │
 │                                                       │
 │  [Preview Template]  [Save as Draft]  [Activate]    │
+│                                                       │
+└──────────────────────────────────────────────────────┘
+```
+
+### Super Admin Dashboard
+
+```
+┌──────────────────────────────────────────────────────┐
+│  ClassReflect Platform Admin                         │
+│  Logged in as: System Administrator                  │
+├──────────────────────────────────────────────────────┤
+│                                                       │
+│  [🏫 Create School] [📊 Platform Analytics]          │
+│  [🔧 System Settings] [📋 Global Templates]          │
+│                                                       │
+│  ┌─────────────────────────────────────────────┐    │
+│  │  Platform Overview                           │    │
+│  ├─────────────────────────────────────────────┤    │
+│  │  Total Schools: 42                           │    │
+│  │  Active Teachers: 1,247                      │    │
+│  │  Recordings This Month: 8,456                │    │
+│  │  Storage Used: 2.4 TB / 10 TB                │    │
+│  └─────────────────────────────────────────────┘    │
+│                                                       │
+│  ┌─────────────────────────────────────────────┐    │
+│  │  Schools Management                          │    │
+│  ├─────────────────────────────────────────────┤    │
+│  │  School Name        │ Plan    │ Status      │    │
+│  │  ───────────────────┼─────────┼────────     │    │
+│  │  Lincoln Elementary │ Pro     │ ✅ Active   │    │
+│  │  Washington High    │ Basic   │ ✅ Active   │    │
+│  │  Jefferson Middle   │ Pro     │ ⚠️ Trial    │    │
+│  │  Roosevelt Academy  │ Enterprise│ ✅ Active │    │
+│  │                                              │    │
+│  │  [View All] [Add School] [Export]           │    │
+│  └─────────────────────────────────────────────┘    │
+│                                                       │
+└──────────────────────────────────────────────────────┘
+```
+
+### Create School Modal (Super Admin)
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Create New School Account                           │
+├──────────────────────────────────────────────────────┤
+│                                                       │
+│  School Information:                                 │
+│  ─────────────────                                   │
+│  School Name: * [Lincoln Elementary School     ]     │
+│  Domain:        [lincoln.edu                   ]     │
+│  Address:       [123 Main St, City, State      ]     │
+│                                                       │
+│  Subscription Plan:                                  │
+│  [ ] Basic (10 teachers, 100 uploads/month)          │
+│  [●] Professional (50 teachers, 500 uploads/month)   │
+│  [ ] Enterprise (Unlimited)                          │
+│                                                       │
+│  Initial School Manager Account:                     │
+│  ─────────────────────────────                       │
+│  Email: *       [admin@lincoln.edu             ]     │
+│  First Name: *  [Michael                       ]     │
+│  Last Name: *   [Roberts                       ]     │
+│  Phone:         [555-0123                      ]     │
+│                                                       │
+│  Configuration:                                      │
+│  [✓] Send welcome email to manager                   │
+│  [✓] Enable default evaluation templates             │
+│  [✓] 30-day trial period                            │
+│                                                       │
+│      [Cancel]            [Create School]             │
 │                                                       │
 └──────────────────────────────────────────────────────┘
 ```
@@ -1016,6 +1278,40 @@ curl -X GET https://api.classreflect.gdwd.co.uk/analytics/school?startDate=2024-
 
 ---
 
-*Document Version: 1.0*  
+## Key Design Updates (v2.0)
+
+### Controlled Access Model
+This design implements a **controlled, invitation-only** system with no public registration:
+
+1. **Hierarchical Account Creation**
+   - Super Admin → Creates schools with initial manager
+   - School Manager → Creates teacher accounts
+   - Teachers → Cannot create accounts (view-only access)
+
+2. **Upload & Evaluation Control**
+   - **Only School Managers** can upload recordings
+   - School Managers **must set evaluation criteria** for each upload
+   - Criteria include: base template, custom weights, focus areas, context
+   - Teachers receive notifications but cannot upload
+
+3. **Role Responsibilities**
+   - **Super Admin**: Platform management, school provisioning
+   - **School Manager**: Uploads, criteria configuration, teacher management
+   - **Teacher**: View results, track progress, export reports
+
+4. **No Self-Service Features**
+   - No public signup/registration
+   - All accounts pre-provisioned by administrators
+   - Email invitations with temporary passwords
+
+This approach ensures:
+- Complete control over platform access
+- Consistent evaluation standards set by managers
+- Protection of sensitive classroom data
+- Clear accountability for uploads and evaluations
+
+---
+
+*Document Version: 2.0*  
 *Last Updated: October 2024*  
-*Status: Design Phase*
+*Status: Design Phase - Controlled Access Model*

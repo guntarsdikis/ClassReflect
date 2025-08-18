@@ -26,6 +26,13 @@ export const authConfig = {
  * Initialize authentication middleware based on configuration
  */
 export function initializeAuth(pool: Pool) {
+  console.log('🔧 Auth config check:', {
+    hasPoolId: !!process.env.COGNITO_USER_POOL_ID,
+    hasClientId: !!process.env.COGNITO_CLIENT_ID,
+    hasClientSecret: !!process.env.COGNITO_CLIENT_SECRET,
+    useCognito: authConfig.useCognito
+  });
+  
   if (authConfig.useCognito) {
     console.log('🔐 Using AWS Cognito authentication');
     

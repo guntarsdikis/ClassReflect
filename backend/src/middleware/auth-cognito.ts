@@ -10,15 +10,14 @@ export interface AuthenticatedUser {
   lastName: string;
   role: 'teacher' | 'school_manager' | 'super_admin';
   schoolId: string;
-  cognitoSub: string;
-  cognitoUsername: string;
+  cognitoSub?: string;
+  cognitoUsername?: string;
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthenticatedUser;
-    }
+// Extend Express Request type
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: AuthenticatedUser;
   }
 }
 

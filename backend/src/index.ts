@@ -1,18 +1,18 @@
+import dotenv from 'dotenv';
+// Load environment variables first
+dotenv.config();
+
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { initializeDatabase } from './database';
 import pool from './database';
 
-// Import routes
-import authRoutes, { initializeAuthRoutes } from './routes/auth';
-import usersRoutes, { initializeUsersRoutes } from './routes/users';
+// Import routes and auth configuration
+import { initializeAuth, authConfig } from './config/auth.config';
 import uploadRoutes from './routes/upload';
 import jobsRoutes from './routes/jobs';
 import schoolsRoutes from './routes/schools';
 import teachersRoutes from './routes/teachers';
-
-dotenv.config();
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -48,9 +48,8 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-// Initialize routes with database pool
-initializeAuthRoutes(pool);
-initializeUsersRoutes(pool);
+// Initialize authentication system (Cognito or JWT based on config)
+const { authRoutes, usersRoutes } = initializeAuth(pool);
 
 // API Routes
 app.use('/api/auth', authRoutes);

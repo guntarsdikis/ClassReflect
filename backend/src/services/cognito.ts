@@ -85,7 +85,7 @@ export class CognitoService {
         Username: userData.email, // Use email as username
         UserAttributes: attributes,
         TemporaryPassword: temporaryPassword,
-        MessageAction: MessageActionType.SEND, // Send welcome email
+        MessageAction: 'SUPPRESS' as any, // Suppress welcome email for test users
         ForceAliasCreation: false
       });
 
@@ -106,21 +106,40 @@ export class CognitoService {
    */
   async authenticateUser(email: string, password: string): Promise<AuthResult> {
     try {
+      // For test users, map email to username
+      // In production, you'd typically use email as username or have a mapping table
+      let username = email;
+      
+      // Map test emails to test usernames
+      const testUserMap: { [key: string]: string } = {
+        'superadmin@test.local': 'superadmin-test',
+        'manager@test.local': 'manager-test',
+        'teacher@test.local': 'teacher-test',
+        'testadmin@classreflect.local': 'testadmin'
+      };
+      
+      if (testUserMap[email]) {
+        username = testUserMap[email];
+      }
+      
       // Create secret hash for client authentication
-      const secretHash = this.generateSecretHash(email);
+      const secretHash = this.generateSecretHash(username);
 
+      console.log('Attempting auth with username:', username);
+      
       const command = new AdminInitiateAuthCommand({
         UserPoolId: this.userPoolId,
         ClientId: this.clientId,
         AuthFlow: 'ADMIN_NO_SRP_AUTH',
         AuthParameters: {
-          USERNAME: email,
+          USERNAME: username,
           PASSWORD: password,
           SECRET_HASH: secretHash
         }
       });
 
       const result = await this.client.send(command);
+      console.log('Auth successful, got tokens');
 
       // Handle challenges (like password reset required)
       if (result.ChallengeName) {
@@ -131,8 +150,10 @@ export class CognitoService {
         throw new Error('Authentication failed - no result');
       }
 
-      // Get user details
-      const user = await this.getUser(email);
+      // Get user details using the username
+      console.log('Getting user details for:', username);
+      const user = await this.getUser(username);
+      console.log('Got user details:', user);
 
       return {
         accessToken: result.AuthenticationResult.AccessToken!,

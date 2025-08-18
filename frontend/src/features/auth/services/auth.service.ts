@@ -15,8 +15,8 @@ interface LoginResponse {
   user: User;
 }
 
-// Use mock auth in development
-const USE_MOCK_AUTH = import.meta.env.DEV;
+// Use mock auth in development (disabled for Cognito testing)
+const USE_MOCK_AUTH = false; // import.meta.env.DEV;
 
 // Login hook
 export const useLogin = () => {

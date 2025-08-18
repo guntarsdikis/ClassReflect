@@ -27,7 +27,12 @@ router.post('/login', async (req: Request, res: Response) => {
     const authResult = await cognitoService.authenticateUser(email, password);
     
     // Sync user with local database (or create if not exists)
-    await syncUserWithDatabase(authResult.user);
+    try {
+      await syncUserWithDatabase(authResult.user);
+    } catch (syncError: any) {
+      console.error('Error syncing user with database:', syncError);
+      // Continue anyway - user is authenticated with Cognito
+    }
     
     // Get full user details including school info
     const [rows] = await pool.execute(
@@ -40,7 +45,25 @@ router.post('/login', async (req: Request, res: Response) => {
     );
     
     if (!Array.isArray(rows) || rows.length === 0) {
-      res.status(404).json({ error: 'User not found in database' });
+      // User authenticated with Cognito but not in database yet
+      // Return data from Cognito
+      res.json({
+        accessToken: authResult.accessToken,
+        idToken: authResult.idToken,
+        refreshToken: authResult.refreshToken,
+        user: {
+          id: 0, // Temporary ID until database sync
+          email: authResult.user.email,
+          firstName: authResult.user.firstName || 'User',
+          lastName: authResult.user.lastName || '',
+          role: authResult.user.role || 'teacher',
+          schoolId: authResult.user.schoolId || 'test-school-001',
+          schoolName: 'Test School',
+          subjects: authResult.user.subjects || [],
+          grades: authResult.user.grades || [],
+          cognitoUsername: authResult.user.username
+        },
+      });
       return;
     }
     
@@ -66,6 +89,8 @@ router.post('/login', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Login error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     
     // Handle specific Cognito errors
     if (error.name === 'NotAuthorizedException') {

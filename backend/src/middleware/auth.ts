@@ -1,18 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Pool } from 'mysql2/promise';
+import { AuthenticatedUser } from './auth-cognito';
 
-// Extend Express Request to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role: 'teacher' | 'school_manager' | 'super_admin';
-        schoolId: string;
-      };
-    }
+// Extend Express Request type
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: AuthenticatedUser;
   }
 }
 
@@ -49,6 +43,8 @@ export const authenticate = async (
       req.user = {
         id: decoded.userId,
         email: decoded.email,
+        firstName: '', // JWT doesn't have these fields
+        lastName: '',
         role: decoded.role,
         schoolId: decoded.schoolId,
       };

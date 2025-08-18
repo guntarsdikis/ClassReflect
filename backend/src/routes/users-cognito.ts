@@ -305,8 +305,8 @@ router.get('/teachers',
   requireSchoolAccess,
   async (req: Request, res: Response) => {
     try {
-      let query;
-      let params;
+      let query: string;
+      let params: any[] = [];
 
       if (req.user!.role === 'super_admin') {
         // Super admin can see all teachers
@@ -321,7 +321,7 @@ router.get('/teachers',
             WHERE u.role = 'teacher' AND u.school_id = ?
             ORDER BY u.last_name, u.first_name
           `;
-          params = [schoolId];
+          params = [schoolId] as any[];
         } else {
           query = `
             SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school_id,
@@ -332,7 +332,7 @@ router.get('/teachers',
             WHERE u.role = 'teacher'
             ORDER BY s.name, u.last_name, u.first_name
           `;
-          params = [];
+          params = [] as any[];
         }
       } else if (req.user!.role === 'school_manager') {
         // School manager can see teachers in their school
@@ -345,7 +345,7 @@ router.get('/teachers',
           WHERE u.role = 'teacher' AND u.school_id = ?
           ORDER BY u.last_name, u.first_name
         `;
-        params = [req.user!.schoolId];
+        params = [req.user!.schoolId] as any[];
       } else {
         // Teachers can only see their own profile
         query = `

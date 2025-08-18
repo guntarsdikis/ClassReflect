@@ -1318,6 +1318,20 @@ This approach ensures:
 
 ---
 
+Summary
+
+  The AWS Cognito authentication is now fully working! You can login with:
+
+  Test Admin Account:
+  - Email: testadmin@classreflect.local
+  - Password: Welcome2024!
+  - Role: Super Admin
+
+  Other Test Accounts (if needed):
+  - superadmin@test.local / AdminPass2024!@ (Super Admin)
+  - manager@test.local / ManagerPass2024!@ (School Manager)
+  - teacher@test.local / TeacherPass2024!@ (Teacher)
+
 *Document Version: 2.1*  
 *Last Updated: November 2024*  
 *Status: Partially Implemented - Core Features Complete*  

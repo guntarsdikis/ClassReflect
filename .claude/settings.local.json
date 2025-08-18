@@ -92,7 +92,16 @@
       "Bash(VITE_AWS_REGION=eu-west-2)",
       "Bash(aws amplify list-domain-associations:*)",
       "Bash(aws amplify:*)",
-      "mcp__brave-search__brave_web_search"
+      "mcp__brave-search__brave_web_search",
+      "WebFetch(domain:aws-amplify-prod-eu-west-2-artifacts.s3.eu-west-2.amazonaws.com)",
+      "Bash(npm info:*)",
+      "Bash(aws ecs describe-task-definition:*)",
+      "Bash(aws:*)",
+      "Bash(lsof:*)",
+      "mcp__puppeteer__puppeteer_navigate",
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

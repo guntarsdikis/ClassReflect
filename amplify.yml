@@ -3,18 +3,18 @@ frontend:
   phases:
     preBuild:
       commands:
-        - cd frontend-new
+        - cd frontend
         - npm ci
     build:
       commands:
         - npm run build
   artifacts:
-    baseDirectory: frontend-new/dist
+    baseDirectory: frontend/dist
     files:
       - '**/*'
   cache:
     paths:
-      - frontend-new/node_modules/**/*
+      - frontend/node_modules/**/*
   customHeaders:
     - pattern: '**/*'
       headers:

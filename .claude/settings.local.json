@@ -83,7 +83,16 @@
       "Bash(npm run docker:build:*)",
       "Bash(npm run docker:push:*)",
       "mcp__sequential-thinking__sequentialthinking",
-      "Bash(npm create:*)"
+      "Bash(npm create:*)",
+      "Bash(touch:*)",
+      "Bash(aws amplify list-apps:*)",
+      "Bash(aws amplify list-branches:*)",
+      "Bash(VITE_API_URL=https://api.classreflect.gdwd.co.uk,)",
+      "Bash(VITE_APP_URL=https://classreflect.gdwd.co.uk,)",
+      "Bash(VITE_AWS_REGION=eu-west-2)",
+      "Bash(aws amplify list-domain-associations:*)",
+      "Bash(aws amplify:*)",
+      "mcp__brave-search__brave_web_search"
     ],
     "deny": [],
     "ask": []

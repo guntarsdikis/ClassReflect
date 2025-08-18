@@ -4,8 +4,9 @@ A serverless platform for analyzing classroom audio recordings using AI to provi
 
 ## Architecture Overview
 
-- **Frontend**: React/TypeScript hosted on AWS Amplify
+- **Frontend**: React/TypeScript with Vite, hosted on AWS Amplify
 - **Backend API**: Node.js/Express containerized on ECS Fargate
+- **Authentication**: AWS Cognito User Pools with custom attributes
 - **Processing**: On-demand t3.xlarge instances with OpenAI Whisper
 - **Database**: Aurora MySQL (existing cluster)
 - **Storage**: S3 for audio files
@@ -91,7 +92,7 @@ aws s3api create-bucket \
 ### Frontend
 ```bash
 cd frontend
-npm start
+npm run dev
 # Runs on http://localhost:3000
 ```
 
@@ -99,7 +100,15 @@ npm start
 ```bash
 cd backend
 npm run dev
-# Runs on http://localhost:3000
+# Runs on http://localhost:3001
+```
+
+### Start Both Services
+```bash
+# From project root
+./start-local.sh
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:3001
 ```
 
 ## Deployment
@@ -138,13 +147,26 @@ Estimated monthly costs:
   - ChatGPT API: ~$0.01
 - **Total**: $10-25/month for typical usage
 
-## Security
+## Authentication & Security
 
+### AWS Cognito Integration
+- **User Pool ID**: `eu-west-2_E3SFkCKPU`
+- **Client ID**: Available in `.env` files
+- **Features**:
+  - Invitation-only user creation (no self-registration)
+  - Role-based access control (Teacher, School Manager, Super Admin)
+  - Custom attributes for school isolation
+  - Advanced security mode enabled
+  - Password policy: 12+ characters with mixed case, numbers, and symbols
+
+### Security Features
 - All data encrypted in transit (HTTPS) and at rest
 - VPC with private subnets for ECS tasks
 - IAM roles with least privilege access
 - Secrets managed via AWS Secrets Manager
-- API authentication via JWT tokens
+- JWT token validation via AWS Cognito
+- School-level data isolation
+- Audit logging for compliance
 
 ## Monitoring
 
@@ -173,8 +195,10 @@ Comprehensive documentation is available in the `/docs` directory:
 
 ### Key Documents
 - [User Access & Authentication Design](docs/architecture/USER_ACCESS_DESIGN.md)
+- [AWS Cognito Configuration](COGNITO_CONFIG.md)
 - [Implementation Roadmap](docs/development/IMPLEMENTATION_ROADMAP.md)
 - [Current Deployment Status](docs/deployment/DEPLOYMENT_STATUS.md)
+- [Cognito Implementation Summary](COGNITO_IMPLEMENTATION_SUMMARY.md)
 
 ## Support
 

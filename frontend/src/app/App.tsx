@@ -7,6 +7,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AppRouter } from './AppRouter';
 import { queryClient } from '@shared/services/queryClient';
 import { theme } from '@styles/theme';
+import '../config/amplify'; // Initialize Amplify configuration
 import '@styles/global.css';
 
 export function App() {

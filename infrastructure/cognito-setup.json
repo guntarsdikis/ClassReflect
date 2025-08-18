@@ -1,0 +1,107 @@
+{
+  "PoolName": "classreflect-users",
+  "Policies": {
+    "PasswordPolicy": {
+      "MinimumLength": 12,
+      "RequireUppercase": true,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireSymbols": true,
+      "TemporaryPasswordValidityDays": 7
+    }
+  },
+  "Schema": [
+    {
+      "Name": "email",
+      "AttributeDataType": "String",
+      "Required": true,
+      "Mutable": true
+    },
+    {
+      "Name": "given_name", 
+      "AttributeDataType": "String",
+      "Required": false,
+      "Mutable": true
+    },
+    {
+      "Name": "family_name",
+      "AttributeDataType": "String", 
+      "Required": false,
+      "Mutable": true
+    },
+    {
+      "Name": "school_id",
+      "AttributeDataType": "String",
+      "DeveloperOnlyAttribute": false,
+      "Mutable": false,
+      "Required": false,
+      "StringAttributeConstraints": {
+        "MinLength": "1",
+        "MaxLength": "36"
+      }
+    },
+    {
+      "Name": "role",
+      "AttributeDataType": "String",
+      "DeveloperOnlyAttribute": false,
+      "Mutable": true,
+      "Required": false,
+      "StringAttributeConstraints": {
+        "MinLength": "1",
+        "MaxLength": "20"
+      }
+    },
+    {
+      "Name": "subjects",
+      "AttributeDataType": "String",
+      "DeveloperOnlyAttribute": false,
+      "Mutable": true,
+      "Required": false,
+      "StringAttributeConstraints": {
+        "MinLength": "0",
+        "MaxLength": "500"
+      }
+    },
+    {
+      "Name": "grades",
+      "AttributeDataType": "String",
+      "DeveloperOnlyAttribute": false,
+      "Mutable": true,
+      "Required": false,
+      "StringAttributeConstraints": {
+        "MinLength": "0",
+        "MaxLength": "100"
+      }
+    }
+  ],
+  "AliasAttributes": ["email"],
+  "AutoVerifiedAttributes": ["email"],
+  "EmailConfiguration": {
+    "EmailSendingAccount": "COGNITO_DEFAULT"
+  },
+  "VerificationMessageTemplate": {
+    "DefaultEmailOption": "CONFIRM_WITH_LINK",
+    "EmailSubjectByLink": "Welcome to ClassReflect - Verify your email",
+    "EmailMessageByLink": "Welcome to ClassReflect! Please click the link below to verify your email address: {##Verify Email##}"
+  },
+  "AdminCreateUserConfig": {
+    "AllowAdminCreateUserOnly": true,
+    "InviteMessageTemplate": {
+      "EmailSubject": "Your ClassReflect Account",
+      "EmailMessage": "Welcome to ClassReflect! Your username is {username} and temporary password is {####}. Please login at https://classreflect.gdwd.co.uk and change your password."
+    }
+  },
+  "MfaConfiguration": "OFF",
+  "AccountRecoverySetting": {
+    "RecoveryMechanisms": [
+      {
+        "Priority": 1,
+        "Name": "verified_email"
+      }
+    ]
+  },
+  "DeletionProtection": "ACTIVE",
+  "UserPoolAddOns": {
+    "AdvancedSecurityMode": "ENFORCED"
+  }
+}

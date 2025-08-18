@@ -4,10 +4,10 @@ frontend:
     preBuild:
       commands:
         - cd frontend
-        - npm ci
+        - yarn install --frozen-lockfile
     build:
       commands:
-        - npm run build
+        - yarn build
   artifacts:
     baseDirectory: frontend/dist
     files:
@@ -15,6 +15,7 @@ frontend:
   cache:
     paths:
       - frontend/node_modules/**/*
+      - frontend/yarn.lock
   customHeaders:
     - pattern: '**/*'
       headers:

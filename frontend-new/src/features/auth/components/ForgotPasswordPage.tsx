@@ -24,7 +24,7 @@ export function ForgotPasswordPage() {
       email: '',
     },
     validate: {
-      email: (value) => {
+      email: (value: string) => {
         if (!value) return 'Email is required';
         if (!/^\S+@\S+$/.test(value)) return 'Invalid email';
         return null;

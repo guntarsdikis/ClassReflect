@@ -22,11 +22,9 @@ import {
   IconChartBar,
   IconTemplate,
   IconSchool,
-  IconBuildingBank,
 } from '@tabler/icons-react';
-import { useAuthStore, UserRole } from '@store/auth.store';
+import { useAuthStore, type UserRole } from '@store/auth.store';
 import { useLogout } from '@features/auth/services/auth.service';
-import classes from './AppShell.module.css';
 
 // Define navigation items for each role
 const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: string }>> = {

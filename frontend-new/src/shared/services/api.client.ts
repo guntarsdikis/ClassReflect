@@ -49,7 +49,7 @@ apiClient.interceptors.response.use(
         color: 'red',
       });
     } 
-    else if (error.response?.status >= 500) {
+    else if (error.response && error.response.status >= 500) {
       notifications.show({
         title: 'Server Error',
         message: 'Something went wrong. Please try again later.',

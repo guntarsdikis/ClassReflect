@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { api } from '@shared/services/api.client';
 import { useAuthStore, type User } from '@store/auth.store';
+import { mockLogin } from './mockAuth'; // Remove in production
 
 interface LoginCredentials {
   email: string;
@@ -14,6 +15,9 @@ interface LoginResponse {
   user: User;
 }
 
+// Use mock auth in development
+const USE_MOCK_AUTH = import.meta.env.DEV;
+
 // Login hook
 export const useLogin = () => {
   const navigate = useNavigate();
@@ -21,6 +25,16 @@ export const useLogin = () => {
   
   return useMutation({
     mutationFn: async (credentials: LoginCredentials) => {
+      // Use mock auth in development
+      if (USE_MOCK_AUTH) {
+        const result = await mockLogin(credentials.email, credentials.password);
+        if (!result) {
+          throw new Error('Invalid credentials');
+        }
+        return result;
+      }
+      
+      // Production auth
       const response = await api.auth.login(credentials.email, credentials.password);
       return response.data as LoginResponse;
     },

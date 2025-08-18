@@ -25,12 +25,12 @@ export function LoginPage() {
       password: '',
     },
     validate: {
-      email: (value) => {
+      email: (value: string) => {
         if (!value) return 'Email is required';
         if (!/^\S+@\S+$/.test(value)) return 'Invalid email';
         return null;
       },
-      password: (value) => {
+      password: (value: string) => {
         if (!value) return 'Password is required';
         if (value.length < 6) return 'Password must be at least 6 characters';
         return null;
@@ -100,6 +100,16 @@ export function LoginPage() {
           No registration available. Accounts are created by your school administrator.
         </Text>
       </Paper>
+      
+      {/* Demo credentials for development */}
+      {import.meta.env.DEV && (
+        <Paper withBorder p="md" mt="xl" style={{ backgroundColor: '#f8f9fa' }}>
+          <Text size="sm" fw={600} mb="xs">Demo Credentials:</Text>
+          <Text size="xs" c="dimmed">Teacher: teacher@demo.com / teacher123</Text>
+          <Text size="xs" c="dimmed">Manager: manager@demo.com / manager123</Text>
+          <Text size="xs" c="dimmed">Admin: admin@demo.com / admin123</Text>
+        </Paper>
+      )}
       
       <Text c="dimmed" size="xs" ta="center" mt={20}>
         By signing in, you agree to our Terms of Service and Privacy Policy.

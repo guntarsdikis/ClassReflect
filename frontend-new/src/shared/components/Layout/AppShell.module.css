@@ -1,0 +1,23 @@
+.navbar {
+  padding: var(--mantine-spacing-md);
+}
+
+.navLink {
+  display: block;
+  width: 100%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+  border-radius: var(--mantine-radius-md);
+  text-decoration: none;
+  color: var(--mantine-color-text);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  
+  &:hover {
+    background-color: var(--mantine-color-gray-0);
+  }
+  
+  &[data-active] {
+    background-color: var(--mantine-color-blue-light);
+    color: var(--mantine-color-blue-filled);
+  }
+}

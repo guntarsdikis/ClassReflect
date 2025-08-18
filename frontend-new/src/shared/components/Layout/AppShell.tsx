@@ -1,0 +1,169 @@
+import { useState } from 'react';
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import {
+  AppShell as MantineAppShell,
+  Burger,
+  Group,
+  NavLink,
+  Text,
+  Avatar,
+  Menu,
+  UnstyledButton,
+  rem,
+} from '@mantine/core';
+import {
+  IconChevronDown,
+  IconLogout,
+  IconSettings,
+  IconUser,
+  IconHome,
+  IconUpload,
+  IconUsers,
+  IconChartBar,
+  IconTemplate,
+  IconSchool,
+  IconBuildingBank,
+} from '@tabler/icons-react';
+import { useAuthStore, UserRole } from '@store/auth.store';
+import { useLogout } from '@features/auth/services/auth.service';
+import classes from './AppShell.module.css';
+
+// Define navigation items for each role
+const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: string }>> = {
+  teacher: [
+    { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
+    { label: 'My Progress', icon: IconChartBar, href: '/progress' },
+    { label: 'Reports', icon: IconChartBar, href: '/reports' },
+  ],
+  school_manager: [
+    { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
+    { label: 'Upload Recording', icon: IconUpload, href: '/upload' },
+    { label: 'Teachers', icon: IconUsers, href: '/teachers' },
+    { label: 'Templates', icon: IconTemplate, href: '/templates' },
+    { label: 'Analytics', icon: IconChartBar, href: '/analytics' },
+  ],
+  super_admin: [
+    { label: 'Dashboard', icon: IconHome, href: '/admin' },
+    { label: 'Schools', icon: IconSchool, href: '/admin/schools' },
+    { label: 'Platform Analytics', icon: IconChartBar, href: '/admin/platform' },
+    { label: 'System Settings', icon: IconSettings, href: '/admin/settings' },
+  ],
+};
+
+export function AppShell() {
+  const [opened, setOpened] = useState(false);
+  const location = useLocation();
+  const user = useAuthStore((state) => state.user);
+  const { mutate: logout } = useLogout();
+  
+  if (!user) return null;
+  
+  const navItems = navigationItems[user.role] || [];
+  
+  return (
+    <MantineAppShell
+      header={{ height: 60 }}
+      navbar={{
+        width: 250,
+        breakpoint: 'sm',
+        collapsed: { mobile: !opened },
+      }}
+      padding="md"
+    >
+      <MantineAppShell.Header>
+        <Group h="100%" px="md" justify="space-between">
+          <Group>
+            <Burger
+              opened={opened}
+              onClick={() => setOpened(!opened)}
+              hiddenFrom="sm"
+              size="sm"
+            />
+            <Text size="xl" fw={700} c="blue">
+              ClassReflect
+            </Text>
+          </Group>
+          
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <UnstyledButton>
+                <Group gap={7}>
+                  <Avatar 
+                    color="blue" 
+                    radius="xl" 
+                    size="md"
+                  >
+                    {user.firstName[0]}{user.lastName[0]}
+                  </Avatar>
+                  <Text fw={500} size="sm" mr={3}>
+                    {user.firstName} {user.lastName}
+                  </Text>
+                  <IconChevronDown size={rem(12)} stroke={1.5} />
+                </Group>
+              </UnstyledButton>
+            </Menu.Target>
+            
+            <Menu.Dropdown>
+              <Menu.Label>{user.schoolName}</Menu.Label>
+              <Menu.Label>{user.role.replace('_', ' ').toUpperCase()}</Menu.Label>
+              
+              <Menu.Divider />
+              
+              <Menu.Item
+                component={Link}
+                to="/profile"
+                leftSection={<IconUser size={rem(14)} />}
+              >
+                Profile
+              </Menu.Item>
+              
+              <Menu.Item
+                component={Link}
+                to="/settings"
+                leftSection={<IconSettings size={rem(14)} />}
+              >
+                Settings
+              </Menu.Item>
+              
+              <Menu.Divider />
+              
+              <Menu.Item
+                color="red"
+                leftSection={<IconLogout size={rem(14)} />}
+                onClick={() => logout()}
+              >
+                Logout
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </MantineAppShell.Header>
+      
+      <MantineAppShell.Navbar p="md">
+        <MantineAppShell.Section grow>
+          {navItems.map((item) => (
+            <NavLink
+              key={item.href}
+              component={Link}
+              to={item.href}
+              label={item.label}
+              leftSection={<item.icon size={20} />}
+              active={location.pathname === item.href}
+              mb="xs"
+            />
+          ))}
+        </MantineAppShell.Section>
+        
+        <MantineAppShell.Section>
+          <Text size="xs" c="dimmed" ta="center">
+            © 2024 ClassReflect
+          </Text>
+        </MantineAppShell.Section>
+      </MantineAppShell.Navbar>
+      
+      <MantineAppShell.Main>
+        <Outlet />
+      </MantineAppShell.Main>
+    </MantineAppShell>
+  );
+}

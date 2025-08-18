@@ -2,8 +2,11 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './database';
+import pool from './database';
 
 // Import routes
+import authRoutes, { initializeAuthRoutes } from './routes/auth';
+import usersRoutes, { initializeUsersRoutes } from './routes/users';
 import uploadRoutes from './routes/upload';
 import jobsRoutes from './routes/jobs';
 import schoolsRoutes from './routes/schools';
@@ -35,6 +38,8 @@ app.get('/', (req: Request, res: Response) => {
     message: 'ClassReflect API',
     version: '1.0.0',
     endpoints: {
+      auth: '/api/auth',
+      users: '/api/users',
       upload: '/api/upload',
       jobs: '/api/jobs',
       schools: '/api/schools',
@@ -43,7 +48,13 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
+// Initialize routes with database pool
+initializeAuthRoutes(pool);
+initializeUsersRoutes(pool);
+
 // API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/schools', schoolsRoutes);

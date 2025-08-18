@@ -6,6 +6,7 @@ import { MulterError } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../database';
 import { uploadToS3, generatePresignedUploadUrl, sendToProcessingQueue } from '../services/aws';
+import { authenticate, authorize } from '../middleware/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const router = Router();
@@ -38,7 +39,11 @@ const upload = multer({
 });
 
 // Get pre-signed URL for direct upload (recommended for large files)
-router.post('/presigned-url', async (req: Request, res: Response) => {
+// Only school managers can upload recordings
+router.post('/presigned-url', 
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
   try {
     const { fileName, fileType, teacherId, schoolId } = req.body;
 
@@ -76,7 +81,12 @@ router.post('/presigned-url', async (req: Request, res: Response) => {
 });
 
 // Direct file upload endpoint (for smaller files)
-router.post('/direct', upload.single('audio'), async (req: Request, res: Response) => {
+// Only school managers can upload recordings
+router.post('/direct', 
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  upload.single('audio'), 
+  async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

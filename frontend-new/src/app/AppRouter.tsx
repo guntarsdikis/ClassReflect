@@ -5,9 +5,9 @@ import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { RoleRoute } from '@features/auth/components/RoleRoute';
 import { AppShell } from '@shared/components/Layout/AppShell';
 import { TeacherDashboard } from '@features/dashboard/teacher/TeacherDashboard';
-// import { ManagerDashboard } from '@features/dashboard/manager/ManagerDashboard';
+import { ManagerDashboard } from '@features/dashboard/manager/ManagerDashboard';
 // import { AdminDashboard } from '@features/dashboard/admin/AdminDashboard';
-// import { UploadWizard } from '@features/uploads/components/UploadWizard';
+import { UploadWizard } from '@features/uploads/components/UploadWizard';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
 // import { TemplateEditor } from '@features/templates/components/TemplateEditor';
 // import { SchoolAnalytics } from '@features/analytics/components/SchoolAnalytics';
@@ -34,8 +34,8 @@ export function AppRouter() {
           
           {/* School Manager Routes */}
           <Route element={<RoleRoute roles={['school_manager']} />}>
-            <Route path="/dashboard" element={<div>Manager Dashboard - Coming Soon</div>} />
-            {/* <Route path="/upload" element={<UploadWizard />} /> */}
+            <Route path="/dashboard" element={<ManagerDashboard />} />
+            <Route path="/upload" element={<UploadWizard />} />
             {/* <Route path="/teachers" element={<TeacherManagement />} /> */}
             {/* <Route path="/templates" element={<TemplateEditor />} /> */}
             {/* <Route path="/analytics" element={<SchoolAnalytics />} /> */}

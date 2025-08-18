@@ -161,6 +161,21 @@ Base URL: `https://api.classreflect.gdwd.co.uk`
 - `GET /jobs/:id` - Get job status
 - `GET /results/:id` - Get analysis results
 
+## Documentation
+
+Comprehensive documentation is available in the `/docs` directory:
+
+- 📚 [Documentation Index](docs/README.md) - Complete documentation overview
+- 🏗️ [Architecture](docs/architecture/) - System design and technical architecture
+- 🚀 [Deployment](docs/deployment/) - Deployment guides and status
+- 💻 [Development](docs/development/) - Development roadmap and implementation
+- ⚙️ [Setup](docs/setup/) - Configuration and setup guides
+
+### Key Documents
+- [User Access & Authentication Design](docs/architecture/USER_ACCESS_DESIGN.md)
+- [Implementation Roadmap](docs/development/IMPLEMENTATION_ROADMAP.md)
+- [Current Deployment Status](docs/deployment/DEPLOYMENT_STATUS.md)
+
 ## Support
 
-For issues or questions, please check the documentation or create an issue on GitHub.
+For issues or questions, please check the [documentation](docs/README.md) or create an issue on GitHub.

@@ -37,6 +37,11 @@ curl http://35.178.11.53:8000/health
 
 ### 🚀 Quick Test Commands
 
+**Web Chat Interface** (NEW!):
+```
+http://35.178.11.53:8000/chat-ui
+```
+
 **Health Check**:
 ```bash
 curl http://35.178.11.53:8000/health

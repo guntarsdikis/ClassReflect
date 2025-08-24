@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen2.5 LLM Chat</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🤖 Qwen2.5 LLM Chat</h1>
+                <p>Enter your credentials to start chatting</p>
+            </div>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="apikey">API Key</button>
+                <button class="auth-tab" data-tab="username">Username</button>
+            </div>
+            
+            <!-- API Key Login -->
+            <form id="apikeyForm" class="auth-form active">
+                <div class="input-group">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" placeholder="sk-demo123456789" required>
+                </div>
+                <button type="submit" class="btn-primary">Connect with API Key</button>
+                <div class="help-text">
+                    Demo keys: sk-demo123456789, sk-test987654321, sk-prod555666777
+                </div>
+            </form>
+            
+            <!-- Username/Password Login -->
+            <form id="usernameForm" class="auth-form">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="demo" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="demo123" required>
+                </div>
+                <button type="submit" class="btn-primary">Login</button>
+                <div class="help-text">
+                    Demo account: demo/demo123 or admin/admin123
+                </div>
+            </form>
+            
+            <div id="loginError" class="error-message"></div>
+            <div id="loginStatus" class="status-message"></div>
+        </div>
+    </div>
+
+    <!-- Chat Screen -->
+    <div id="chatScreen" class="screen hidden">
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="header-left">
+                    <h2>🤖 Qwen2.5-7B Chat</h2>
+                    <div class="model-status">
+                        <span id="modelStatus" class="status-badge loading">Model Loading...</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <span id="userInfo" class="user-info"></span>
+                    <button id="logoutBtn" class="btn-secondary">Logout</button>
+                </div>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-message">
+                    <div class="message bot-message">
+                        <div class="message-content">
+                            <strong>Welcome to Qwen2.5 Chat!</strong><br>
+                            I'm a 7 billion parameter AI assistant ready to help you with questions, creative writing, code, and more.
+                            <br><br>
+                            <em>Please wait for the model to finish loading before sending your first message...</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-input-container">
+                <form id="chatForm" class="chat-form">
+                    <div class="input-wrapper">
+                        <textarea id="messageInput" placeholder="Type your message here..." rows="1" disabled></textarea>
+                        <button type="submit" id="sendBtn" class="send-btn" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m22 2-7 20-4-9-9-4zm0 0-11 9"/>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+                <div class="input-settings">
+                    <div class="setting">
+                        <label for="maxTokens">Max Tokens:</label>
+                        <input type="number" id="maxTokens" value="1000" min="50" max="2048">
+                    </div>
+                    <div class="setting">
+                        <label for="temperature">Temperature:</label>
+                        <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                        <span id="temperatureValue">0.7</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

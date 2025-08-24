@@ -101,7 +101,8 @@
       "mcp__puppeteer__puppeteer_navigate",
       "Bash(node:*)",
       "Bash(npx tsc:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(scp:*)"
     ],
     "deny": [],
     "ask": []

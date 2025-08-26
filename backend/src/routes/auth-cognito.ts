@@ -11,6 +11,25 @@ export const initializeCognitoAuthRoutes = (dbPool: Pool) => {
 };
 
 /**
+ * Parse array field that might be JSON array, actual array, or comma-separated string
+ */
+function parseArrayField(value: string | string[] | null): string[] {
+  if (!value) return [];
+  
+  // If it's already an array, return it
+  if (Array.isArray(value)) return value;
+  
+  // If it's a string, try JSON parsing first
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    // If JSON parsing fails, treat as comma-separated string
+    return value.split(',').map(item => item.trim()).filter(item => item.length > 0);
+  }
+}
+
+/**
  * POST /api/auth/login
  * Authenticate user with Cognito and sync with local database
  */
@@ -82,8 +101,8 @@ router.post('/login', async (req: Request, res: Response) => {
         role: user.role,
         schoolId: user.school_id,
         schoolName: user.school_name,
-        subjects: user.subjects ? JSON.parse(user.subjects) : [],
-        grades: user.grades ? JSON.parse(user.grades) : [],
+        subjects: parseArrayField(user.subjects),
+        grades: parseArrayField(user.grades),
         cognitoUsername: authResult.user.username
       },
     });
@@ -224,8 +243,8 @@ router.post('/set-permanent-password', async (req: Request, res: Response) => {
         role: user.role,
         schoolId: user.school_id,
         schoolName: user.school_name,
-        subjects: user.subjects ? JSON.parse(user.subjects) : [],
-        grades: user.grades ? JSON.parse(user.grades) : [],
+        subjects: parseArrayField(user.subjects),
+        grades: parseArrayField(user.grades),
         cognitoUsername: authResult.user.username
       },
     });

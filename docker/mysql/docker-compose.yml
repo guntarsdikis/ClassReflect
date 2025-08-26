@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: classreflect-mysql-local
+    environment:
+      MYSQL_ROOT_PASSWORD: ClassReflect2024!
+      MYSQL_DATABASE: classreflect
+      MYSQL_USER: classreflect_user
+      MYSQL_PASSWORD: ClassReflect2024!
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
+    networks:
+      - classreflect-local
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  mysql_data:
+
+networks:
+  classreflect-local:
+    driver: bridge

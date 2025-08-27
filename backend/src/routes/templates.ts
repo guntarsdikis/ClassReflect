@@ -102,9 +102,8 @@ router.get('/:templateId', async (req: Request, res: Response) => {
 
     // Get template criteria
     const [criteriaRows] = await pool.execute<RowDataPacket[]>(`
-      SELECT tc.*, ac.criteria_name, ac.criteria_description
+      SELECT tc.*
       FROM template_criteria tc
-      LEFT JOIN analysis_criteria ac ON tc.criteria_id = ac.id
       WHERE tc.template_id = ? AND tc.is_active = TRUE
       ORDER BY tc.weight DESC, tc.criteria_name
     `, [templateId]);
@@ -225,7 +224,7 @@ router.put('/:templateId', authorize('school_manager', 'super_admin'), async (re
 
     const allowedFields = [
       'template_name', 'description', 'category', 'grade_levels', 
-      'subjects', 'is_active'
+      'subjects', 'is_active', 'school_id'
     ];
 
     for (const field of allowedFields) {
@@ -240,16 +239,36 @@ router.put('/:templateId', authorize('school_manager', 'super_admin'), async (re
       }
     }
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No valid fields to update' });
+    if (updateFields.length > 0) {
+      values.push(templateId);
+      await pool.execute(
+        `UPDATE templates SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+        values
+      );
     }
 
-    values.push(templateId);
+    // Handle criteria updates
+    if (updates.criteria !== undefined && Array.isArray(updates.criteria)) {
+      // First, deactivate all existing criteria
+      await pool.execute(
+        'UPDATE template_criteria SET is_active = FALSE WHERE template_id = ?',
+        [templateId]
+      );
 
-    await pool.execute(
-      `UPDATE templates SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
-      values
-    );
+      // Add new criteria
+      for (const criterion of updates.criteria) {
+        await pool.execute(`
+          INSERT INTO template_criteria (
+            template_id, criteria_name, criteria_description, weight, is_active
+          ) VALUES (?, ?, ?, ?, TRUE)
+        `, [
+          templateId,
+          criterion.criteria_name,
+          criterion.criteria_description,
+          criterion.weight || 1.0
+        ]);
+      }
+    }
 
     res.json({ message: 'Template updated successfully' });
   } catch (error) {

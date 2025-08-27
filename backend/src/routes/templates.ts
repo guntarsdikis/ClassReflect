@@ -35,11 +35,11 @@ router.get('/', async (req: Request, res: Response) => {
       params.push(`"${grade}"`);
     }
 
-    // Access control: SuperAdmin sees all, School Manager sees global + own school templates
+    // Access control: SuperAdmin sees all, School Manager sees only own school templates
     if (user.role === 'super_admin') {
       conditions.push('(t.is_global = TRUE OR t.school_id IS NOT NULL)');
     } else {
-      conditions.push('(t.is_global = TRUE OR t.school_id = ?)');
+      conditions.push('t.school_id = ?');
       params.push(user.schoolId);
     }
 
@@ -95,8 +95,8 @@ router.get('/:templateId', async (req: Request, res: Response) => {
 
     const template = templateRows[0];
 
-    // Check access permissions
-    if (!template.is_global && template.school_id !== user.schoolId && user.role !== 'super_admin') {
+    // Check access permissions - school managers can only access their own school's templates
+    if (template.school_id !== user.schoolId && user.role !== 'super_admin') {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -212,9 +212,8 @@ router.put('/:templateId', authorize('school_manager', 'super_admin'), async (re
 
     const template = templateRows[0];
 
-    // Check permissions
-    if (user.role !== 'super_admin' && 
-        (!template.is_global && template.school_id !== user.schoolId)) {
+    // Check permissions - school managers can only modify their own school's templates
+    if (user.role !== 'super_admin' && template.school_id !== user.schoolId) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -295,9 +294,8 @@ router.delete('/:templateId', authorize('school_manager', 'super_admin'), async 
 
     const template = templateRows[0];
 
-    // Check permissions
-    if (user.role !== 'super_admin' && 
-        (!template.is_global && template.school_id !== user.schoolId)) {
+    // Check permissions - school managers can only modify their own school's templates
+    if (user.role !== 'super_admin' && template.school_id !== user.schoolId) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

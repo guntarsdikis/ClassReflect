@@ -43,8 +43,7 @@ interface SchoolFormData {
   name: string;
   domain: string;
   contactEmail: string;
-  subscriptionStatus: 'trial' | 'active' | 'suspended' | 'cancelled';
-  subscriptionExpires: Date | null;
+  isActive: boolean;
   maxTeachers: number;
   maxMonthlyUploads: number;
 }
@@ -59,8 +58,7 @@ export function SchoolManagement() {
     name: '',
     domain: '',
     contactEmail: '',
-    subscriptionStatus: 'trial',
-    subscriptionExpires: null,
+    isActive: true,
     maxTeachers: 10,
     maxMonthlyUploads: 100,
   });
@@ -83,15 +81,8 @@ export function SchoolManagement() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'green';
-      case 'trial': return 'blue';
-      case 'expired': return 'red';
-      case 'suspended': return 'yellow';
-      case 'cancelled': return 'gray';
-      default: return 'gray';
-    }
+  const getStatusColor = (isActive: boolean) => {
+    return isActive ? 'green' : 'red';
   };
 
   const handleCreateSchool = () => {
@@ -100,8 +91,7 @@ export function SchoolManagement() {
       name: '',
       domain: '',
       contactEmail: '',
-      subscriptionStatus: 'trial',
-      subscriptionExpires: null,
+      isActive: true,
       maxTeachers: 10,
       maxMonthlyUploads: 100,
     });
@@ -114,8 +104,7 @@ export function SchoolManagement() {
       name: school.name,
       domain: school.domain || '',
       contactEmail: school.contact_email,
-      subscriptionStatus: school.subscription_status,
-      subscriptionExpires: new Date(school.subscription_expires),
+      isActive: school.is_active,
       maxTeachers: school.max_teachers,
       maxMonthlyUploads: school.max_monthly_uploads,
     });
@@ -128,8 +117,7 @@ export function SchoolManagement() {
         name: formData.name,
         domain: formData.domain,
         contact_email: formData.contactEmail,
-        subscription_status: formData.subscriptionStatus,
-        subscription_expires: formData.subscriptionExpires?.toISOString().split('T')[0],
+        is_active: formData.isActive,
         max_teachers: formData.maxTeachers,
         max_monthly_uploads: formData.maxMonthlyUploads,
       };
@@ -182,15 +170,15 @@ export function SchoolManagement() {
     }
   };
 
-  const expiredSchools = schools.filter(school => school.subscription_status === 'expired').length;
-  const trialSchools = schools.filter(school => school.subscription_status === 'trial').length;
+  const suspendedSchools = schools.filter(school => !school.is_active).length;
+  const activeSchools = schools.filter(school => school.is_active).length;
 
   return (
     <Container size="xl">
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={1}>School Management</Title>
-          <Text c="dimmed">Manage schools, subscriptions, and platform access</Text>
+          <Text c="dimmed">Manage schools and platform access</Text>
         </div>
         <Group>
           <Button
@@ -202,16 +190,10 @@ export function SchoolManagement() {
         </Group>
       </Group>
 
-      {/* Alerts for expired/expiring schools */}
-      {expiredSchools > 0 && (
+      {/* Alerts for suspended schools */}
+      {suspendedSchools > 0 && (
         <Alert variant="filled" color="red" icon={<IconAlertCircle />} mb="md">
-          {expiredSchools} school{expiredSchools > 1 ? 's' : ''} ha{expiredSchools > 1 ? 've' : 's'} expired subscriptions
-        </Alert>
-      )}
-
-      {trialSchools > 0 && (
-        <Alert variant="light" color="blue" icon={<IconAlertCircle />} mb="md">
-          {trialSchools} school{trialSchools > 1 ? 's are' : ' is'} currently on trial
+          {suspendedSchools} school{suspendedSchools > 1 ? 's are' : ' is'} currently suspended
         </Alert>
       )}
 
@@ -220,14 +202,11 @@ export function SchoolManagement() {
         <Group justify="space-between" mb="md">
           <Title order={3}>All Schools ({schools.length})</Title>
           <Group>
-            <Badge variant="light" color="blue">
-              {trialSchools} Trials
-            </Badge>
             <Badge variant="light" color="green">
-              {schools.filter(s => s.subscription_status === 'active').length} Active
+              {activeSchools} Active
             </Badge>
             <Badge variant="light" color="red">
-              {expiredSchools} Expired
+              {suspendedSchools} Suspended
             </Badge>
           </Group>
         </Group>
@@ -244,7 +223,7 @@ export function SchoolManagement() {
                 <Table.Th>Manager</Table.Th>
                 <Table.Th>Status</Table.Th>
                 <Table.Th>Usage</Table.Th>
-                <Table.Th>Subscription</Table.Th>
+                <Table.Th>Created</Table.Th>
                 <Table.Th>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -277,10 +256,10 @@ export function SchoolManagement() {
                     </Table.Td>
                     <Table.Td>
                       <Badge
-                        color={getStatusColor(school.subscription_status)}
+                        color={getStatusColor(school.is_active)}
                         variant="light"
                       >
-                        {school.subscription_status}
+                        {school.is_active ? 'Active' : 'Suspended'}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -298,14 +277,11 @@ export function SchoolManagement() {
                     </Table.Td>
                     <Table.Td>
                       <div>
-                        <Text 
-                          size="sm" 
-                          c={school.subscription_status === 'expired' ? 'red' : undefined}
-                        >
-                          Expires: {format(new Date(school.subscription_expires), 'MMM dd, yyyy')}
+                        <Text size="sm">
+                          {format(new Date(school.created_at), 'MMM dd, yyyy')}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          Created: {format(new Date(school.created_at), 'MMM dd, yyyy')}
+                          Updated: {format(new Date(school.updated_at), 'MMM dd, yyyy')}
                         </Text>
                       </div>
                     </Table.Td>
@@ -383,26 +359,16 @@ export function SchoolManagement() {
             />
           </Group>
 
-          <Group grow>
-            <Select
-              label="Subscription Status"
-              value={formData.subscriptionStatus}
-              onChange={(value) => setFormData({...formData, subscriptionStatus: value as any})}
-              data={[
-                { value: 'trial', label: 'Trial' },
-                { value: 'active', label: 'Active' },
-                { value: 'suspended', label: 'Suspended' },
-                { value: 'cancelled', label: 'Cancelled' },
-              ]}
-              required
-            />
-            <DateInput
-              label="Subscription Expires"
-              value={formData.subscriptionExpires}
-              onChange={(date) => setFormData({...formData, subscriptionExpires: date})}
-              required
-            />
-          </Group>
+          <Select
+            label="Status"
+            value={formData.isActive ? 'active' : 'suspended'}
+            onChange={(value) => setFormData({...formData, isActive: value === 'active'})}
+            data={[
+              { value: 'active', label: 'Active' },
+              { value: 'suspended', label: 'Suspended' },
+            ]}
+            required
+          />
 
           <Group grow>
             <NumberInput

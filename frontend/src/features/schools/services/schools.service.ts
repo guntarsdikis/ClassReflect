@@ -5,8 +5,7 @@ export interface School {
   name: string;
   domain?: string;
   contact_email: string;
-  subscription_status: 'trial' | 'active' | 'suspended' | 'cancelled';
-  subscription_expires: string;
+  is_active: boolean;
   max_teachers: number;
   max_monthly_uploads: number;
   total_teachers?: number;
@@ -24,8 +23,7 @@ export interface CreateSchoolRequest {
   name: string;
   domain?: string;
   contact_email: string;
-  subscription_status?: 'trial' | 'active' | 'suspended' | 'cancelled';
-  subscription_expires?: string;
+  is_active?: boolean;
   max_teachers?: number;
   max_monthly_uploads?: number;
 }

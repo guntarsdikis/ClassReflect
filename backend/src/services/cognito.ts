@@ -271,6 +271,29 @@ export class CognitoService {
   }
 
   /**
+   * Reset user password (Admin only - generates temporary password)
+   */
+  async resetUserPassword(username: string): Promise<{ temporaryPassword: string }> {
+    try {
+      const temporaryPassword = this.generateTemporaryPassword();
+      
+      const command = new AdminSetUserPasswordCommand({
+        UserPoolId: this.userPoolId,
+        Username: username,
+        Password: temporaryPassword,
+        Permanent: false // Force password change on next login
+      });
+
+      await this.client.send(command);
+      
+      return { temporaryPassword };
+    } catch (error) {
+      console.error('Error resetting user password:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete user
    */
   async deleteUser(email: string): Promise<void> {

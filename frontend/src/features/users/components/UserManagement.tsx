@@ -47,6 +47,7 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { usersService, User, CreateTeacherRequest, CreateSchoolManagerRequest } from '../services/users.service';
 import { schoolsService, School } from '@features/schools/services/schools.service';
+import { useAuthStore } from '@store/auth.store';
 
 interface TeacherFormData extends CreateTeacherRequest {
   schoolId: number;
@@ -64,9 +65,15 @@ interface BulkTeacher {
 
 export function UserManagement() {
   const navigate = useNavigate();
+  const currentUser = useAuthStore((state) => state.user);
   const [teacherModalOpened, { open: openTeacherModal, close: closeTeacherModal }] = useDisclosure(false);
   const [managerModalOpened, { open: openManagerModal, close: closeManagerModal }] = useDisclosure(false);
   const [bulkModalOpened, { open: openBulkModal, close: closeBulkModal }] = useDisclosure(false);
+  
+  // Role-based access control
+  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isSchoolManager = currentUser.role === 'school_manager';
+  const currentUserSchoolId = currentUser.schoolId;
   
   const [users, setUsers] = useState<User[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -106,13 +113,33 @@ export function UserManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Load real data from backend
-      const [usersData, schoolsData] = await Promise.all([
-        usersService.getAllUsers(),
-        schoolsService.getAllSchools(),
-      ]);
-      setUsers(usersData);
-      setSchools(schoolsData);
+      
+      if (isSuperAdmin) {
+        // Super admin can see all users and schools
+        const [usersData, schoolsData] = await Promise.all([
+          usersService.getAllUsers(),
+          schoolsService.getAllSchools(),
+        ]);
+        setUsers(usersData);
+        setSchools(schoolsData);
+      } else if (isSchoolManager) {
+        // School manager can only see users from their school
+        const [usersData, schoolData] = await Promise.all([
+          usersService.getAllUsers(), // TODO: Add endpoint to get users by schoolId
+          schoolsService.getSchool(currentUserSchoolId),
+        ]);
+        
+        // Filter users to only show teachers from their school
+        const filteredUsers = usersData.filter(user => 
+          user.schoolId === currentUserSchoolId && user.role === 'teacher'
+        );
+        
+        setUsers(filteredUsers);
+        setSchools([schoolData]);
+        
+        // Auto-set school filter for school managers
+        setFilterSchool(currentUserSchoolId.toString());
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
       notifications.show({
@@ -133,7 +160,7 @@ export function UserManagement() {
       lastName: '',
       subjects: [],
       grades: [],
-      schoolId: 0,
+      schoolId: isSchoolManager ? currentUserSchoolId : 0,
       sendInviteEmail: true,
     });
     openTeacherModal();
@@ -429,23 +456,32 @@ export function UserManagement() {
     <Container size="xl">
       <Group justify="space-between" mb="xl">
         <div>
-          <Title order={1}>User Management</Title>
-          <Text c="dimmed">Manage users, teachers, and school managers across the platform</Text>
+          <Title order={1}>{isSchoolManager ? 'Teacher Management' : 'User Management'}</Title>
+          <Text c="dimmed">
+            {isSchoolManager 
+              ? 'Manage teachers in your school' 
+              : 'Manage users, teachers, and school managers across the platform'
+            }
+          </Text>
         </div>
         <Group>
-          <Button
-            leftSection={<IconUpload size={16} />}
-            variant="light"
-            onClick={openBulkModal}
-          >
-            Bulk Import
-          </Button>
-          <Button
-            leftSection={<IconSchool size={16} />}
-            onClick={openManagerModal}
-          >
-            Create School & Manager
-          </Button>
+          {isSuperAdmin && (
+            <Button
+              leftSection={<IconUpload size={16} />}
+              variant="light"
+              onClick={openBulkModal}
+            >
+              Bulk Import
+            </Button>
+          )}
+          {isSuperAdmin && (
+            <Button
+              leftSection={<IconSchool size={16} />}
+              onClick={openManagerModal}
+            >
+              Create School & Manager
+            </Button>
+          )}
           <Button
             leftSection={<IconUserPlus size={16} />}
             onClick={handleCreateTeacher}
@@ -499,37 +535,41 @@ export function UserManagement() {
       <Card shadow="sm" p="lg" radius="md" withBorder mb="xl">
         <Group>
           <TextInput
-            placeholder="Search users..."
+            placeholder={isSchoolManager ? 'Search teachers...' : 'Search users...'}
             leftSection={<IconSearch size={16} />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ flex: 1 }}
           />
-          <Select
-            placeholder="Filter by role"
-            value={filterRole}
-            onChange={(value) => setFilterRole(value || 'all')}
-            data={[
-              { value: 'all', label: 'All Roles' },
-              { value: 'teacher', label: 'Teachers' },
-              { value: 'school_manager', label: 'School Managers' },
-              { value: 'super_admin', label: 'Super Admins' },
-            ]}
-            w={200}
-          />
-          <Select
-            placeholder="Filter by school"
-            value={filterSchool}
-            onChange={(value) => setFilterSchool(value || 'all')}
-            data={[
-              { value: 'all', label: 'All Schools' },
-              ...schools.map(school => ({
-                value: school.id.toString(),
-                label: school.name,
-              })),
-            ]}
-            w={200}
-          />
+          {isSuperAdmin && (
+            <Select
+              placeholder="Filter by role"
+              value={filterRole}
+              onChange={(value) => setFilterRole(value || 'all')}
+              data={[
+                { value: 'all', label: 'All Roles' },
+                { value: 'teacher', label: 'Teachers' },
+                { value: 'school_manager', label: 'School Managers' },
+                { value: 'super_admin', label: 'Super Admins' },
+              ]}
+              w={200}
+            />
+          )}
+          {isSuperAdmin && (
+            <Select
+              placeholder="Filter by school"
+              value={filterSchool}
+              onChange={(value) => setFilterSchool(value || 'all')}
+              data={[
+                { value: 'all', label: 'All Schools' },
+                ...schools.map(school => ({
+                  value: school.id.toString(),
+                  label: school.name,
+                })),
+              ]}
+              w={200}
+            />
+          )}
         </Group>
       </Card>
 
@@ -721,7 +761,7 @@ export function UserManagement() {
               label: school.name,
             }))}
             required
-            disabled={!!editingUser}
+            disabled={!!editingUser || isSchoolManager}
           />
 
           <Group grow>

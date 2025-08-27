@@ -61,6 +61,9 @@ import { schoolsService, School } from '@features/schools/services/schools.servi
 export function TemplateManagement() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const isSuperAdmin = user.role === 'super_admin';
+  const isSchoolManager = user.role === 'school_manager';
+  const currentUserSchoolId = user.schoolId;
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const [viewModalOpened, { open: openViewModal, close: closeViewModal }] = useDisclosure(false);
   const [applyModalOpened, { open: openApplyModal, close: closeApplyModal }] = useDisclosure(false);
@@ -81,7 +84,8 @@ export function TemplateManagement() {
     category: '',
     grade_levels: [],
     subjects: [],
-    is_global: false,
+    is_global: false, // Always false - no global templates
+    school_id: isSchoolManager ? currentUserSchoolId : undefined,
     criteria: [],
   });
 
@@ -141,7 +145,8 @@ export function TemplateManagement() {
       category: '',
       grade_levels: [],
       subjects: [],
-      is_global: user?.role === 'super_admin',
+      is_global: false, // Always false - no global templates
+      school_id: isSchoolManager ? currentUserSchoolId : undefined, // School managers can only create for their school
       criteria: [],
     });
     openModal();
@@ -159,7 +164,8 @@ export function TemplateManagement() {
         category: fullTemplate.category,
         grade_levels: fullTemplate.grade_levels,
         subjects: fullTemplate.subjects,
-        is_global: fullTemplate.is_global,
+        is_global: false, // Always false - no global templates
+        school_id: fullTemplate.school_id,
         criteria: fullTemplate.criteria?.map(c => ({
           criteria_name: c.criteria_name,
           criteria_description: c.criteria_description || '',
@@ -208,15 +214,32 @@ export function TemplateManagement() {
         return;
       }
 
+      // For super admin, school_id is required when creating school-specific templates
+      if (isSuperAdmin && !formData.school_id) {
+        notifications.show({
+          title: 'Error',
+          message: 'School selection is required',
+          color: 'red',
+        });
+        return;
+      }
+
+      // Prepare the template data
+      const templateData = {
+        ...formData,
+        is_global: false, // Always false - no global templates
+        school_id: isSchoolManager ? currentUserSchoolId : formData.school_id, // Ensure school ID is set
+      };
+
       if (editingTemplate) {
-        await templatesService.updateTemplate(editingTemplate.id, formData);
+        await templatesService.updateTemplate(editingTemplate.id, templateData);
         notifications.show({
           title: 'Success',
           message: 'Template updated successfully',
           color: 'green',
         });
       } else {
-        await templatesService.createTemplate(formData);
+        await templatesService.createTemplate(templateData);
         notifications.show({
           title: 'Success',
           message: 'Template created successfully',
@@ -333,13 +356,11 @@ export function TemplateManagement() {
   });
 
   const getTemplateTypeColor = (template: Template) => {
-    if (template.is_global) return 'blue';
-    return 'green';
+    return 'green'; // All templates are now school-specific
   };
 
   const getTemplateTypeLabel = (template: Template) => {
-    if (template.is_global) return 'Global';
-    return 'School';
+    return template.school_name || 'School Template';
   };
 
   return (
@@ -375,21 +396,21 @@ export function TemplateManagement() {
         <Card shadow="sm" p="lg" radius="md" withBorder>
           <Group justify="space-between">
             <div>
-              <Text c="dimmed" size="sm">Global Templates</Text>
-              <Text fw={700} size="xl">{templates.filter(t => t.is_global).length}</Text>
+              <Text c="dimmed" size="sm">Total Templates</Text>
+              <Text fw={700} size="xl">{templates.length}</Text>
             </div>
             <ThemeIcon color="green" variant="light" radius="md" size={40}>
-              <IconWorld size={28} />
+              <IconTemplate size={28} />
             </ThemeIcon>
           </Group>
         </Card>
         <Card shadow="sm" p="lg" radius="md" withBorder>
           <Group justify="space-between">
             <div>
-              <Text c="dimmed" size="sm">School Templates</Text>
-              <Text fw={700} size="xl">{templates.filter(t => !t.is_global).length}</Text>
+              <Text c="dimmed" size="sm">{isSchoolManager ? 'My School Templates' : 'School Templates'}</Text>
+              <Text fw={700} size="xl">{templates.length}</Text>
             </div>
-            <ThemeIcon color="orange" variant="light" radius="md" size={40}>
+            <ThemeIcon color="blue" variant="light" radius="md" size={40}>
               <IconSchool size={28} />
             </ThemeIcon>
           </Group>
@@ -543,8 +564,7 @@ export function TemplateManagement() {
                         >
                           <IconCopy size={16} />
                         </ActionIcon>
-                        {(template.is_global && user?.role === 'super_admin') ||
-                         (!template.is_global && template.school_id === user?.schoolId) ? (
+                        {(isSuperAdmin || template.school_id === currentUserSchoolId) ? (
                           <>
                             <ActionIcon 
                               variant="subtle" 
@@ -618,12 +638,18 @@ export function TemplateManagement() {
               allowDeselect={false}
               required
             />
-            {user?.role === 'super_admin' && (
-              <Switch
-                label="Global Template"
-                description="Available to all schools"
-                checked={formData.is_global}
-                onChange={(event) => setFormData({...formData, is_global: event.currentTarget.checked})}
+            {isSuperAdmin && (
+              <Select
+                label="School"
+                placeholder="Select school for this template"
+                value={formData.school_id?.toString() || ''}
+                onChange={(value) => setFormData({...formData, school_id: value ? parseInt(value) : undefined})}
+                data={schools.map(school => ({
+                  value: school.id.toString(),
+                  label: school.name,
+                }))}
+                required
+                disabled={isSchoolManager} // School managers can only create for their own school
               />
             )}
           </Group>

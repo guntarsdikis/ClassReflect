@@ -494,6 +494,64 @@ router.put('/teachers/:id',
 );
 
 /**
+ * POST /api/users/teachers/:id/reset-password
+ * Reset teacher password (School Manager and Super Admin only)
+ */
+router.post('/teachers/:id/reset-password',
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  requireSchoolAccess,
+  async (req: Request, res: Response) => {
+    try {
+      const teacherId = req.params.id;
+
+      // Get teacher details
+      const [teacherRows] = await pool.execute(
+        'SELECT email, school_id, cognito_username, first_name, last_name FROM users WHERE id = ? AND role = ?',
+        [teacherId, 'teacher']
+      );
+
+      if (!Array.isArray(teacherRows) || teacherRows.length === 0) {
+        res.status(404).json({ error: 'Teacher not found' });
+        return;
+      }
+
+      const teacher = teacherRows[0] as any;
+
+      // Check school access (unless super admin)
+      if (req.user!.role !== 'super_admin' && teacher.school_id !== req.user!.schoolId) {
+        res.status(403).json({ error: 'Access denied - different school' });
+        return;
+      }
+
+      // Reset password in Cognito (skip in development mode)
+      let temporaryPassword = 'TempPass123!'; // Default for development
+      
+      if (process.env.NODE_ENV !== 'development') {
+        const resetResult = await cognitoService.resetUserPassword(teacher.cognito_username || teacher.email);
+        temporaryPassword = resetResult.temporaryPassword;
+      } else {
+        console.log('Development mode: Skipping Cognito password reset for', teacher.email);
+      }
+
+      // TODO: Add audit logging when audit_log table is created
+      console.log('Password reset:', { teacherId, email: teacher.email, resetBy: req.user!.id });
+
+      res.json({
+        message: 'Password reset successfully',
+        temporaryPassword: temporaryPassword,
+        teacherEmail: teacher.email,
+        teacherName: `${teacher.first_name} ${teacher.last_name}`,
+        requiresPasswordChange: true
+      });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
+    }
+  }
+);
+
+/**
  * DELETE /api/users/teachers/:id
  * Delete teacher (School Manager only)
  */

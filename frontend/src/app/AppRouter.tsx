@@ -10,6 +10,7 @@ import { SchoolDetail } from '@features/schools/components/SchoolDetail';
 import { UserManagement } from '@features/users/components/UserManagement';
 import { UserDetail } from '@features/users/components/UserDetail';
 import { TemplateManagement } from '@features/templates/components/TemplateManagement';
+import { CategoriesManagement } from '@features/categories/components/CategoriesManagement';
 import { UploadWizard } from '@features/uploads/components/UploadWizard';
 import { JobManagement } from '@features/admin/components/JobManagement';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
@@ -33,16 +34,17 @@ export function AppRouter() {
           
           {/* Teacher Routes */}
           <Route element={<RoleRoute roles={['teacher']} />}>
+            <Route path="/progress" element={<div style={{padding: '2rem', textAlign: 'center'}}><h2>My Progress - Coming Soon</h2><p>Track your teaching progress and performance metrics here.</p></div>} />
+            <Route path="/reports" element={<div style={{padding: '2rem', textAlign: 'center'}}><h2>Reports - Coming Soon</h2><p>View detailed reports and analytics about your lessons here.</p></div>} />
             {/* <Route path="/feedback/:jobId" element={<FeedbackView />} /> */}
-            {/* <Route path="/progress" element={<ProgressView />} /> */}
-            {/* <Route path="/reports" element={<ReportsView />} /> */}
           </Route>
           
           {/* School Manager Routes */}
           <Route element={<RoleRoute roles={['school_manager']} />}>
             <Route path="/upload" element={<UploadWizard />} />
             <Route path="/templates" element={<TemplateManagement />} />
-            {/* <Route path="/teachers" element={<TeacherManagement />} /> */}
+            <Route path="/categories" element={<CategoriesManagement />} />
+            <Route path="/teachers" element={<UserManagement />} />
             {/* <Route path="/analytics" element={<SchoolAnalytics />} /> */}
           </Route>
           
@@ -55,10 +57,17 @@ export function AppRouter() {
             <Route path="/admin/users/:id" element={<UserDetail />} />
             <Route path="/admin/users/new" element={<UserManagement />} />
             <Route path="/admin/templates" element={<TemplateManagement />} />
+            <Route path="/admin/categories" element={<CategoriesManagement />} />
             <Route path="/admin/jobs" element={<JobManagement />} />
           </Route>
           
-          {/* Shared Routes */}
+          {/* Shared Routes - Super Admin and School Manager */}
+          <Route element={<RoleRoute roles={['super_admin', 'school_manager']} />}>
+            <Route path="/users/:id" element={<UserDetail />} />
+            <Route path="/teachers/:id" element={<UserDetail />} />
+          </Route>
+          
+          {/* Shared Routes - All roles */}
           <Route path="/profile" element={<div>Profile - Coming Soon</div>} />
           <Route path="/settings" element={<div>Settings - Coming Soon</div>} />
         </Route>

@@ -82,8 +82,7 @@ router.post('/', authorize('super_admin'), async (req: Request, res: Response) =
       name, 
       domain,
       contact_email,
-      subscription_status = 'trial',
-      subscription_expires,
+      is_active = true,
       max_teachers = 10,
       max_monthly_uploads = 100
     } = req.body;
@@ -108,17 +107,16 @@ router.post('/', authorize('super_admin'), async (req: Request, res: Response) =
 
     const [result] = await pool.execute<ResultSetHeader>(`
       INSERT INTO schools (
-        name, domain, contact_email, subscription_status, 
-        subscription_expires, max_teachers, max_monthly_uploads
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [name, domain || null, contact_email, subscription_status, subscription_expires || null, max_teachers, max_monthly_uploads]);
+        name, domain, contact_email, is_active, max_teachers, max_monthly_uploads
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `, [name, domain || null, contact_email, is_active, max_teachers, max_monthly_uploads]);
 
     res.status(201).json({
       id: result.insertId,
       name,
       domain,
       contact_email,
-      subscription_status,
+      is_active,
       message: 'School created successfully'
     });
   } catch (error) {
@@ -138,8 +136,7 @@ router.put('/:schoolId', authorize('super_admin'), async (req: Request, res: Res
     const values = [];
 
     const allowedFields = [
-      'name', 'domain', 'contact_email', 'subscription_status', 
-      'subscription_expires', 'max_teachers', 'max_monthly_uploads'
+      'name', 'domain', 'contact_email', 'is_active', 'max_teachers', 'max_monthly_uploads'
     ];
 
     for (const field of allowedFields) {
@@ -189,7 +186,7 @@ router.delete('/:schoolId', authorize('super_admin'), async (req: Request, res: 
 
     // Instead of deleting, suspend the school
     await pool.execute(
-      `UPDATE schools SET subscription_status = 'cancelled', updated_at = NOW() WHERE id = ?`,
+      `UPDATE schools SET is_active = false, updated_at = NOW() WHERE id = ?`,
       [schoolId]
     );
 
@@ -333,6 +330,71 @@ router.post('/:schoolId/criteria', authorize('school_manager', 'super_admin'), a
   } catch (error) {
     console.error('Error creating criterion:', error);
     res.status(500).json({ error: 'Failed to create analysis criterion' });
+  }
+});
+
+// Update analysis criterion for school
+router.put('/:schoolId/criteria/:criterionId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId, criterionId } = req.params;
+    const { criteria_name, criteria_description, weight = 1.0 } = req.body;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!criteria_name) {
+      return res.status(400).json({ 
+        error: 'Missing required field: criteria_name' 
+      });
+    }
+
+    await pool.execute(`
+      UPDATE analysis_criteria 
+      SET criteria_name = ?, criteria_description = ?, weight = ?, updated_at = NOW() 
+      WHERE id = ? AND school_id = ?
+    `, [criteria_name, criteria_description, weight, criterionId, schoolId]);
+
+    res.json({
+      id: criterionId,
+      schoolId,
+      criteria_name,
+      message: 'Analysis criterion updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating criterion:', error);
+    res.status(500).json({ error: 'Failed to update analysis criterion' });
+  }
+});
+
+// Delete analysis criterion for school (soft delete)
+router.delete('/:schoolId/criteria/:criterionId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId, criterionId } = req.params;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Soft delete by setting is_active to false
+    await pool.execute(`
+      UPDATE analysis_criteria 
+      SET is_active = FALSE, updated_at = NOW() 
+      WHERE id = ? AND school_id = ?
+    `, [criterionId, schoolId]);
+
+    res.json({
+      id: criterionId,
+      schoolId,
+      message: 'Analysis criterion deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting criterion:', error);
+    res.status(500).json({ error: 'Failed to delete analysis criterion' });
   }
 });
 

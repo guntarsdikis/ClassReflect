@@ -37,11 +37,14 @@ import {
   IconCheck,
   IconX,
   IconSearch,
+  IconKey,
+  IconCopy,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { usersService, User, CreateTeacherRequest, CreateSchoolManagerRequest } from '../services/users.service';
 import { schoolsService, School } from '@features/schools/services/schools.service';
 
@@ -281,12 +284,102 @@ export function UserManagement() {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
+  const handleResetPassword = async (user: User) => {
+    modals.openConfirmModal({
+      title: 'Reset Password',
+      children: (
+        <Text size="sm">
+          Are you sure you want to reset the password for <strong>{user.firstName} {user.lastName}</strong>? 
+          A new temporary password will be generated and they will need to change it on their next login.
+        </Text>
+      ),
+      labels: { confirm: 'Reset Password', cancel: 'Cancel' },
+      confirmProps: { color: 'blue' },
+      onConfirm: () => confirmResetPassword(user.id),
+    });
+  };
+
+  const confirmResetPassword = async (userId: number) => {
     try {
-      await usersService.deleteTeacher(userId);
+      const result = await usersService.resetTeacherPassword(userId);
+      
+      // Show password in a modal with copy functionality
+      modals.open({
+        title: 'Password Reset Successful',
+        children: (
+          <Stack gap="md">
+            <Alert variant="light" color="green" icon={<IconCheck />}>
+              Password has been reset successfully for <strong>{result.teacherName}</strong>
+            </Alert>
+            
+            <div>
+              <Text size="sm" fw={500} mb="xs">Temporary Password:</Text>
+              <Group gap="xs">
+                <TextInput
+                  value={result.temporaryPassword}
+                  readOnly
+                  style={{ flex: 1 }}
+                />
+                <ActionIcon 
+                  variant="light" 
+                  color="blue"
+                  onClick={() => {
+                    navigator.clipboard.writeText(result.temporaryPassword);
+                    notifications.show({
+                      message: 'Password copied to clipboard',
+                      color: 'blue',
+                    });
+                  }}
+                >
+                  <IconCopy size={16} />
+                </ActionIcon>
+              </Group>
+            </div>
+            
+            <Alert variant="light" color="yellow" icon={<IconAlertCircle />}>
+              <Text size="sm">
+                <strong>Important:</strong> Share this password securely with {result.teacherName} ({result.teacherEmail}). 
+                They will be required to change it on their next login.
+              </Text>
+            </Alert>
+          </Stack>
+        ),
+        size: 'md',
+      });
+      
+      await loadData();
+    } catch (error) {
+      console.error('Failed to reset password:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to reset password. Please try again.',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDeleteUser = (user: User) => {
+    modals.openConfirmModal({
+      title: 'Delete User',
+      children: (
+        <Text size="sm">
+          Are you sure you want to delete <strong>{user.firstName} {user.lastName}</strong>? 
+          If they have associated teaching records, their account will be deactivated instead of deleted.
+          This action cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete User', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => confirmDeleteUser(user.id),
+    });
+  };
+
+  const confirmDeleteUser = async (userId: number) => {
+    try {
+      const result = await usersService.deleteTeacher(userId);
       notifications.show({
         title: 'Success',
-        message: 'User deleted/deactivated successfully',
+        message: result.deleted ? 'User deleted successfully' : 'User deactivated successfully (had associated records)',
         color: 'green',
       });
       await loadData();
@@ -548,8 +641,19 @@ export function UserManagement() {
                         {user.role !== 'super_admin' && (
                           <ActionIcon 
                             variant="subtle" 
+                            color="blue"
+                            onClick={() => handleResetPassword(user)}
+                            title="Reset Password"
+                          >
+                            <IconKey size={16} />
+                          </ActionIcon>
+                        )}
+                        {user.role !== 'super_admin' && (
+                          <ActionIcon 
+                            variant="subtle" 
                             color="red"
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => handleDeleteUser(user)}
+                            title="Delete User"
                           >
                             <IconTrash size={16} />
                           </ActionIcon>

@@ -114,6 +114,19 @@ export class UsersService {
   }
 
   /**
+   * Reset teacher password (Admin only)
+   */
+  async resetTeacherPassword(teacherId: number): Promise<{
+    message: string;
+    temporaryPassword: string;
+    teacherEmail: string;
+    teacherName: string;
+    requiresPasswordChange: boolean;
+  }> {
+    return this.api.post(`/users/teachers/${teacherId}/reset-password`, {});
+  }
+
+  /**
    * Delete/deactivate teacher
    */
   async deleteTeacher(teacherId: number): Promise<{ 

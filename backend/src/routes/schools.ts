@@ -111,7 +111,7 @@ router.post('/', authorize('super_admin'), async (req: Request, res: Response) =
         name, domain, contact_email, subscription_status, 
         subscription_expires, max_teachers, max_monthly_uploads
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [name, domain, contact_email, subscription_status, subscription_expires, max_teachers, max_monthly_uploads]);
+    `, [name, domain || null, contact_email, subscription_status, subscription_expires || null, max_teachers, max_monthly_uploads]);
 
     res.status(201).json({
       id: result.insertId,

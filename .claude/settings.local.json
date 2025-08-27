@@ -47,8 +47,6 @@
       "Bash(aws amplify create-domain-association:*)",
       "Bash(aws amplify get-domain-association:*)",
       "Bash(aws route53 list-resource-record-sets:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
       "Bash(aws ecs describe-services:*)",
       "Bash(aws ecs list-tasks:*)",
       "Bash(aws logs tail:*)",

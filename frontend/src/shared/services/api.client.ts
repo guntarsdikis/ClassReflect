@@ -83,6 +83,9 @@ export const api = {
     login: (email: string, password: string) =>
       apiClient.post('/auth/login', { email, password }),
     
+    completeChallenge: (username: string, newPassword: string, temporaryPassword: string) =>
+      apiClient.post('/auth/complete-challenge', { username, newPassword, temporaryPassword }),
+    
     logout: () =>
       apiClient.post('/auth/logout'),
     

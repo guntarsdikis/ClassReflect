@@ -350,6 +350,11 @@ export function UserManagement() {
       console.log('🔐 Password reset API response:', result);
       
       // Show password in a modal with copy functionality
+      console.log('🔐 Opening success modal with data:', { 
+        teacherName: result.teacherName, 
+        temporaryPassword: result.temporaryPassword 
+      });
+      
       modals.open({
         title: 'Password Reset Successful',
         children: (

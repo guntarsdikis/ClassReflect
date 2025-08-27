@@ -524,16 +524,29 @@ router.post('/teachers/:id/reset-password',
         return;
       }
 
-      // Reset password in Cognito (skip in development mode)
-      let temporaryPassword = 'DevPass123!'; // Default for development
+      // Reset password in Cognito 
+      let temporaryPassword = 'DevPass123!';
       
-      if (process.env.NODE_ENV !== 'development') {
-        const resetResult = await cognitoService.resetUserPassword(teacher.cognito_username || teacher.email);
-        temporaryPassword = resetResult.temporaryPassword;
-      } else {
-        console.log('Development mode: Skipping Cognito password reset for', teacher.email);
-        // In development, generate a fake temporary password for testing UI
-        temporaryPassword = `DevTemp${Math.random().toString(36).substring(7)}!`;
+      try {
+        if (process.env.NODE_ENV !== 'development') {
+          // Production: Use Cognito password reset
+          const resetResult = await cognitoService.resetUserPassword(teacher.cognito_username || teacher.email);
+          temporaryPassword = resetResult.temporaryPassword;
+        } else {
+          // Development: Actually reset in Cognito too, but with a known password
+          console.log('Development mode: Performing Cognito password reset for', teacher.email);
+          const resetResult = await cognitoService.resetUserPassword(teacher.cognito_username || teacher.email);
+          temporaryPassword = resetResult.temporaryPassword;
+        }
+      } catch (cognitoError) {
+        console.error('Cognito password reset failed:', cognitoError);
+        // In development, if Cognito fails, use a fake password for UI testing
+        if (process.env.NODE_ENV === 'development') {
+          temporaryPassword = `DevTemp${Math.random().toString(36).substring(7)}!`;
+          console.log('Using fake password for development UI testing:', temporaryPassword);
+        } else {
+          throw cognitoError; // Re-throw in production
+        }
       }
 
       // TODO: Add audit logging when audit_log table is created

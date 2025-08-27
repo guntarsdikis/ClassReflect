@@ -45,6 +45,19 @@ router.post('/login', async (req: Request, res: Response) => {
     // Authenticate with Cognito
     const authResult = await cognitoService.authenticateUser(email, password);
     
+    // Check if password challenge is required
+    if (authResult.challengeRequired) {
+      console.log('Password challenge required for user:', email);
+      res.json({
+        challengeRequired: true,
+        challengeName: authResult.challengeName,
+        session: authResult.session,
+        username: authResult.user.username,
+        email: authResult.user.email
+      });
+      return;
+    }
+    
     // Sync user with local database (or create if not exists)
     try {
       await syncUserWithDatabase(authResult.user);
@@ -132,12 +145,117 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
     
-    if (error.message.includes('Authentication challenge required')) {
-      res.status(401).json({ error: 'Password change required. Please use temporary password flow.' });
+    
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+/**
+ * POST /api/auth/complete-challenge
+ * Complete NEW_PASSWORD_REQUIRED challenge
+ */
+router.post('/complete-challenge', async (req: Request, res: Response) => {
+  try {
+    const { username, newPassword, temporaryPassword } = req.body;
+    
+    if (!username || !newPassword || !temporaryPassword) {
+      res.status(400).json({ error: 'Username, new password, and temporary password are required' });
       return;
     }
     
-    res.status(500).json({ error: 'Authentication failed' });
+    if (newPassword.length < 12) {
+      res.status(400).json({ error: 'Password must be at least 12 characters' });
+      return;
+    }
+    
+    console.log('Completing password challenge for user:', username);
+    
+    // Re-authenticate with temporary password to get fresh session
+    let authResult;
+    try {
+      authResult = await cognitoService.authenticateUser(username.includes('@') ? username : `${username}@test.local`, temporaryPassword);
+    } catch (error: any) {
+      if (error.message && error.message.includes('Authentication challenge required')) {
+        // This is expected - we should get the challenge again
+        authResult = await cognitoService.authenticateUser(username.includes('@') ? username : `${username}@test.local`, temporaryPassword);
+      } else {
+        throw error;
+      }
+    }
+    
+    if (!authResult.challengeRequired || !authResult.session) {
+      res.status(400).json({ error: 'Unable to get fresh challenge session' });
+      return;
+    }
+    
+    // Complete the challenge using the fresh session
+    const challengeResult = await cognitoService.completeNewPasswordChallenge(username, newPassword, authResult.session);
+    
+    if (!challengeResult.success) {
+      res.status(400).json({ error: 'Failed to complete password challenge' });
+      return;
+    }
+    
+    // Get user details from Cognito
+    const cognitoUser = await cognitoService.getUser(username);
+    
+    // Sync user with local database
+    await syncUserWithDatabase(cognitoUser);
+    
+    // Get full user details from database
+    const [rows] = await pool.execute(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, 
+              u.school_id, s.name as school_name, u.subjects, u.grades
+       FROM users u
+       LEFT JOIN schools s ON u.school_id = s.id
+       WHERE u.email = ? AND u.is_active = true`,
+      [cognitoUser.email]
+    );
+    
+    if (!Array.isArray(rows) || rows.length === 0) {
+      // Return Cognito data if not in database yet
+      res.json({
+        accessToken: challengeResult.tokens.accessToken,
+        idToken: challengeResult.tokens.idToken,
+        refreshToken: challengeResult.tokens.refreshToken,
+        user: {
+          id: 0,
+          email: cognitoUser.email,
+          firstName: cognitoUser.firstName,
+          lastName: cognitoUser.lastName,
+          role: cognitoUser.role,
+          schoolId: cognitoUser.schoolId,
+          schoolName: 'Test School',
+          subjects: cognitoUser.subjects || [],
+          grades: cognitoUser.grades || [],
+          cognitoUsername: cognitoUser.username
+        }
+      });
+      return;
+    }
+    
+    const user = rows[0] as any;
+    
+    res.json({
+      accessToken: challengeResult.tokens.accessToken,
+      idToken: challengeResult.tokens.idToken,
+      refreshToken: challengeResult.tokens.refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: user.role,
+        schoolId: user.school_id,
+        schoolName: user.school_name,
+        subjects: parseArrayField(user.subjects),
+        grades: parseArrayField(user.grades),
+        cognitoUsername: cognitoUser.username
+      }
+    });
+  } catch (error: any) {
+    console.error('Complete challenge error:', error);
+    res.status(500).json({ error: 'Failed to complete password challenge' });
   }
 });
 

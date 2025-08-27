@@ -11,8 +11,16 @@ interface LoginCredentials {
 }
 
 interface LoginResponse {
-  token: string;
-  user: User;
+  token?: string;
+  user?: User;
+  challengeRequired?: boolean;
+  challengeName?: string;
+  session?: string;
+  username?: string;
+  email?: string;
+  accessToken?: string;
+  idToken?: string;
+  refreshToken?: string;
 }
 
 // Use mock auth in development (disabled for Cognito testing)
@@ -39,7 +47,19 @@ export const useLogin = () => {
       return response.data as LoginResponse;
     },
     onSuccess: (data) => {
-      setAuth(data.user, data.token);
+      // If challenge is required, don't set auth or navigate - let UI handle it
+      if (data.challengeRequired) {
+        console.log('Password challenge required:', data.challengeName);
+        return;
+      }
+      
+      // Normal login flow
+      const token = data.token || data.accessToken;
+      if (!data.user || !token) {
+        throw new Error('Invalid login response');
+      }
+      
+      setAuth(data.user, token);
       
       notifications.show({
         title: 'Welcome back!',
@@ -65,6 +85,51 @@ export const useLogin = () => {
     onError: (error: any) => {
       // Error notification handled by API client interceptor
       console.error('Login error:', error);
+    },
+  });
+};
+
+// Complete password challenge hook
+export const useCompleteChallenge = () => {
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
+  
+  return useMutation({
+    mutationFn: async ({ username, newPassword, temporaryPassword }: { username: string; newPassword: string; temporaryPassword: string }) => {
+      const response = await api.auth.completeChallenge(username, newPassword, temporaryPassword);
+      return response.data as LoginResponse;
+    },
+    onSuccess: (data) => {
+      const token = data.accessToken;
+      if (!data.user || !token) {
+        throw new Error('Invalid challenge completion response');
+      }
+      
+      setAuth(data.user, token);
+      
+      notifications.show({
+        title: 'Password updated successfully!',
+        message: `Welcome back, ${data.user.firstName} ${data.user.lastName}`,
+        color: 'green',
+      });
+      
+      // Redirect based on role
+      switch (data.user.role) {
+        case 'super_admin':
+          navigate('/admin');
+          break;
+        case 'school_manager':
+          navigate('/dashboard');
+          break;
+        case 'teacher':
+          navigate('/dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    },
+    onError: (error: any) => {
+      console.error('Challenge completion error:', error);
     },
   });
 };

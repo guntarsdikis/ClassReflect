@@ -32,10 +32,13 @@ export interface CognitoUser {
 }
 
 export interface AuthResult {
-  accessToken: string;
-  idToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  idToken?: string;
+  refreshToken?: string;
   user: CognitoUser;
+  challengeRequired?: boolean;
+  challengeName?: string;
+  session?: string;
 }
 
 export class CognitoService {
@@ -145,7 +148,24 @@ export class CognitoService {
       console.log('Auth successful, got tokens');
 
       // Handle challenges (like password reset required)
-      if (result.ChallengeName) {
+      if (result.ChallengeName === 'NEW_PASSWORD_REQUIRED') {
+        // Return challenge info for frontend to handle
+        return {
+          challengeRequired: true,
+          challengeName: result.ChallengeName,
+          session: result.Session,
+          user: {
+            username: username,
+            email: username.includes('@') ? username : `${username}@test.local`,
+            firstName: 'User',
+            lastName: '',
+            schoolId: 'test-school-001',
+            role: 'teacher',
+            subjects: [],
+            grades: []
+          }
+        };
+      } else if (result.ChallengeName) {
         throw new Error(`Authentication challenge required: ${result.ChallengeName}`);
       }
 
@@ -266,6 +286,53 @@ export class CognitoService {
       await this.client.send(command);
     } catch (error) {
       console.error('Error setting permanent password:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Complete new password challenge (when user needs to change temporary password)
+   */
+  async completeNewPasswordChallenge(username: string, newPassword: string, session: string): Promise<{
+    success: boolean;
+    user: any;
+    tokens: any;
+  }> {
+    try {
+      const secretHash = this.generateSecretHash(username);
+      
+      const command = new AdminRespondToAuthChallengeCommand({
+        UserPoolId: this.userPoolId,
+        ClientId: this.clientId,
+        ChallengeName: 'NEW_PASSWORD_REQUIRED',
+        Session: session,
+        ChallengeResponses: {
+          USERNAME: username,
+          NEW_PASSWORD: newPassword,
+          SECRET_HASH: secretHash
+        }
+      });
+
+      const result = await this.client.send(command);
+
+      if (!result.AuthenticationResult) {
+        throw new Error('Failed to complete password challenge');
+      }
+
+      return {
+        success: true,
+        user: {
+          username,
+          email: username
+        },
+        tokens: {
+          accessToken: result.AuthenticationResult.AccessToken!,
+          refreshToken: result.AuthenticationResult.RefreshToken!,
+          idToken: result.AuthenticationResult.IdToken!
+        }
+      };
+    } catch (error) {
+      console.error('Error completing password challenge:', error);
       throw error;
     }
   }

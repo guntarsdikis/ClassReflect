@@ -59,7 +59,7 @@ export function ForgotPasswordPage() {
             <Group justify="space-between" mt="lg">
               <Anchor component={Link} to="/login" c="dimmed" size="sm">
                 <Center inline>
-                  <IconArrowLeft size={rem(12)} stroke={1.5} />
+                  <IconArrowLeft size={12} stroke={1.5} />
                   <Box ml={5}>Back to login</Box>
                 </Center>
               </Anchor>
@@ -83,7 +83,7 @@ export function ForgotPasswordPage() {
             <Group justify="center" mt="xl">
               <Anchor component={Link} to="/login" size="sm">
                 <Center inline>
-                  <IconArrowLeft size={rem(12)} stroke={1.5} />
+                  <IconArrowLeft size={12} stroke={1.5} />
                   <Box ml={5}>Back to login</Box>
                 </Center>
               </Anchor>

@@ -119,7 +119,7 @@ export function TeacherDashboard() {
                   {stat.value}
                 </Text>
               </div>
-              <ThemeIcon color={stat.color} variant="light" radius="md" size="xl">
+              <ThemeIcon color={stat.color} variant="light" radius="md" size={40}>
                 <stat.icon size={28} stroke={1.5} />
               </ThemeIcon>
             </Group>
@@ -133,7 +133,7 @@ export function TeacherDashboard() {
           <Card shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
               <Title order={3}>Recent Evaluations</Title>
-              <Button variant="subtle" size="sm" rightSection={<IconChartBar size={16} />}>
+              <Button variant="subtle" size={32} rightSection={<IconChartBar size={16} />}>
                 View All
               </Button>
             </Group>

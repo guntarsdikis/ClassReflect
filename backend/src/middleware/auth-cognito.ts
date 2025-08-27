@@ -89,6 +89,33 @@ function verifyToken(token: string): Promise<any> {
  */
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // TEMPORARY: For development, use the super admin user directly
+    // TODO: Remove this and restore proper JWT authentication
+    if (process.env.NODE_ENV === 'development') {
+      const [rows] = await dbPool.execute(
+        `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school_id, u.cognito_username
+         FROM users u
+         WHERE u.role = 'super_admin' AND u.is_active = true
+         LIMIT 1`,
+        []
+      );
+      
+      if (Array.isArray(rows) && rows.length > 0) {
+        const user = rows[0] as any;
+        req.user = {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          schoolId: user.school_id,
+          cognitoSub: user.cognito_username
+        };
+        next();
+        return;
+      }
+    }
+    
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

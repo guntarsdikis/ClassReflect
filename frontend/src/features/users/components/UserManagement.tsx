@@ -103,6 +103,7 @@ export function UserManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
+      // Load real data from backend
       const [usersData, schoolsData] = await Promise.all([
         usersService.getAllUsers(),
         schoolsService.getAllSchools(),

@@ -102,6 +102,7 @@ export function TemplateManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
+      // Load real data from backend
       const [templatesData, categoriesData] = await Promise.all([
         templatesService.getTemplates(filters),
         templatesService.getTemplateCategories(),
@@ -366,7 +367,7 @@ export function TemplateManagement() {
               <Text c="dimmed" size="sm">Total Templates</Text>
               <Text fw={700} size="xl">{templates.length}</Text>
             </div>
-            <ThemeIcon color="blue" variant="light" radius="md" size="xl">
+            <ThemeIcon color="blue" variant="light" radius="md" size={40}>
               <IconTemplate size={28} />
             </ThemeIcon>
           </Group>
@@ -377,7 +378,7 @@ export function TemplateManagement() {
               <Text c="dimmed" size="sm">Global Templates</Text>
               <Text fw={700} size="xl">{templates.filter(t => t.is_global).length}</Text>
             </div>
-            <ThemeIcon color="green" variant="light" radius="md" size="xl">
+            <ThemeIcon color="green" variant="light" radius="md" size={40}>
               <IconWorld size={28} />
             </ThemeIcon>
           </Group>
@@ -388,7 +389,7 @@ export function TemplateManagement() {
               <Text c="dimmed" size="sm">School Templates</Text>
               <Text fw={700} size="xl">{templates.filter(t => !t.is_global).length}</Text>
             </div>
-            <ThemeIcon color="orange" variant="light" radius="md" size="xl">
+            <ThemeIcon color="orange" variant="light" radius="md" size={40}>
               <IconSchool size={28} />
             </ThemeIcon>
           </Group>
@@ -399,7 +400,7 @@ export function TemplateManagement() {
               <Text c="dimmed" size="sm">Categories</Text>
               <Text fw={700} size="xl">{categories.length}</Text>
             </div>
-            <ThemeIcon color="teal" variant="light" radius="md" size="xl">
+            <ThemeIcon color="teal" variant="light" radius="md" size={40}>
               <IconCategory size={28} />
             </ThemeIcon>
           </Group>
@@ -583,7 +584,7 @@ export function TemplateManagement() {
             </Text>
           </Group>
         }
-        size="xl"
+        size={800}
       >
         <Stack>
           <TextInput
@@ -608,14 +609,13 @@ export function TemplateManagement() {
               placeholder="Select category"
               value={formData.category}
               onChange={(value) => setFormData({...formData, category: value || ''})}
-              data={templatesService.getDefaultCategories()}
+              data={[
+                ...templatesService.getDefaultCategories(),
+                ...(formData.category && !templatesService.getDefaultCategories().includes(formData.category) 
+                  ? [formData.category] : [])
+              ]}
               searchable
-              creatable
-              getCreateLabel={(query) => `+ Create "${query}"`}
-              onCreate={(query) => {
-                setFormData({...formData, category: query});
-                return query;
-              }}
+              allowDeselect={false}
               required
             />
             {user?.role === 'super_admin' && (

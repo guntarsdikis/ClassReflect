@@ -184,7 +184,7 @@ export function ManagerDashboard() {
                   {stat.value}
                 </Text>
               </div>
-              <ThemeIcon color={stat.color} variant="light" radius="md" size="xl">
+              <ThemeIcon color={stat.color} variant="light" radius="md" size={40}>
                 <stat.icon size={28} stroke={1.5} />
               </ThemeIcon>
             </Group>

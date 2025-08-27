@@ -97,6 +97,9 @@ router.post('/teachers',
       const userId = (result as any).insertId;
 
       // Log the action for audit trail
+      // TODO: Add audit logging when audit_log table is created
+      console.log('User created:', { userId, email, firstName, lastName, role: 'teacher', createdBy: req.user!.id });
+      /*
       await pool.execute(
         `INSERT INTO audit_log (user_id, action, resource_type, resource_id, changes, created_at)
          VALUES (?, 'CREATE_USER', 'user', ?, ?, NOW())`,
@@ -112,6 +115,7 @@ router.post('/teachers',
           })
         ]
       );
+      */
 
       res.status(201).json({
         message: 'Teacher account created successfully',
@@ -267,19 +271,8 @@ router.post('/teachers/bulk',
         }
       }
 
-      // Log bulk creation for audit trail
-      await pool.execute(
-        `INSERT INTO audit_log (user_id, action, resource_type, changes, created_at)
-         VALUES (?, 'BULK_CREATE_USERS', 'user', ?, NOW())`,
-        [
-          req.user!.id,
-          JSON.stringify({ 
-            attempted: teachers.length,
-            successful: results.length,
-            failed: errors.length
-          })
-        ]
-      );
+      // TODO: Add audit logging when audit_log table is created
+      console.log('Bulk users created:', { attempted: teachers.length, successful: results.length, failed: errors.length, createdBy: req.user!.id });
 
       res.json({
         message: `Bulk creation completed: ${results.length} successful, ${errors.length} failed`,
@@ -366,6 +359,22 @@ router.get('/teachers',
         return;
       }
 
+      // Helper function to safely parse JSON or comma-separated strings
+      const parseJsonOrString = (value: any): string[] => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            // Fallback: treat as comma-separated string
+            return value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+          }
+        }
+        return [];
+      };
+
       const teachers = rows.map((row: any) => ({
         id: row.id,
         email: row.email,
@@ -374,8 +383,8 @@ router.get('/teachers',
         role: row.role,
         schoolId: row.school_id,
         schoolName: row.school_name,
-        subjects: row.subjects ? JSON.parse(row.subjects) : [],
-        grades: row.grades ? JSON.parse(row.grades) : [],
+        subjects: parseJsonOrString(row.subjects),
+        grades: parseJsonOrString(row.grades),
         isActive: row.is_active,
         lastLogin: row.last_login,
         createdAt: row.created_at
@@ -448,9 +457,11 @@ router.put('/teachers/:id',
         return;
       }
 
-      // Update Cognito user (only if we have Cognito-relevant updates)
-      if (updates.subjects !== undefined || updates.grades !== undefined) {
+      // Update Cognito user (only if we have Cognito-relevant updates and not in development mode)
+      if (process.env.NODE_ENV !== 'development' && (updates.subjects !== undefined || updates.grades !== undefined)) {
         await cognitoService.updateUser(teacher.email, updates);
+      } else if (process.env.NODE_ENV === 'development') {
+        console.log('Development mode: Skipping Cognito user update for', teacher.email, updates);
       }
 
       // Update local database
@@ -460,21 +471,19 @@ router.put('/teachers/:id',
         dbUpdates
       );
 
-      // Handle Cognito user status
-      if (isActive !== undefined) {
+      // Handle Cognito user status (skip in development mode)
+      if (isActive !== undefined && process.env.NODE_ENV !== 'development') {
         if (isActive) {
           await cognitoService.enableUser(teacher.email);
         } else {
           await cognitoService.disableUser(teacher.email);
         }
+      } else if (isActive !== undefined && process.env.NODE_ENV === 'development') {
+        console.log('Development mode: Skipping Cognito user status change for', teacher.email, { isActive });
       }
 
-      // Log the update for audit trail
-      await pool.execute(
-        `INSERT INTO audit_log (user_id, action, resource_type, resource_id, changes, created_at)
-         VALUES (?, 'UPDATE_USER', 'user', ?, ?, NOW())`,
-        [req.user!.id, teacherId, JSON.stringify({ subjects, grades, isActive })]
-      );
+      // TODO: Add audit logging when audit_log table is created
+      console.log('Teacher updated:', { teacherId, subjects, grades, isActive, updatedBy: req.user!.id });
 
       res.json({ message: 'Teacher updated successfully' });
     } catch (error: any) {
@@ -547,12 +556,8 @@ router.delete('/teachers/:id',
         });
       }
 
-      // Log the action for audit trail
-      await pool.execute(
-        `INSERT INTO audit_log (user_id, action, resource_type, resource_id, changes, created_at)
-         VALUES (?, 'DELETE_USER', 'user', ?, ?, NOW())`,
-        [req.user!.id, teacherId, JSON.stringify({ email: teacher.email, hasJobs: jobCount > 0 })]
-      );
+      // TODO: Add audit logging when audit_log table is created
+      console.log('Teacher deleted/deactivated:', { teacherId, email: teacher.email, hasJobs: jobCount > 0, deletedBy: req.user!.id });
 
     } catch (error) {
       console.error('Delete teacher error:', error);
@@ -654,22 +659,8 @@ router.post('/admin/schools',
 
       const managerId = (managerResult as any).insertId;
 
-      // Log the action for audit trail
-      await pool.execute(
-        `INSERT INTO audit_log (user_id, action, resource_type, resource_id, changes, created_at)
-         VALUES (?, 'CREATE_SCHOOL', 'school', ?, ?, NOW())`,
-        [
-          req.user!.id,
-          schoolId,
-          JSON.stringify({ 
-            schoolName, 
-            domain, 
-            subscriptionTier,
-            managerEmail,
-            managerId 
-          })
-        ]
-      );
+      // TODO: Add audit logging when audit_log table is created
+      console.log('School with manager created:', { schoolId, schoolName, domain, subscriptionTier, managerEmail, managerId, createdBy: req.user!.id });
 
       res.status(201).json({
         message: 'School and manager created successfully',

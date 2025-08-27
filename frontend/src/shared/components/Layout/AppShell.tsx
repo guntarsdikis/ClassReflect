@@ -22,6 +22,7 @@ import {
   IconChartBar,
   IconTemplate,
   IconSchool,
+  IconClock,
 } from '@tabler/icons-react';
 import { useAuthStore, type UserRole } from '@store/auth.store';
 import { useLogout } from '@features/auth/services/auth.service';
@@ -41,10 +42,11 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
     { label: 'Analytics', icon: IconChartBar, href: '/analytics' },
   ],
   super_admin: [
-    { label: 'Dashboard', icon: IconHome, href: '/admin' },
+    { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
     { label: 'Schools', icon: IconSchool, href: '/admin/schools' },
-    { label: 'Platform Analytics', icon: IconChartBar, href: '/admin/platform' },
-    { label: 'System Settings', icon: IconSettings, href: '/admin/settings' },
+    { label: 'Users', icon: IconUsers, href: '/admin/users' },
+    { label: 'Templates', icon: IconTemplate, href: '/admin/templates' },
+    { label: 'Jobs', icon: IconClock, href: '/admin/jobs' },
   ],
 };
 
@@ -88,7 +90,7 @@ export function AppShell() {
                 <Group gap={7}>
                   <Avatar 
                     color="blue" 
-                    radius="xl" 
+                    radius={20} 
                     size="md"
                   >
                     {user.firstName[0]}{user.lastName[0]}
@@ -96,7 +98,7 @@ export function AppShell() {
                   <Text fw={500} size="sm" mr={3}>
                     {user.firstName} {user.lastName}
                   </Text>
-                  <IconChevronDown size={rem(12)} stroke={1.5} />
+                  <IconChevronDown size={12} stroke={1.5} />
                 </Group>
               </UnstyledButton>
             </Menu.Target>
@@ -110,7 +112,7 @@ export function AppShell() {
               <Menu.Item
                 component={Link}
                 to="/profile"
-                leftSection={<IconUser size={rem(14)} />}
+                leftSection={<IconUser size={14} />}
               >
                 Profile
               </Menu.Item>
@@ -118,7 +120,7 @@ export function AppShell() {
               <Menu.Item
                 component={Link}
                 to="/settings"
-                leftSection={<IconSettings size={rem(14)} />}
+                leftSection={<IconSettings size={14} />}
               >
                 Settings
               </Menu.Item>
@@ -127,7 +129,7 @@ export function AppShell() {
               
               <Menu.Item
                 color="red"
-                leftSection={<IconLogout size={rem(14)} />}
+                leftSection={<IconLogout size={14} />}
                 onClick={() => logout()}
               >
                 Logout

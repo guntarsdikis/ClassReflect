@@ -16,7 +16,12 @@ export function App() {
       <MantineProvider theme={theme} defaultColorScheme="light">
         <ModalsProvider>
           <Notifications position="top-right" zIndex={1000} />
-          <BrowserRouter>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
             <AppRouter />
           </BrowserRouter>
         </ModalsProvider>

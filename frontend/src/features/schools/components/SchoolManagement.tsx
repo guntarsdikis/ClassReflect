@@ -25,6 +25,7 @@ import {
   IconEye,
   IconEdit,
   IconTrash,
+  IconBan,
   IconBuildingBank,
   IconAlertCircle,
   IconCheck,
@@ -33,6 +34,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
 import { format } from 'date-fns';
+import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { schoolsService, School } from '../services/schools.service';
 
 
@@ -70,6 +73,7 @@ export function SchoolManagement() {
   const loadSchools = async () => {
     try {
       setLoading(true);
+      // Load real data from backend
       const data = await schoolsService.getAllSchools();
       setSchools(data);
     } catch (error) {
@@ -143,12 +147,38 @@ export function SchoolManagement() {
     }
   };
 
-  const handleDelete = async (schoolId: number) => {
+  const handleDelete = (school: School) => {
+    modals.openConfirmModal({
+      title: 'Suspend School',
+      children: (
+        <Text size="sm">
+          Are you sure you want to suspend <strong>{school.name}</strong>? 
+          This will cancel their subscription and prevent access to the platform.
+          This action can be reversed later.
+        </Text>
+      ),
+      labels: { confirm: 'Suspend School', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => confirmSuspendSchool(school.id),
+    });
+  };
+
+  const confirmSuspendSchool = async (schoolId: number) => {
     try {
       await schoolsService.suspendSchool(schoolId);
+      notifications.show({
+        title: 'Success',
+        message: 'School has been suspended successfully',
+        color: 'green',
+      });
       await loadSchools(); // Reload the list
     } catch (error) {
       console.error('Failed to suspend school:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to suspend school. Please try again.',
+        color: 'red',
+      });
     }
   };
 
@@ -298,9 +328,10 @@ export function SchoolManagement() {
                         <ActionIcon 
                           variant="subtle" 
                           color="red"
-                          onClick={() => handleDelete(school.id)}
+                          onClick={() => handleDelete(school)}
+                          title="Suspend School"
                         >
-                          <IconTrash size={16} />
+                          <IconBan size={16} />
                         </ActionIcon>
                       </Group>
                     </Table.Td>

@@ -105,7 +105,14 @@
       "Bash(scp:*)",
       "Bash(docker exec:*)",
       "Bash(docker inspect:*)",
-      "Bash(docker logs:*)"
+      "Bash(docker logs:*)",
+      "Bash(npm run lint)",
+      "Bash(sed:*)",
+      "Bash(npm run type-check:*)",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_fill",
+      "mcp__puppeteer__puppeteer_click",
+      "mcp__puppeteer__puppeteer_evaluate"
     ],
     "deny": [],
     "ask": []

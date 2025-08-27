@@ -485,7 +485,7 @@ export function UploadWizard() {
                       </Paper>
                     ))}
                   </Stack>
-                  <Button variant="outline" onClick={addCustomCriterion} size="sm">
+                  <Button variant="outline" onClick={addCustomCriterion} size={32}>
                     Add Criterion
                   </Button>
                 </>

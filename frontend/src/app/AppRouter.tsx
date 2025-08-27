@@ -4,13 +4,14 @@ import { ForgotPasswordPage } from '@features/auth/components/ForgotPasswordPage
 import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { RoleRoute } from '@features/auth/components/RoleRoute';
 import { AppShell } from '@shared/components/Layout/AppShell';
-import { TeacherDashboard } from '@features/dashboard/teacher/TeacherDashboard';
-import { ManagerDashboard } from '@features/dashboard/manager/ManagerDashboard';
-import { SuperAdminDashboard } from '@features/dashboard/admin/SuperAdminDashboard';
+import { DashboardRouter } from '@features/dashboard/components/DashboardRouter';
 import { SchoolManagement } from '@features/schools/components/SchoolManagement';
+import { SchoolDetail } from '@features/schools/components/SchoolDetail';
 import { UserManagement } from '@features/users/components/UserManagement';
+import { UserDetail } from '@features/users/components/UserDetail';
 import { TemplateManagement } from '@features/templates/components/TemplateManagement';
 import { UploadWizard } from '@features/uploads/components/UploadWizard';
+import { JobManagement } from '@features/admin/components/JobManagement';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
 // import { TemplateEditor } from '@features/templates/components/TemplateEditor';
 // import { SchoolAnalytics } from '@features/analytics/components/SchoolAnalytics';
@@ -27,9 +28,11 @@ export function AppRouter() {
         <Route element={<AppShell />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           
+          {/* Smart Dashboard Route - redirects based on user role */}
+          <Route path="/dashboard" element={<DashboardRouter />} />
+          
           {/* Teacher Routes */}
           <Route element={<RoleRoute roles={['teacher']} />}>
-            <Route path="/dashboard" element={<TeacherDashboard />} />
             {/* <Route path="/feedback/:jobId" element={<FeedbackView />} /> */}
             {/* <Route path="/progress" element={<ProgressView />} /> */}
             {/* <Route path="/reports" element={<ReportsView />} /> */}
@@ -37,7 +40,6 @@ export function AppRouter() {
           
           {/* School Manager Routes */}
           <Route element={<RoleRoute roles={['school_manager']} />}>
-            <Route path="/dashboard" element={<ManagerDashboard />} />
             <Route path="/upload" element={<UploadWizard />} />
             <Route path="/templates" element={<TemplateManagement />} />
             {/* <Route path="/teachers" element={<TeacherManagement />} /> */}
@@ -46,12 +48,14 @@ export function AppRouter() {
           
           {/* Super Admin Routes */}
           <Route element={<RoleRoute roles={['super_admin']} />}>
-            <Route path="/admin" element={<SuperAdminDashboard />} />
-            <Route path="/dashboard" element={<SuperAdminDashboard />} />
             <Route path="/admin/schools" element={<SchoolManagement />} />
+            <Route path="/admin/schools/:id" element={<SchoolDetail />} />
+            <Route path="/admin/schools/new" element={<SchoolManagement />} />
             <Route path="/admin/users" element={<UserManagement />} />
+            <Route path="/admin/users/:id" element={<UserDetail />} />
+            <Route path="/admin/users/new" element={<UserManagement />} />
             <Route path="/admin/templates" element={<TemplateManagement />} />
-            {/* <Route path="/admin/platform" element={<PlatformAnalytics />} /> */}
+            <Route path="/admin/jobs" element={<JobManagement />} />
           </Route>
           
           {/* Shared Routes */}

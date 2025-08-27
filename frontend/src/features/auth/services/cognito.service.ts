@@ -1,6 +1,8 @@
 import { signIn, signOut, getCurrentUser, fetchAuthSession, signUp, confirmSignUp } from 'aws-amplify/auth';
 import type { User, LoginCredentials, AuthResponse } from '../types';
 
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+
 export class CognitoAuthService {
   /**
    * Sign in with email and password
@@ -70,7 +72,7 @@ export class CognitoAuthService {
    */
   async setPermanentPassword(email: string, temporaryPassword: string, newPassword: string): Promise<AuthResponse> {
     try {
-      const response = await fetch('/api/auth/set-permanent-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/set-permanent-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -144,7 +146,7 @@ export class CognitoAuthService {
    * Get user profile from backend
    */
   private async getUserProfile(accessToken?: string): Promise<User> {
-    const response = await fetch('/api/auth/profile', {
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
       headers: accessToken ? {
         'Authorization': `Bearer ${accessToken}`
       } : {}
@@ -193,7 +195,7 @@ export class CognitoAuthService {
         return { success: false, message: 'Not authenticated' };
       }
 
-      const response = await fetch('/api/auth/change-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -221,7 +223,7 @@ export class CognitoAuthService {
    */
   async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await fetch('/api/auth/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -81,25 +81,25 @@ export const api = {
   // Auth endpoints
   auth: {
     login: (email: string, password: string) =>
-      apiClient.post('/api/auth/login', { email, password }),
+      apiClient.post('/auth/login', { email, password }),
     
     logout: () =>
-      apiClient.post('/api/auth/logout'),
+      apiClient.post('/auth/logout'),
     
     forgotPassword: (email: string) =>
-      apiClient.post('/api/auth/forgot-password', { email }),
+      apiClient.post('/auth/forgot-password', { email }),
     
     resetPassword: (token: string, password: string) =>
-      apiClient.post('/api/auth/reset-password', { token, password }),
+      apiClient.post('/auth/reset-password', { token, password }),
   },
   
   // User management (School Manager only)
   users: {
     getProfile: () =>
-      apiClient.get('/api/users/profile'),
+      apiClient.get('/users/profile'),
     
     getTeachers: () =>
-      apiClient.get('/api/users/teachers'),
+      apiClient.get('/users/teachers'),
     
     createTeacher: (data: {
       email: string;
@@ -108,14 +108,14 @@ export const api = {
       subjects: string[];
       grades: string[];
     }) =>
-      apiClient.post('/api/users/teachers', data),
+      apiClient.post('/users/teachers', data),
     
     updateTeacher: (id: string, data: Partial<{
       subjects: string[];
       grades: string[];
       isActive: boolean;
     }>) =>
-      apiClient.put(`/api/users/teachers/${id}`, data),
+      apiClient.put(`/users/teachers/${id}`, data),
     
     bulkCreateTeachers: (teachers: Array<{
       email: string;
@@ -124,7 +124,7 @@ export const api = {
       subjects: string[];
       grades: string[];
     }>) =>
-      apiClient.post('/api/users/teachers/bulk', { teachers }),
+      apiClient.post('/users/teachers/bulk', { teachers }),
   },
   
   // School management (Super Admin only)
@@ -137,10 +137,10 @@ export const api = {
       managerFirstName: string;
       managerLastName: string;
     }) =>
-      apiClient.post('/api/admin/schools', data),
+      apiClient.post('/admin/schools', data),
     
     getSchools: () =>
-      apiClient.get('/api/admin/schools'),
+      apiClient.get('/admin/schools'),
     
     updateSchool: (id: string, data: Partial<{
       subscriptionTier: string;
@@ -148,13 +148,13 @@ export const api = {
       maxTeachers: number;
       maxMonthlyUploads: number;
     }>) =>
-      apiClient.put(`/api/admin/schools/${id}`, data),
+      apiClient.put(`/admin/schools/${id}`, data),
   },
   
   // Upload endpoints (School Manager only)
   upload: {
     uploadRecording: (formData: FormData, onProgress?: (progress: number) => void) =>
-      apiClient.post('/api/upload/recording', formData, {
+      apiClient.post('/upload/recording', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total && onProgress) {
@@ -165,37 +165,37 @@ export const api = {
       }),
     
     getTemplates: (params?: { grade?: string; subject?: string; curriculum?: string }) =>
-      apiClient.get('/api/upload/templates', { params }),
+      apiClient.get('/upload/templates', { params }),
   },
   
   // Jobs and results
   jobs: {
     getTeacherJobs: (teacherId: string) =>
-      apiClient.get(`/api/jobs/teacher/${teacherId}`),
+      apiClient.get(`/jobs/teacher/${teacherId}`),
     
     getJobStatus: (jobId: string) =>
-      apiClient.get(`/api/jobs/${jobId}`),
+      apiClient.get(`/jobs/${jobId}`),
     
     getJobResult: (jobId: string) =>
-      apiClient.get(`/api/jobs/${jobId}/result`),
+      apiClient.get(`/jobs/${jobId}/result`),
   },
   
   // Analytics
   analytics: {
     getTeacherAnalytics: (teacherId: string, params?: { startDate?: string; endDate?: string }) =>
-      apiClient.get(`/api/analytics/teacher/${teacherId}`, { params }),
+      apiClient.get(`/analytics/teacher/${teacherId}`, { params }),
     
     getSchoolAnalytics: (params?: { startDate?: string; endDate?: string }) =>
-      apiClient.get('/api/analytics/school', { params }),
+      apiClient.get('/analytics/school', { params }),
   },
   
   // Templates (School Manager)
   templates: {
     getTemplates: (params?: { category?: string; subject?: string; grade?: string }) =>
-      apiClient.get('/api/templates', { params }),
+      apiClient.get('/templates', { params }),
     
     getTemplate: (id: string) =>
-      apiClient.get(`/api/templates/${id}`),
+      apiClient.get(`/templates/${id}`),
     
     createTemplate: (data: {
       templateName: string;
@@ -205,13 +205,13 @@ export const api = {
       criteria: any;
       baseTemplateId?: string;
     }) =>
-      apiClient.post('/api/templates', data),
+      apiClient.post('/templates', data),
     
     updateTemplate: (id: string, data: Partial<{
       criteria: any;
       isActive: boolean;
     }>) =>
-      apiClient.put(`/api/templates/${id}`, data),
+      apiClient.put(`/templates/${id}`, data),
   },
 };
 

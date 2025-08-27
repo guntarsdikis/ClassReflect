@@ -14,6 +14,7 @@ router.get('/', authorize('super_admin'), async (req: Request, res: Response) =>
     const [schools] = await pool.execute<RowDataPacket[]>(`
       SELECT 
         s.*,
+        CASE WHEN s.subscription_status = 'active' THEN true ELSE false END as is_active,
         COUNT(DISTINCT u.id) as total_teachers,
         COUNT(DISTINCT aj.id) as total_uploads,
         COUNT(CASE WHEN aj.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN 1 END) as monthly_uploads,
@@ -49,6 +50,7 @@ router.get('/:schoolId', async (req: Request, res: Response) => {
     const [schools] = await pool.execute<RowDataPacket[]>(`
       SELECT 
         s.*,
+        CASE WHEN s.subscription_status = 'active' THEN true ELSE false END as is_active,
         COUNT(DISTINCT u.id) as total_teachers,
         COUNT(DISTINCT aj.id) as total_uploads,
         COUNT(CASE WHEN aj.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN 1 END) as monthly_uploads,
@@ -87,6 +89,9 @@ router.post('/', authorize('super_admin'), async (req: Request, res: Response) =
       max_monthly_uploads = 100
     } = req.body;
 
+    // Map is_active to subscription_status for database compatibility
+    const subscription_status = is_active ? 'active' : 'suspended';
+
     if (!name || !contact_email) {
       return res.status(400).json({ 
         error: 'Missing required fields: name, contact_email' 
@@ -107,9 +112,9 @@ router.post('/', authorize('super_admin'), async (req: Request, res: Response) =
 
     const [result] = await pool.execute<ResultSetHeader>(`
       INSERT INTO schools (
-        name, domain, contact_email, is_active, max_teachers, max_monthly_uploads
+        name, domain, contact_email, subscription_status, max_teachers, max_monthly_uploads
       ) VALUES (?, ?, ?, ?, ?, ?)
-    `, [name, domain || null, contact_email, is_active, max_teachers, max_monthly_uploads]);
+    `, [name, domain || null, contact_email, subscription_status, max_teachers, max_monthly_uploads]);
 
     res.status(201).json({
       id: result.insertId,
@@ -136,7 +141,7 @@ router.put('/:schoolId', authorize('super_admin'), async (req: Request, res: Res
     const values = [];
 
     const allowedFields = [
-      'name', 'domain', 'contact_email', 'is_active', 'max_teachers', 'max_monthly_uploads'
+      'name', 'domain', 'contact_email', 'max_teachers', 'max_monthly_uploads'
     ];
 
     for (const field of allowedFields) {
@@ -144,6 +149,12 @@ router.put('/:schoolId', authorize('super_admin'), async (req: Request, res: Res
         updateFields.push(`${field} = ?`);
         values.push(updates[field]);
       }
+    }
+
+    // Handle is_active -> subscription_status mapping
+    if (updates.is_active !== undefined) {
+      updateFields.push('subscription_status = ?');
+      values.push(updates.is_active ? 'active' : 'suspended');
     }
 
     if (updateFields.length === 0) {
@@ -186,7 +197,7 @@ router.delete('/:schoolId', authorize('super_admin'), async (req: Request, res: 
 
     // Instead of deleting, suspend the school
     await pool.execute(
-      `UPDATE schools SET is_active = false, updated_at = NOW() WHERE id = ?`,
+      `UPDATE schools SET subscription_status = 'suspended', updated_at = NOW() WHERE id = ?`,
       [schoolId]
     );
 

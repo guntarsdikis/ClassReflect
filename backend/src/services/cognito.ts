@@ -63,6 +63,9 @@ export class CognitoService {
    */
   async createUser(userData: CognitoUser, temporaryPassword: string): Promise<{ username: string; temporaryPassword: string }> {
     try {
+      // Generate unique username (not email format since User Pool uses email aliases)
+      const uniqueUsername = this.generateUniqueUsername(userData.firstName, userData.lastName);
+      
       const attributes: AttributeType[] = [
         { Name: 'email', Value: userData.email },
         { Name: 'email_verified', Value: 'true' },
@@ -82,7 +85,7 @@ export class CognitoService {
 
       const command = new AdminCreateUserCommand({
         UserPoolId: this.userPoolId,
-        Username: userData.email, // Use email as username
+        Username: uniqueUsername, // Use generated username, email will be alias
         UserAttributes: attributes,
         TemporaryPassword: temporaryPassword,
         MessageAction: 'SUPPRESS' as any, // Suppress welcome email for test users
@@ -92,7 +95,7 @@ export class CognitoService {
       const result = await this.client.send(command);
       
       return {
-        username: result.User!.Username!,
+        username: uniqueUsername,
         temporaryPassword: temporaryPassword
       };
     } catch (error) {
@@ -366,6 +369,21 @@ export class CognitoService {
       console.error('Error listing users:', error);
       throw error;
     }
+  }
+
+  /**
+   * Generate unique username (not email format) for Cognito User Pool with email aliases
+   */
+  private generateUniqueUsername(firstName: string, lastName: string): string {
+    // Remove spaces and special characters, convert to lowercase
+    const cleanFirst = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // Generate timestamp-based unique suffix
+    const timestamp = Date.now().toString().slice(-8); // Last 8 digits of timestamp
+    const randomSuffix = Math.random().toString(36).substring(2, 6); // 4 random chars
+    
+    return `${cleanFirst}${cleanLast}${timestamp}${randomSuffix}`;
   }
 
   /**

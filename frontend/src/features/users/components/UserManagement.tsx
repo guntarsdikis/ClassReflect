@@ -114,25 +114,41 @@ export function UserManagement() {
     try {
       setLoading(true);
       
+      console.log('User Management - Current User:', { 
+        role: currentUser.role, 
+        schoolId: currentUserSchoolId 
+      });
+      
       if (isSuperAdmin) {
         // Super admin can see all users and schools
         const [usersData, schoolsData] = await Promise.all([
           usersService.getAllUsers(),
           schoolsService.getAllSchools(),
         ]);
+        console.log('Super Admin - Loaded data:', { 
+          usersCount: usersData.length, 
+          schoolsCount: schoolsData.length 
+        });
         setUsers(usersData);
         setSchools(schoolsData);
       } else if (isSchoolManager) {
         // School manager can only see users from their school
+        console.log('School Manager - Loading data for school:', currentUserSchoolId);
+        
         const [usersData, schoolData] = await Promise.all([
           usersService.getAllUsers(), // TODO: Add endpoint to get users by schoolId
           schoolsService.getSchool(currentUserSchoolId),
         ]);
         
+        console.log('School Manager - Raw users data:', usersData);
+        console.log('School Manager - School data:', schoolData);
+        
         // Filter users to only show teachers from their school
         const filteredUsers = usersData.filter(user => 
           user.schoolId === currentUserSchoolId && user.role === 'teacher'
         );
+        
+        console.log('School Manager - Filtered users:', filteredUsers);
         
         setUsers(filteredUsers);
         setSchools([schoolData]);
@@ -142,6 +158,7 @@ export function UserManagement() {
       }
     } catch (error) {
       console.error('Failed to load data:', error);
+      console.error('Error details:', error);
       notifications.show({
         title: 'Error',
         message: 'Failed to load user data',

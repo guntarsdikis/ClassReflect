@@ -525,13 +525,15 @@ router.post('/teachers/:id/reset-password',
       }
 
       // Reset password in Cognito (skip in development mode)
-      let temporaryPassword = 'TempPass123!'; // Default for development
+      let temporaryPassword = 'DevPass123!'; // Default for development
       
       if (process.env.NODE_ENV !== 'development') {
         const resetResult = await cognitoService.resetUserPassword(teacher.cognito_username || teacher.email);
         temporaryPassword = resetResult.temporaryPassword;
       } else {
         console.log('Development mode: Skipping Cognito password reset for', teacher.email);
+        // In development, generate a fake temporary password for testing UI
+        temporaryPassword = `DevTemp${Math.random().toString(36).substring(7)}!`;
       }
 
       // TODO: Add audit logging when audit_log table is created

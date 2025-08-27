@@ -345,7 +345,9 @@ export function UserManagement() {
 
   const confirmResetPassword = async (userId: number) => {
     try {
+      console.log('🔐 Calling resetTeacherPassword for userId:', userId);
       const result = await usersService.resetTeacherPassword(userId);
+      console.log('🔐 Password reset API response:', result);
       
       // Show password in a modal with copy functionality
       modals.open({
@@ -393,7 +395,8 @@ export function UserManagement() {
       
       await loadData();
     } catch (error) {
-      console.error('Failed to reset password:', error);
+      console.error('🔐 Failed to reset password:', error);
+      console.error('🔐 Error details:', error);
       notifications.show({
         title: 'Error',
         message: 'Failed to reset password. Please try again.',

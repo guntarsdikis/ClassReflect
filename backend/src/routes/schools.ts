@@ -1,71 +1,124 @@
 import { Router, Request, Response } from 'express';
 import pool from '../database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { authenticate, authorize } from '../middleware/auth-cognito';
 
 const router = Router();
 
-// Get all schools
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT * FROM schools WHERE is_active = TRUE ORDER BY name`
-    );
+// Apply authentication to all routes
+router.use(authenticate);
 
-    res.json(rows);
+// Get all schools (SuperAdmin only)
+router.get('/', authorize('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const [schools] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        s.*,
+        COUNT(DISTINCT u.id) as total_teachers,
+        COUNT(DISTINCT aj.id) as total_uploads,
+        COUNT(CASE WHEN aj.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN 1 END) as monthly_uploads,
+        sm.first_name as manager_first_name,
+        sm.last_name as manager_last_name,
+        sm.email as manager_email
+      FROM schools s
+      LEFT JOIN users u ON s.id = u.school_id AND u.role = 'teacher'
+      LEFT JOIN audio_jobs aj ON s.id = aj.school_id
+      LEFT JOIN users sm ON s.id = sm.school_id AND sm.role = 'school_manager'
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+    `);
+
+    res.json(schools);
   } catch (error) {
     console.error('Error fetching schools:', error);
     res.status(500).json({ error: 'Failed to fetch schools' });
   }
 });
 
-// Get single school
+// Get single school with detailed stats (SuperAdmin or School Manager)
 router.get('/:schoolId', async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
+    const user = (req as any).user;
 
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT * FROM schools WHERE id = ?`,
-      [schoolId]
-    );
+    // Check permissions - SuperAdmin can access any school, Manager only their own
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
 
-    if (rows.length === 0) {
+    const [schools] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        s.*,
+        COUNT(DISTINCT u.id) as total_teachers,
+        COUNT(DISTINCT aj.id) as total_uploads,
+        COUNT(CASE WHEN aj.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN 1 END) as monthly_uploads,
+        COUNT(CASE WHEN aj.status = 'processing' THEN 1 END) as processing_jobs,
+        sm.first_name as manager_first_name,
+        sm.last_name as manager_last_name,
+        sm.email as manager_email
+      FROM schools s
+      LEFT JOIN users u ON s.id = u.school_id AND u.role = 'teacher'
+      LEFT JOIN audio_jobs aj ON s.id = aj.school_id
+      LEFT JOIN users sm ON s.id = sm.school_id AND sm.role = 'school_manager'
+      WHERE s.id = ?
+      GROUP BY s.id
+    `, [schoolId]);
+
+    if (schools.length === 0) {
       return res.status(404).json({ error: 'School not found' });
     }
 
-    res.json(rows[0]);
+    res.json(schools[0]);
   } catch (error) {
     console.error('Error fetching school:', error);
     res.status(500).json({ error: 'Failed to fetch school' });
   }
 });
 
-// Create new school
-router.post('/', async (req: Request, res: Response) => {
+// Create new school (SuperAdmin only)
+router.post('/', authorize('super_admin'), async (req: Request, res: Response) => {
   try {
     const { 
       name, 
-      address, 
-      contactEmail, 
-      contactPhone,
-      maxMonthlyHours = 100,
-      whisperModel = 'base'
+      domain,
+      contact_email,
+      subscription_status = 'trial',
+      subscription_expires,
+      max_teachers = 10,
+      max_monthly_uploads = 100
     } = req.body;
 
-    if (!name || !contactEmail) {
+    if (!name || !contact_email) {
       return res.status(400).json({ 
-        error: 'Missing required fields: name, contactEmail' 
+        error: 'Missing required fields: name, contact_email' 
       });
     }
 
-    const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO schools (name, address, contact_email, contact_phone, max_monthly_hours, whisper_model) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [name, address, contactEmail, contactPhone, maxMonthlyHours, whisperModel]
-    );
+    // Check if domain already exists
+    if (domain) {
+      const [existing] = await pool.execute<RowDataPacket[]>(
+        'SELECT id FROM schools WHERE domain = ?',
+        [domain]
+      );
+      
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Domain already exists' });
+      }
+    }
+
+    const [result] = await pool.execute<ResultSetHeader>(`
+      INSERT INTO schools (
+        name, domain, contact_email, subscription_status, 
+        subscription_expires, max_teachers, max_monthly_uploads
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [name, domain, contact_email, subscription_status, subscription_expires, max_teachers, max_monthly_uploads]);
 
     res.status(201).json({
       id: result.insertId,
       name,
+      domain,
+      contact_email,
+      subscription_status,
       message: 'School created successfully'
     });
   } catch (error) {
@@ -74,8 +127,8 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// Update school
-router.put('/:schoolId', async (req: Request, res: Response) => {
+// Update school (SuperAdmin only)
+router.put('/:schoolId', authorize('super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
     const updates = req.body;
@@ -85,8 +138,8 @@ router.put('/:schoolId', async (req: Request, res: Response) => {
     const values = [];
 
     const allowedFields = [
-      'name', 'address', 'contact_email', 'contact_phone', 
-      'max_monthly_hours', 'whisper_model', 'is_active'
+      'name', 'domain', 'contact_email', 'subscription_status', 
+      'subscription_expires', 'max_teachers', 'max_monthly_uploads'
     ];
 
     for (const field of allowedFields) {
@@ -100,10 +153,22 @@ router.put('/:schoolId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
+    // Check if domain already exists (if updating domain)
+    if (updates.domain) {
+      const [existing] = await pool.execute<RowDataPacket[]>(
+        'SELECT id FROM schools WHERE domain = ? AND id != ?',
+        [updates.domain, schoolId]
+      );
+      
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Domain already exists' });
+      }
+    }
+
     values.push(schoolId);
 
     await pool.execute(
-      `UPDATE schools SET ${updateFields.join(', ')} WHERE id = ?`,
+      `UPDATE schools SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
       values
     );
 
@@ -117,15 +182,117 @@ router.put('/:schoolId', async (req: Request, res: Response) => {
   }
 });
 
+// Delete/suspend school (SuperAdmin only)
+router.delete('/:schoolId', authorize('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId } = req.params;
+
+    // Instead of deleting, suspend the school
+    await pool.execute(
+      `UPDATE schools SET subscription_status = 'cancelled', updated_at = NOW() WHERE id = ?`,
+      [schoolId]
+    );
+
+    res.json({
+      schoolId,
+      message: 'School suspended successfully'
+    });
+  } catch (error) {
+    console.error('Error suspending school:', error);
+    res.status(500).json({ error: 'Failed to suspend school' });
+  }
+});
+
+// Get platform statistics (SuperAdmin only)
+router.get('/admin/stats', authorize('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const [stats] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        COUNT(DISTINCT s.id) as total_schools,
+        COUNT(DISTINCT u.id) as total_users,
+        COUNT(DISTINCT CASE WHEN aj.status = 'processing' THEN aj.id END) as processing_jobs,
+        COUNT(DISTINCT CASE WHEN s.subscription_status = 'active' THEN s.id END) as active_schools,
+        COUNT(DISTINCT CASE WHEN s.subscription_status = 'trial' THEN s.id END) as trial_schools,
+        COUNT(DISTINCT CASE WHEN s.subscription_status = 'expired' THEN s.id END) as expired_schools
+      FROM schools s
+      LEFT JOIN users u ON s.id = u.school_id
+      LEFT JOIN audio_jobs aj ON s.id = aj.school_id AND aj.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+    `);
+
+    res.json(stats[0]);
+  } catch (error) {
+    console.error('Error fetching platform stats:', error);
+    res.status(500).json({ error: 'Failed to fetch platform statistics' });
+  }
+});
+
+// Get recent platform activity (SuperAdmin only)
+router.get('/admin/activity', authorize('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const [activities] = await pool.execute<RowDataPacket[]>(`
+      (
+        SELECT 
+          'school_created' as type,
+          s.name as school_name,
+          s.id as school_id,
+          s.subscription_status as status,
+          s.created_at as timestamp,
+          NULL as manager_name
+        FROM schools s
+        WHERE s.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      )
+      UNION ALL
+      (
+        SELECT 
+          'user_created' as type,
+          s.name as school_name,
+          s.id as school_id,
+          s.subscription_status as status,
+          u.created_at as timestamp,
+          CONCAT(u.first_name, ' ', u.last_name) as manager_name
+        FROM users u
+        JOIN schools s ON u.school_id = s.id
+        WHERE u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND u.role = 'school_manager'
+      )
+      UNION ALL
+      (
+        SELECT 
+          'subscription_expired' as type,
+          s.name as school_name,
+          s.id as school_id,
+          s.subscription_status as status,
+          s.subscription_expires as timestamp,
+          NULL as manager_name
+        FROM schools s
+        WHERE s.subscription_expires <= NOW() AND s.subscription_expires >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      )
+      ORDER BY timestamp DESC
+      LIMIT 20
+    `);
+
+    res.json(activities);
+  } catch (error) {
+    console.error('Error fetching platform activity:', error);
+    res.status(500).json({ error: 'Failed to fetch platform activity' });
+  }
+});
+
 // Get school's analysis criteria
 router.get('/:schoolId/criteria', async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
+    const user = (req as any).user;
 
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT * FROM analysis_criteria WHERE school_id = ? AND is_active = TRUE ORDER BY weight DESC`,
-      [schoolId]
-    );
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const [rows] = await pool.execute<RowDataPacket[]>(`
+      SELECT * FROM analysis_criteria 
+      WHERE school_id = ? AND is_active = TRUE 
+      ORDER BY weight DESC
+    `, [schoolId]);
 
     res.json(rows);
   } catch (error) {
@@ -135,27 +302,32 @@ router.get('/:schoolId/criteria', async (req: Request, res: Response) => {
 });
 
 // Add analysis criterion for school
-router.post('/:schoolId/criteria', async (req: Request, res: Response) => {
+router.post('/:schoolId/criteria', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
-    const { name, description, category, weight = 1.0 } = req.body;
+    const { criteria_name, criteria_description, weight = 1.0 } = req.body;
+    const user = (req as any).user;
 
-    if (!name || !category) {
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!criteria_name) {
       return res.status(400).json({ 
-        error: 'Missing required fields: name, category' 
+        error: 'Missing required field: criteria_name' 
       });
     }
 
-    const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO analysis_criteria (school_id, name, description, category, weight) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [schoolId, name, description, category, weight]
-    );
+    const [result] = await pool.execute<ResultSetHeader>(`
+      INSERT INTO analysis_criteria (school_id, criteria_name, criteria_description, weight) 
+      VALUES (?, ?, ?, ?)
+    `, [schoolId, criteria_name, criteria_description, weight]);
 
     res.status(201).json({
       id: result.insertId,
       schoolId,
-      name,
+      criteria_name,
       message: 'Analysis criterion created successfully'
     });
   } catch (error) {

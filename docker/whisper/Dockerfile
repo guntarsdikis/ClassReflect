@@ -14,8 +14,9 @@ WORKDIR /opt/whisper
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy processor script
+# Copy processor scripts
 COPY local-processor.py processor.py
+COPY whisper_service.py whisper_service.py
 
 # Make script executable
 RUN chmod +x processor.py
@@ -24,5 +25,5 @@ RUN chmod +x processor.py
 RUN useradd -m whisperuser && chown -R whisperuser:whisperuser /opt/whisper
 USER whisperuser
 
-# Run the processor
-CMD ["python", "processor.py"]
+# Default command - can be overridden by docker-compose
+CMD ["python", "whisper_service.py"]

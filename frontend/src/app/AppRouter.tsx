@@ -6,7 +6,10 @@ import { RoleRoute } from '@features/auth/components/RoleRoute';
 import { AppShell } from '@shared/components/Layout/AppShell';
 import { TeacherDashboard } from '@features/dashboard/teacher/TeacherDashboard';
 import { ManagerDashboard } from '@features/dashboard/manager/ManagerDashboard';
-// import { AdminDashboard } from '@features/dashboard/admin/AdminDashboard';
+import { SuperAdminDashboard } from '@features/dashboard/admin/SuperAdminDashboard';
+import { SchoolManagement } from '@features/schools/components/SchoolManagement';
+import { UserManagement } from '@features/users/components/UserManagement';
+import { TemplateManagement } from '@features/templates/components/TemplateManagement';
 import { UploadWizard } from '@features/uploads/components/UploadWizard';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
 // import { TemplateEditor } from '@features/templates/components/TemplateEditor';
@@ -36,15 +39,18 @@ export function AppRouter() {
           <Route element={<RoleRoute roles={['school_manager']} />}>
             <Route path="/dashboard" element={<ManagerDashboard />} />
             <Route path="/upload" element={<UploadWizard />} />
+            <Route path="/templates" element={<TemplateManagement />} />
             {/* <Route path="/teachers" element={<TeacherManagement />} /> */}
-            {/* <Route path="/templates" element={<TemplateEditor />} /> */}
             {/* <Route path="/analytics" element={<SchoolAnalytics />} /> */}
           </Route>
           
           {/* Super Admin Routes */}
           <Route element={<RoleRoute roles={['super_admin']} />}>
-            <Route path="/admin" element={<div>Admin Dashboard - Coming Soon</div>} />
-            {/* <Route path="/admin/schools" element={<SchoolManagement />} /> */}
+            <Route path="/admin" element={<SuperAdminDashboard />} />
+            <Route path="/dashboard" element={<SuperAdminDashboard />} />
+            <Route path="/admin/schools" element={<SchoolManagement />} />
+            <Route path="/admin/users" element={<UserManagement />} />
+            <Route path="/admin/templates" element={<TemplateManagement />} />
             {/* <Route path="/admin/platform" element={<PlatformAnalytics />} /> */}
           </Route>
           

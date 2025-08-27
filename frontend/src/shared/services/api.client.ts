@@ -214,3 +214,34 @@ export const api = {
       apiClient.put(`/api/templates/${id}`, data),
   },
 };
+
+// Generic API Client class for services
+export class ApiClient {
+  private client: AxiosInstance;
+
+  constructor() {
+    this.client = apiClient;
+  }
+
+  async get<T>(url: string, params?: any): Promise<T> {
+    const response = await this.client.get(url, { params });
+    return response.data;
+  }
+
+  async post<T>(url: string, data?: any, config?: any): Promise<T> {
+    const response = await this.client.post(url, data, config);
+    return response.data;
+  }
+
+  async put<T>(url: string, data?: any): Promise<T> {
+    const response = await this.client.put(url, data);
+    return response.data;
+  }
+
+  async delete<T>(url: string): Promise<T> {
+    const response = await this.client.delete(url);
+    return response.data;
+  }
+}
+
+export default apiClient;

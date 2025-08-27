@@ -159,35 +159,3 @@ CREATE TABLE IF NOT EXISTS api_keys (
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert default school for testing
-INSERT INTO schools (name, domain, contact_email, subscription_status, max_teachers, max_monthly_uploads)
-VALUES ('Demo School', 'demo.classreflect.gdwd.co.uk', 'demo@classreflect.gdwd.co.uk', 'trial', 5, 50)
-ON DUPLICATE KEY UPDATE id=id;
-
--- Insert default admin user (password: 'changeme123')
--- Note: In production, use proper password hashing
-INSERT INTO teachers (school_id, email, password_hash, first_name, last_name, role, status)
-VALUES (
-    (SELECT id FROM schools WHERE domain = 'demo.classreflect.gdwd.co.uk'),
-    'admin@classreflect.gdwd.co.uk',
-    '$2b$10$YourHashedPasswordHere', -- This should be properly hashed
-    'Admin',
-    'User',
-    'super_admin',
-    'active'
-) ON DUPLICATE KEY UPDATE id=id;
-
--- Insert default analysis criteria
-INSERT INTO analysis_criteria (school_id, criteria_name, criteria_description, weight)
-VALUES 
-    ((SELECT id FROM schools WHERE domain = 'demo.classreflect.gdwd.co.uk'), 
-     'Student Engagement', 'Measures how well the teacher engages students', 1.5),
-    ((SELECT id FROM schools WHERE domain = 'demo.classreflect.gdwd.co.uk'), 
-     'Clear Instructions', 'Evaluates clarity of instructions and explanations', 1.2),
-    ((SELECT id FROM schools WHERE domain = 'demo.classreflect.gdwd.co.uk'), 
-     'Question Techniques', 'Assesses questioning strategies and wait time', 1.3),
-    ((SELECT id FROM schools WHERE domain = 'demo.classreflect.gdwd.co.uk'), 
-     'Classroom Management', 'Reviews classroom control and time management', 1.0),
-    ((SELECT id FROM schools WHERE domain = 'demo.classreflect.gdwd.co.uk'), 
-     'Inclusive Teaching', 'Checks for inclusive practices and differentiation', 1.1)
-ON DUPLICATE KEY UPDATE id=id;

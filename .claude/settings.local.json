@@ -102,7 +102,10 @@
       "Bash(node:*)",
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker logs:*)"
     ],
     "deny": [],
     "ask": []

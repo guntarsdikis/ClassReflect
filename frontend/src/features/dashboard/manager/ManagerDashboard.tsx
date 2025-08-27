@@ -14,7 +14,6 @@ import {
   Progress,
   Table,
   ActionIcon,
-  rem,
 } from '@mantine/core';
 import {
   IconUpload,
@@ -186,7 +185,7 @@ export function ManagerDashboard() {
                 </Text>
               </div>
               <ThemeIcon color={stat.color} variant="light" radius="md" size="xl">
-                <stat.icon size={rem(28)} stroke={1.5} />
+                <stat.icon size={28} stroke={1.5} />
               </ThemeIcon>
             </Group>
           </Card>

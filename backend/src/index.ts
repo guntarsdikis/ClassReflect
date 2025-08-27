@@ -6,13 +6,16 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import { initializeDatabase } from './database';
 import pool from './database';
+// Import environment configuration
+import { config } from './config/environment';
 
 // Import routes and auth configuration
 import { initializeAuth, authConfig } from './config/auth.config';
-import uploadRoutes from './routes/upload';
+import uploadRoutes from './routes/upload-new';
 import jobsRoutes from './routes/jobs';
 import schoolsRoutes from './routes/schools';
 import teachersRoutes from './routes/teachers';
+import templatesRoutes from './routes/templates';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -43,7 +46,8 @@ app.get('/', (req: Request, res: Response) => {
       upload: '/api/upload',
       jobs: '/api/jobs',
       schools: '/api/schools',
-      teachers: '/api/teachers'
+      teachers: '/api/teachers',
+      templates: '/api/templates'
     }
   });
 });
@@ -58,6 +62,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/schools', schoolsRoutes);
 app.use('/api/teachers', teachersRoutes);
+app.use('/api/templates', templatesRoutes);
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

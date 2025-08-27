@@ -39,10 +39,10 @@ const upload = multer({
 });
 
 // Get pre-signed URL for direct upload (recommended for large files)
-// Only school managers can upload recordings
+// Teachers can upload their own recordings, managers can upload for any teacher in their school
 router.post('/presigned-url', 
   authenticate,
-  authorize('school_manager', 'super_admin'),
+  authorize('teacher', 'school_manager', 'super_admin'),
   async (req: Request, res: Response) => {
   try {
     const { fileName, fileType, teacherId, schoolId } = req.body;
@@ -52,6 +52,40 @@ router.post('/presigned-url',
         error: 'Missing required fields: fileName, fileType, teacherId, schoolId' 
       });
     }
+
+    // Role-based access control
+    if (req.user!.role === 'teacher') {
+      // Teachers can only upload their own recordings
+      if (teacherId !== req.user!.id) {
+        return res.status(403).json({ 
+          error: 'Teachers can only upload their own recordings' 
+        });
+      }
+      // Ensure teacher is uploading to their own school
+      if (schoolId !== req.user!.schoolId) {
+        return res.status(403).json({ 
+          error: 'School ID mismatch' 
+        });
+      }
+    } else if (req.user!.role === 'school_manager') {
+      // Managers can upload for teachers in their school
+      if (schoolId !== req.user!.schoolId) {
+        return res.status(403).json({ 
+          error: 'Managers can only upload for teachers in their school' 
+        });
+      }
+      // Verify the target teacher belongs to the manager's school
+      const [teacherCheck] = await pool.execute<RowDataPacket[]>(
+        'SELECT school_id FROM users WHERE id = ? AND role = "teacher"',
+        [teacherId]
+      );
+      if (!teacherCheck.length || teacherCheck[0].school_id !== req.user!.schoolId) {
+        return res.status(403).json({ 
+          error: 'Teacher not found in your school' 
+        });
+      }
+    }
+    // Super admins can upload for anyone (no additional checks needed)
 
     // Generate unique job ID
     const jobId = uuidv4();
@@ -81,10 +115,10 @@ router.post('/presigned-url',
 });
 
 // Direct file upload endpoint (for smaller files)
-// Only school managers can upload recordings
+// Teachers can upload their own recordings, managers can upload for any teacher in their school
 router.post('/direct', 
   authenticate,
-  authorize('school_manager', 'super_admin'),
+  authorize('teacher', 'school_manager', 'super_admin'),
   upload.single('audio'), 
   async (req: Request, res: Response) => {
   try {
@@ -99,6 +133,40 @@ router.post('/direct',
         error: 'Missing required fields: teacherId, schoolId' 
       });
     }
+
+    // Role-based access control
+    if (req.user!.role === 'teacher') {
+      // Teachers can only upload their own recordings
+      if (teacherId !== req.user!.id) {
+        return res.status(403).json({ 
+          error: 'Teachers can only upload their own recordings' 
+        });
+      }
+      // Ensure teacher is uploading to their own school
+      if (schoolId !== req.user!.schoolId) {
+        return res.status(403).json({ 
+          error: 'School ID mismatch' 
+        });
+      }
+    } else if (req.user!.role === 'school_manager') {
+      // Managers can upload for teachers in their school
+      if (schoolId !== req.user!.schoolId) {
+        return res.status(403).json({ 
+          error: 'Managers can only upload for teachers in their school' 
+        });
+      }
+      // Verify the target teacher belongs to the manager's school
+      const [teacherCheck] = await pool.execute<RowDataPacket[]>(
+        'SELECT school_id FROM users WHERE id = ? AND role = "teacher"',
+        [teacherId]
+      );
+      if (!teacherCheck.length || teacherCheck[0].school_id !== req.user!.schoolId) {
+        return res.status(403).json({ 
+          error: 'Teacher not found in your school' 
+        });
+      }
+    }
+    // Super admins can upload for anyone (no additional checks needed)
 
     // Generate unique job ID
     const jobId = uuidv4();

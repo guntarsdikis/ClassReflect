@@ -41,12 +41,12 @@ export const authenticate = async (
       const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
       
       req.user = {
-        id: decoded.userId,
+        id: parseInt(decoded.userId),
         email: decoded.email,
         firstName: '', // JWT doesn't have these fields
         lastName: '',
         role: decoded.role,
-        schoolId: decoded.schoolId,
+        schoolId: parseInt(decoded.schoolId),
       };
       
       next();
@@ -127,7 +127,7 @@ export const authorizeTeacher = async (
   if (req.user.role === 'teacher') {
     const teacherId = req.params.teacherId || req.params.id;
     
-    if (teacherId && teacherId !== req.user.id) {
+    if (teacherId && parseInt(teacherId) !== req.user.id) {
       res.status(403).json({ error: 'Teachers can only access their own data' });
       return;
     }

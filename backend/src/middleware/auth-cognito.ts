@@ -4,12 +4,12 @@ import jwksClient from 'jwks-rsa';
 import { Pool } from 'mysql2/promise';
 
 export interface AuthenticatedUser {
-  id: string;
+  id: number;
   email: string;
   firstName: string;
   lastName: string;
   role: 'teacher' | 'school_manager' | 'super_admin';
-  schoolId: string;
+  schoolId: number;
   cognitoSub?: string;
   cognitoUsername?: string;
 }
@@ -107,11 +107,19 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     }
     
     // Get user from database using Cognito sub or email
+    const cognitoUsername = decoded['cognito:username'] || decoded.username || decoded.sub || null;
+    const email = decoded.email || null;
+    
+    if (!cognitoUsername && !email) {
+      res.status(401).json({ error: 'Invalid token - missing user identifiers' });
+      return;
+    }
+    
     const [rows] = await dbPool.execute(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school_id, u.cognito_username
        FROM users u
        WHERE (u.cognito_username = ? OR u.email = ?) AND u.is_active = true`,
-      [decoded['cognito:username'] || decoded.sub, decoded.email]
+      [cognitoUsername, email]
     );
     
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -200,6 +208,7 @@ export function requireSchoolAccess(req: Request, res: Response, next: NextFunct
   }
   
   // Attach user's school ID to request for database queries
+  if (!req.body) req.body = {};
   req.body.currentSchoolId = req.user.schoolId;
   
   next();
@@ -224,12 +233,13 @@ export function requireTeacherAccess(req: Request, res: Response, next: NextFunc
   if (req.user.role === 'teacher') {
     const teacherId = req.params.teacherId || req.params.id || req.query.teacherId;
     
-    if (teacherId && teacherId !== req.user.id) {
+    if (teacherId && parseInt(teacherId as string) !== req.user.id) {
       res.status(403).json({ error: 'Access denied - can only access your own data' });
       return;
     }
     
     // Set teacher ID for database queries
+    if (!req.body) req.body = {};
     req.body.currentTeacherId = req.user.id;
   }
   

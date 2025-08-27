@@ -296,8 +296,8 @@ router.get('/profile', authenticate, async (req: Request, res: Response) => {
       role: user.role,
       schoolId: user.school_id,
       schoolName: user.school_name,
-      subjects: user.subjects ? JSON.parse(user.subjects) : [],
-      grades: user.grades ? JSON.parse(user.grades) : [],
+      subjects: parseArrayField(user.subjects),
+      grades: parseArrayField(user.grades),
       createdAt: user.created_at,
       lastLogin: user.last_login,
     });
@@ -306,6 +306,20 @@ router.get('/profile', authenticate, async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to get profile' });
   }
 });
+
+/**
+ * Map Cognito school IDs to database school IDs
+ */
+function mapSchoolId(cognitoSchoolId: string): number {
+  // For demo purposes, all users belong to the Demo Elementary School (ID: 1)
+  const schoolMapping: Record<string, number> = {
+    'test-school-001': 1, // Demo Elementary School
+    'test-school-002': 1, // Demo Elementary School (fallback)
+    'platform': 1        // Demo Elementary School (platform users)
+  };
+  
+  return schoolMapping[cognitoSchoolId] || 1; // Default to school 1 if not found
+}
 
 /**
  * Sync Cognito user with local database
@@ -321,6 +335,8 @@ async function syncUserWithDatabase(cognitoUser: CognitoUser): Promise<void> {
     if (Array.isArray(existing) && existing.length > 0) {
       // Update existing user
       const user = existing[0] as any;
+      const dbSchoolId = mapSchoolId(cognitoUser.schoolId);
+      
       await pool.execute(
         `UPDATE users SET 
          first_name = ?, last_name = ?, role = ?, school_id = ?,
@@ -331,7 +347,7 @@ async function syncUserWithDatabase(cognitoUser: CognitoUser): Promise<void> {
           cognitoUser.firstName,
           cognitoUser.lastName,
           cognitoUser.role,
-          cognitoUser.schoolId,
+          dbSchoolId,
           cognitoUser.subjects ? JSON.stringify(cognitoUser.subjects) : null,
           cognitoUser.grades ? JSON.stringify(cognitoUser.grades) : null,
           cognitoUser.username,

@@ -1,11 +1,17 @@
 import { Router, Request, Response } from 'express';
 import pool from '../database';
 import { RowDataPacket } from 'mysql2';
+import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } from '../middleware/auth-cognito';
 
 const router = Router();
 
 // Get all jobs for a teacher
-router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
+// Teachers can only see their own jobs, managers can see jobs for teachers in their school
+router.get('/teacher/:teacherId', 
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  requireTeacherAccess,
+  async (req: Request, res: Response) => {
   try {
     const { teacherId } = req.params;
     const { status, limit = '50', offset = '0' } = req.query;
@@ -22,18 +28,36 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid teacher ID' });
     }
 
+    // School isolation for managers - they can only access teachers in their school
+    if (req.user!.role === 'school_manager') {
+      // First check if the target teacher exists and is in the manager's school
+      const [teacherRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT school_id FROM users WHERE id = ? AND is_active = true',
+        [teacherIdNum]
+      );
+      
+      if (teacherRows.length === 0) {
+        return res.status(403).json({ error: 'Access denied - teacher not found or not in your school' });
+      }
+      
+      const teacherSchoolId = teacherRows[0].school_id;
+      if (teacherSchoolId !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied - teacher not in your school' });
+      }
+    }
+
     // Use query instead of execute to avoid prepared statement issues
     let queryStr = `
       SELECT 
         aj.*,
-        t.first_name,
-        t.last_name,
+        u.first_name,
+        u.last_name,
         s.name as school_name,
         tr.transcript_text as transcript_content,
         tr.word_count,
         tr.confidence_score
       FROM audio_jobs aj
-      JOIN teachers t ON aj.teacher_id = t.id
+      JOIN users u ON aj.teacher_id = u.id
       JOIN schools s ON aj.school_id = s.id
       LEFT JOIN transcripts tr ON aj.id = tr.job_id
       WHERE aj.teacher_id = ${pool.escape(teacherIdNum)}
@@ -66,23 +90,27 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
 });
 
 // Get single job details
-router.get('/:jobId', async (req: Request, res: Response) => {
+// Users can only see jobs they have access to (own jobs for teachers, school jobs for managers)
+router.get('/:jobId', 
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
 
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT 
         aj.*,
-        t.first_name,
-        t.last_name,
-        t.email as teacher_email,
+        u.first_name,
+        u.last_name,
+        u.email as teacher_email,
         s.name as school_name,
         tr.transcript_text as transcript_content,
         tr.word_count,
         ar.score,
         ar.feedback
       FROM audio_jobs aj
-      JOIN teachers t ON aj.teacher_id = t.id
+      JOIN users u ON aj.teacher_id = u.id
       JOIN schools s ON aj.school_id = s.id
       LEFT JOIN transcripts tr ON aj.id = tr.job_id
       LEFT JOIN analysis_results ar ON aj.id = ar.job_id
@@ -93,6 +121,22 @@ router.get('/:jobId', async (req: Request, res: Response) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Job not found' });
     }
+
+    const job = rows[0];
+    
+    // Role-based access control
+    if (req.user!.role === 'teacher') {
+      // Teachers can only see their own jobs
+      if (job.teacher_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    } else if (req.user!.role === 'school_manager') {
+      // Managers can only see jobs from their school
+      if (job.school_id !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+    // Super admins can see any job (no additional checks)
 
     // Format the response to include teacher_name
     const formattedRow = {
@@ -108,7 +152,11 @@ router.get('/:jobId', async (req: Request, res: Response) => {
 });
 
 // Update job status (for testing/admin)
-router.patch('/:jobId/status', async (req: Request, res: Response) => {
+// Update job status (system processes only - super admin or processing system)
+router.patch('/:jobId/status', 
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
     const { status, errorMessage } = req.body;
@@ -151,7 +199,13 @@ router.patch('/:jobId/status', async (req: Request, res: Response) => {
 });
 
 // Get job statistics
-router.get('/stats/:schoolId', async (req: Request, res: Response) => {
+// Get school statistics 
+// Only managers and super admins can see school stats
+router.get('/stats/:schoolId', 
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  requireSchoolAccess,
+  async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
 

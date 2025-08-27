@@ -89,9 +89,135 @@ function verifyToken(token: string): Promise<any> {
  */
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // TEMPORARY: For development, use the super admin user directly
-    // TODO: Remove this and restore proper JWT authentication
+    // TEMPORARY: For development, identify user from token payload
+    // TODO: Replace with proper JWT validation
     if (process.env.NODE_ENV === 'development') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'No token provided' });
+        return;
+      }
+      
+      const token = authHeader.substring(7);
+      
+      try {
+        // For development, we'll decode the token payload to get user info
+        // In production, this should be proper JWT validation
+        const tokenParts = token.split('.');
+        if (tokenParts.length === 3) {
+          // It's a JWT token - decode the payload
+          const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+          const userEmail = payload.email;
+          const username = payload.username;
+          
+          console.log('🔍 JWT Token Debug:');
+          console.log('   Token type: JWT (3 parts)');
+          console.log('   Payload:', JSON.stringify(payload, null, 2));
+          console.log('   User email:', userEmail);
+          console.log('   Username:', username);
+          
+          // Try to find user by email first, then by cognito_username
+          let rows;
+          let searchBy;
+          
+          if (userEmail) {
+            searchBy = 'email';
+            [rows] = await dbPool.execute(
+              `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school_id, u.cognito_username
+               FROM users u
+               WHERE u.email = ? AND u.is_active = true`,
+              [userEmail]
+            );
+          } else if (username) {
+            searchBy = 'cognito_username';
+            [rows] = await dbPool.execute(
+              `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school_id, u.cognito_username
+               FROM users u
+               WHERE u.cognito_username = ? AND u.is_active = true`,
+              [username]
+            );
+          }
+          
+          if (rows) {
+            console.log('   Database lookup by', searchBy + ':', Array.isArray(rows) && rows.length > 0 ? 'Found user' : 'User not found');
+            
+            if (Array.isArray(rows) && rows.length > 0) {
+              const user = rows[0] as any;
+              console.log('   Found user:', {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                school_id: user.school_id
+              });
+              
+              req.user = {
+                id: user.id,
+                email: user.email,
+                firstName: user.first_name,
+                lastName: user.last_name,
+                role: user.role,
+                schoolId: user.school_id,
+                cognitoSub: payload.sub
+              };
+              
+              next();
+              return;
+            } else {
+              // Debug: Show what users exist
+              const [allUsers] = await dbPool.execute(
+                `SELECT email, cognito_username, role FROM users WHERE is_active = true`
+              );
+              console.log('   Available users in database:', allUsers);
+            }
+          }
+        }
+        
+        // Fallback: try to parse as simple JSON token (from our auth service)
+        const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+        if (userData.email) {
+          console.log('🔍 Fallback Token Debug:');
+          console.log('   Token type: Simple JSON');
+          console.log('   User email:', userData.email);
+          
+          const [rows] = await dbPool.execute(
+            `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school_id, u.cognito_username
+             FROM users u
+             WHERE u.email = ? AND u.is_active = true`,
+            [userData.email]
+          );
+          
+          console.log('   Database lookup result:', Array.isArray(rows) && rows.length > 0 ? 'Found user' : 'User not found');
+          
+          if (Array.isArray(rows) && rows.length > 0) {
+            const user = rows[0] as any;
+            console.log('   Found user:', {
+              id: user.id,
+              email: user.email,
+              role: user.role,
+              school_id: user.school_id
+            });
+            
+            req.user = {
+              id: user.id,
+              email: user.email,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              role: user.role,
+              schoolId: user.school_id,
+              cognitoSub: user.cognito_username
+            };
+            
+            next();
+            return;
+          }
+        }
+      } catch (decodeError) {
+        console.log('Token decode failed, using fallback auth');
+      }
+      
+      // Last resort: use super admin for development
+      console.log('🔍 Final Fallback: Using super admin for development');
+      
       const [rows] = await dbPool.execute(
         `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school_id, u.cognito_username
          FROM users u
@@ -102,6 +228,13 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       
       if (Array.isArray(rows) && rows.length > 0) {
         const user = rows[0] as any;
+        console.log('   Using super admin fallback:', {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          school_id: user.school_id
+        });
+        
         req.user = {
           id: user.id,
           email: user.email,
@@ -111,6 +244,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
           schoolId: user.school_id,
           cognitoSub: user.cognito_username
         };
+        
         next();
         return;
       }
@@ -168,6 +302,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       cognitoUsername: decoded['cognito:username'] || decoded.sub
     };
     
+    
     // Update last login
     await dbPool.execute(
       'UPDATE users SET last_login = NOW() WHERE id = ?',
@@ -215,30 +350,38 @@ export function authorize(...allowedRoles: ('teacher' | 'school_manager' | 'supe
  * School isolation middleware - ensures users can only access their school's data
  */
 export function requireSchoolAccess(req: Request, res: Response, next: NextFunction): void {
-  if (!req.user) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return;
-  }
-  
-  // Super admins can access all schools
-  if (req.user.role === 'super_admin') {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    
+    // Super admins can access all schools
+    if (req.user.role === 'super_admin') {
+      next();
+      return;
+    }
+    
+    // Check if request contains school-related parameters
+    const schoolId = req.params.schoolId || req.query.schoolId || req.body?.schoolId;
+    
+    if (schoolId && req.user && req.user.schoolId && schoolId !== req.user.schoolId) {
+      res.status(403).json({ error: 'Access denied - school restriction' });
+      return;
+    }
+    
+    // Attach user's school ID to request for database queries
+    if (!req.body) req.body = {};
+    if (req.user && typeof req.user.schoolId !== 'undefined') {
+      req.body.currentSchoolId = req.user.schoolId;
+    }
+    
     next();
-    return;
+    
+  } catch (error: any) {
+    console.error('Error in requireSchoolAccess middleware:', error);
+    res.status(500).json({ error: 'Internal server error in access control' });
   }
-  
-  // Check if request contains school-related parameters
-  const schoolId = req.params.schoolId || req.query.schoolId || req.body.schoolId;
-  
-  if (schoolId && schoolId !== req.user.schoolId) {
-    res.status(403).json({ error: 'Access denied - school restriction' });
-    return;
-  }
-  
-  // Attach user's school ID to request for database queries
-  if (!req.body) req.body = {};
-  req.body.currentSchoolId = req.user.schoolId;
-  
-  next();
 }
 
 /**

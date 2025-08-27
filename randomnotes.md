@@ -9,7 +9,10 @@
 
 categories should be manageable, each school should be able to create their own categories. superadmin and school manager should be able to create categories. think
 
-template does not update to belong to the school, can you fix it? think
 
-password reset check?
 
+manager should only see templates which belongs to its school
+
+manager should see only teachers which belongs to its school
+
+superadmin should be able to change teacher school

@@ -36,9 +36,20 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     // Access control: SuperAdmin sees all, School Manager sees only own school templates
+    console.log('🏫 Template Access Control Debug:');
+    console.log('   User:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      schoolId: user.schoolId,
+      schoolIdType: typeof user.schoolId
+    });
+    
     if (user.role === 'super_admin') {
+      console.log('   Access: Super Admin - seeing all templates');
       conditions.push('(t.is_global = TRUE OR t.school_id IS NOT NULL)');
     } else {
+      console.log('   Access: School Manager - filtering by school_id =', user.schoolId);
       conditions.push('t.school_id = ?');
       params.push(user.schoolId);
     }
@@ -46,6 +57,9 @@ router.get('/', async (req: Request, res: Response) => {
     if (conditions.length > 0) {
       whereClause = 'WHERE ' + conditions.join(' AND ');
     }
+
+    console.log('   SQL Query:', `SELECT ... FROM templates t ... ${whereClause}`);
+    console.log('   SQL Params:', params);
 
     const [templates] = await pool.execute<RowDataPacket[]>(`
       SELECT 
@@ -62,6 +76,11 @@ router.get('/', async (req: Request, res: Response) => {
       GROUP BY t.id
       ORDER BY t.is_global DESC, t.created_at DESC
     `, params);
+
+    console.log('   Query Results:', templates.length, 'templates found');
+    templates.forEach((template: any) => {
+      console.log(`   - "${template.template_name}" (school_id: ${template.school_id}, school: ${template.school_name})`);
+    });
 
     res.json(templates);
   } catch (error) {

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'mysql2/promise';
+import { randomUUID } from 'crypto';
 import { authenticate, authorize } from '../middleware/auth-cognito';
 import { lemurService } from '../services/lemur';
 
@@ -304,12 +305,16 @@ router.post('/apply-template',
       // Create background analysis job instead of processing immediately
       console.log(`🔄 Creating background analysis job for transcript ${transcriptId} with template "${template.template_name}"`);
       
+      // Generate UUID for the analysis job
+      const analysisJobId = randomUUID();
+      
       const [jobResult] = await pool.execute(`
         INSERT INTO analysis_jobs (
-          transcript_id, template_id, teacher_id, school_id, job_id, applied_by,
+          id, transcript_id, template_id, teacher_id, school_id, job_id, applied_by,
           status, progress_percent, queued_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 'queued', 0, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', 0, NOW())
       `, [
+        analysisJobId,
         transcriptId,
         templateId,
         transcript.teacher_id,
@@ -317,8 +322,6 @@ router.post('/apply-template',
         transcript.job_id,
         req.user!.id
       ]);
-
-      const analysisJobId = (jobResult as any).insertId;
 
       // Update template usage count
       await pool.execute(`
@@ -554,6 +557,8 @@ router.get('/job-status/:jobId',
           aj.completed_at,
           aj.error_message,
           aj.overall_score,
+          aj.school_id,
+          aj.teacher_id,
           tpl.template_name,
           tpl.category as template_category,
           u1.first_name as teacher_first_name,

@@ -28,7 +28,8 @@ import {
   IconClock,
   IconTrash,
   IconMusic,
-  IconInfoCircle
+  IconInfoCircle,
+  IconX
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
@@ -154,91 +155,57 @@ export function AnalysisManager() {
         templateId: parseInt(selectedTemplateId)
       });
 
-      notifications.show({
-        title: 'Analysis Started',
-        message: `Template analysis job created. ${jobResponse.estimatedTimeMinutes}`,
-        color: 'blue',
-        icon: <IconClock />,
-      });
-
-      // Set initial job status
-      setCurrentJobStatus({
-        id: jobResponse.analysisJobId,
-        status: 'queued' as const,
-        progress: {
-          percent: 0,
-          message: 'Analysis job queued and waiting to be processed...'
-        },
-        timeline: {
-          queued_at: new Date().toISOString()
-        },
-        template: {
-          name: templates.find(t => t.id.toString() === selectedTemplateId)?.template_name || 'Selected Template',
-          category: templates.find(t => t.id.toString() === selectedTemplateId)?.category || 'Unknown'
-        },
-        recording: {
-          class_name: selectedRecording.class_name,
-          subject: selectedRecording.subject,
-          grade: selectedRecording.grade,
-          word_count: selectedRecording.word_count
-        },
-        teacher: {
-          first_name: selectedRecording.teacher_first_name,
-          last_name: selectedRecording.teacher_last_name
-        }
-      });
-
-      setPollingJobId(jobResponse.analysisJobId);
-
-      // Start polling for job status
-      try {
-        const finalStatus = await analysisService.pollJobStatus(
-          jobResponse.analysisJobId,
-          (status) => {
-            console.log('📊 Job status update:', status);
-            setCurrentJobStatus(status);
-          }
-        );
-
-        // Job completed successfully
-        notifications.show({
-          title: 'Analysis Complete',
-          message: 'Template analysis completed successfully! Results are ready to view.',
-          color: 'green',
-          icon: <IconCheck />,
-        });
-
-        // Refresh recordings to update has_analysis status
-        await loadRecordings();
-        
-        // Clear job tracking
-        setCurrentJobStatus(null);
-        setPollingJobId(null);
-
-      } catch (pollingError: any) {
-        console.error('Job polling failed:', pollingError);
-        notifications.show({
-          title: 'Analysis Failed',
-          message: pollingError.message || 'Analysis job failed or timed out',
-          color: 'red',
-        });
-        
-        // Clear job tracking
-        setCurrentJobStatus(null);
-        setPollingJobId(null);
-      }
-      
-      // Close modal
+      // Close modal immediately
       setModalOpen(false);
       setSelectedRecording(null);
       setSelectedTemplateId('');
+
+      notifications.show({
+        title: 'Analysis Started! 🚀',
+        message: `Analysis is running in the background. You'll be notified when complete (${jobResponse.estimatedTimeMinutes}).`,
+        color: 'blue',
+        icon: <IconClock />,
+        autoClose: 4000,
+      });
+
+      // Start background polling (non-blocking)
+      analysisService.pollJobStatus(
+        jobResponse.analysisJobId,
+        (status) => {
+          console.log('📊 Background analysis progress:', status);
+          // Optional: Could show progress in a corner indicator if needed
+        }
+      ).then((finalStatus) => {
+        // Job completed successfully
+        notifications.show({
+          title: 'Analysis Complete! 🎉',
+          message: 'Your template analysis is ready! Click "View Results" to see detailed feedback.',
+          color: 'green',
+          icon: <IconCheck />,
+          autoClose: false, // Let user manually close
+        });
+
+        // Refresh recordings to update has_analysis status
+        loadRecordings();
+
+      }).catch((pollingError: any) => {
+        console.error('Background analysis polling failed:', pollingError);
+        
+        notifications.show({
+          title: 'Analysis Status Unknown',
+          message: 'Analysis may still be running in the background. Check your recordings list for results.',
+          color: 'yellow',
+          icon: <IconAlertCircle />,
+        });
+      });
       
     } catch (error: any) {
       console.error('Failed to start template analysis:', error);
       notifications.show({
         title: 'Failed to Start Analysis',
-        message: error.message || 'Failed to create template analysis job',
+        message: error.message || 'Failed to create template analysis job. Please try again.',
         color: 'red',
+        icon: <IconX />,
       });
     } finally {
       setApplyingAnalysis(false);

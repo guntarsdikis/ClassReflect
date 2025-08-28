@@ -409,7 +409,7 @@ router.put('/teachers/:id',
   async (req: Request, res: Response) => {
     try {
       const teacherId = req.params.id;
-      const { subjects, grades, isActive } = req.body;
+      const { subjects, grades, isActive, schoolId } = req.body;
 
       // Get current teacher details
       const [teacherRows] = await pool.execute(
@@ -450,6 +450,34 @@ router.put('/teachers/:id',
       if (isActive !== undefined) {
         dbUpdates.push(isActive);
         dbFields.push('is_active = ?');
+      }
+
+      // School assignment change (Super Admin only)
+      if (schoolId !== undefined && req.user!.role === 'super_admin') {
+        // Validate that the new school exists and is active
+        if (schoolId !== null) {
+          const [schoolRows] = await pool.execute(
+            'SELECT id FROM schools WHERE id = ? AND subscription_status = ?',
+            [schoolId, 'active']
+          );
+          
+          if (!Array.isArray(schoolRows) || schoolRows.length === 0) {
+            res.status(400).json({ error: 'Invalid school ID - school not found or inactive' });
+            return;
+          }
+        }
+        
+        dbUpdates.push(schoolId);
+        dbFields.push('school_id = ?');
+        console.log('Super admin changing teacher school:', { 
+          teacherId, 
+          fromSchool: teacher.school_id, 
+          toSchool: schoolId,
+          adminId: req.user!.id 
+        });
+      } else if (schoolId !== undefined && req.user!.role !== 'super_admin') {
+        res.status(403).json({ error: 'Only Super Admins can change teacher school assignments' });
+        return;
       }
 
       if (dbFields.length === 0) {

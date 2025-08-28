@@ -9,10 +9,8 @@
 
 categories should be manageable, each school should be able to create their own categories. superadmin and school manager should be able to create categories. think
 
+i would like to create template which would go along the principles from the "Teach Like a Champion" book, how do i do it?
 
-
-manager should only see templates which belongs to its school
-
-manager should see only teachers which belongs to its school
+subject should be manageable for the school individually
 
 superadmin should be able to change teacher school

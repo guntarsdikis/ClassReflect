@@ -38,6 +38,7 @@ export interface UpdateTeacherRequest {
   subjects?: string[];
   grades?: string[];
   isActive?: boolean;
+  schoolId?: number; // Super Admin only - to reassign teachers to different schools
 }
 
 export interface BulkCreateTeachersRequest {

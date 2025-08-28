@@ -211,13 +211,28 @@ export function UserManagement() {
       }
 
       if (editingUser) {
-        await usersService.updateTeacher(editingUser.id, {
+        // Build update request - include schoolId only if super admin and school has changed
+        const updateData: any = {
           subjects: teacherFormData.subjects,
           grades: teacherFormData.grades,
-        });
+        };
+        
+        // Super admins can change school assignments
+        if (isSuperAdmin && teacherFormData.schoolId !== editingUser.schoolId) {
+          updateData.schoolId = teacherFormData.schoolId;
+        }
+        
+        await usersService.updateTeacher(editingUser.id, updateData);
+        
+        const schoolChanged = isSuperAdmin && teacherFormData.schoolId !== editingUser.schoolId;
+        const oldSchool = schools.find(s => s.id === editingUser.schoolId)?.name || 'Unknown';
+        const newSchool = schools.find(s => s.id === teacherFormData.schoolId)?.name || 'Unknown';
+        
         notifications.show({
           title: 'Success',
-          message: 'Teacher updated successfully',
+          message: schoolChanged 
+            ? `Teacher updated and moved from ${oldSchool} to ${newSchool}` 
+            : 'Teacher updated successfully',
           color: 'green',
         });
       } else {
@@ -786,7 +801,15 @@ export function UserManagement() {
               label: school.name,
             }))}
             required
-            disabled={!!editingUser || isSchoolManager}
+            disabled={
+              // Super admins can always change school, school managers can only select their own school when creating
+              editingUser ? !isSuperAdmin : isSchoolManager
+            }
+            description={
+              editingUser && isSuperAdmin 
+                ? "As Super Admin, you can reassign teachers to different schools" 
+                : undefined
+            }
           />
 
           <Group grow>

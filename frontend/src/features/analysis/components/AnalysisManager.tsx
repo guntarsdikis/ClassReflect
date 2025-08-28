@@ -30,7 +30,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
 import { useSchoolContextStore } from '@store/school-context.store';
-import { analysisService, type RecordingForAnalysis, type AnalysisResult } from '../services/analysis.service';
+import { analysisService, type RecordingForAnalysis, type AnalysisResult, type AnalysisJobStatus } from '../services/analysis.service';
 import { templatesService, type Template } from '@features/templates/services/templates.service';
 import { AnalysisResults } from './AnalysisResults';
 
@@ -43,6 +43,10 @@ export function AnalysisManager() {
   const [loadingRecordings, setLoadingRecordings] = useState(true);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [applyingAnalysis, setApplyingAnalysis] = useState(false);
+
+  // Job tracking states
+  const [currentJobStatus, setCurrentJobStatus] = useState<AnalysisJobStatus | null>(null);
+  const [pollingJobId, setPollingJobId] = useState<string | null>(null);
 
   // Modal states
   const [selectedRecording, setSelectedRecording] = useState<RecordingForAnalysis | null>(null);
@@ -141,20 +145,85 @@ export function AnalysisManager() {
     try {
       setApplyingAnalysis(true);
       
-      await analysisService.applyTemplate({
+      // Start the analysis job
+      const jobResponse = await analysisService.applyTemplate({
         transcriptId: selectedRecording.transcript_id,
         templateId: parseInt(selectedTemplateId)
       });
 
       notifications.show({
-        title: 'Analysis Complete',
-        message: 'Template analysis has been applied successfully',
-        color: 'green',
-        icon: <IconCheck />,
+        title: 'Analysis Started',
+        message: `Template analysis job created. ${jobResponse.estimatedTimeMinutes}`,
+        color: 'blue',
+        icon: <IconClock />,
       });
 
-      // Refresh recordings to update has_analysis status
-      await loadRecordings();
+      // Set initial job status
+      setCurrentJobStatus({
+        id: jobResponse.analysisJobId,
+        status: 'queued' as const,
+        progress: {
+          percent: 0,
+          message: 'Analysis job queued and waiting to be processed...'
+        },
+        timeline: {
+          queued_at: new Date().toISOString()
+        },
+        template: {
+          name: templates.find(t => t.id.toString() === selectedTemplateId)?.template_name || 'Selected Template',
+          category: templates.find(t => t.id.toString() === selectedTemplateId)?.category || 'Unknown'
+        },
+        recording: {
+          class_name: selectedRecording.class_name,
+          subject: selectedRecording.subject,
+          grade: selectedRecording.grade,
+          word_count: selectedRecording.word_count
+        },
+        teacher: {
+          first_name: selectedRecording.teacher_first_name,
+          last_name: selectedRecording.teacher_last_name
+        }
+      });
+
+      setPollingJobId(jobResponse.analysisJobId);
+
+      // Start polling for job status
+      try {
+        const finalStatus = await analysisService.pollJobStatus(
+          jobResponse.analysisJobId,
+          (status) => {
+            console.log('📊 Job status update:', status);
+            setCurrentJobStatus(status);
+          }
+        );
+
+        // Job completed successfully
+        notifications.show({
+          title: 'Analysis Complete',
+          message: 'Template analysis completed successfully! Results are ready to view.',
+          color: 'green',
+          icon: <IconCheck />,
+        });
+
+        // Refresh recordings to update has_analysis status
+        await loadRecordings();
+        
+        // Clear job tracking
+        setCurrentJobStatus(null);
+        setPollingJobId(null);
+
+      } catch (pollingError: any) {
+        console.error('Job polling failed:', pollingError);
+        notifications.show({
+          title: 'Analysis Failed',
+          message: pollingError.message || 'Analysis job failed or timed out',
+          color: 'red',
+        });
+        
+        // Clear job tracking
+        setCurrentJobStatus(null);
+        setPollingJobId(null);
+      }
       
       // Close modal
       setModalOpen(false);
@@ -162,10 +231,10 @@ export function AnalysisManager() {
       setSelectedTemplateId('');
       
     } catch (error: any) {
-      console.error('Failed to apply template:', error);
+      console.error('Failed to start template analysis:', error);
       notifications.show({
-        title: 'Analysis Failed',
-        message: error.message || 'Failed to apply template analysis',
+        title: 'Failed to Start Analysis',
+        message: error.message || 'Failed to create template analysis job',
         color: 'red',
       });
     } finally {
@@ -260,6 +329,85 @@ export function AnalysisManager() {
         <div style={{ position: 'relative' }}>
           <LoadingOverlay visible={loadingRecordings} />
           
+          {/* Job Progress Display */}
+          {currentJobStatus && (
+            <Alert 
+              mb="md" 
+              p="lg"
+              color={
+                currentJobStatus.status === 'completed' ? 'green' :
+                currentJobStatus.status === 'failed' ? 'red' : 'blue'
+              }
+              title={
+                <Group gap="sm">
+                  <Text fw={600} size="sm">
+                    Analysis Job: {currentJobStatus.template.name}
+                  </Text>
+                  <Badge 
+                    size="sm" 
+                    color={
+                      currentJobStatus.status === 'completed' ? 'green' :
+                      currentJobStatus.status === 'failed' ? 'red' : 'blue'
+                    }
+                    variant="filled"
+                  >
+                    {currentJobStatus.status.toUpperCase()}
+                  </Badge>
+                </Group>
+              }
+              icon={
+                currentJobStatus.status === 'processing' ? (
+                  <IconClock size={20} />
+                ) : currentJobStatus.status === 'completed' ? (
+                  <IconCheck size={20} />
+                ) : (
+                  <IconAlertCircle size={20} />
+                )
+              }
+            >
+              <Stack gap="sm">
+                <Text size="sm">
+                  <Text span fw={500}>Recording:</Text> {currentJobStatus.recording.class_name} • {currentJobStatus.recording.subject} • Grade {currentJobStatus.recording.grade}
+                </Text>
+                
+                <div>
+                  <Group justify="space-between" mb="xs">
+                    <Text size="sm" fw={500}>Progress</Text>
+                    <Text size="sm" c="dimmed">{currentJobStatus.progress.percent}%</Text>
+                  </Group>
+                  <Progress 
+                    value={currentJobStatus.progress.percent} 
+                    color={
+                      currentJobStatus.status === 'completed' ? 'green' :
+                      currentJobStatus.status === 'failed' ? 'red' : 'blue'
+                    }
+                    size="md" 
+                    animated={currentJobStatus.status === 'processing'}
+                    mb="sm"
+                  />
+                  <Text size="xs" c="dimmed" fs="italic">
+                    {currentJobStatus.progress.message}
+                  </Text>
+                </div>
+
+                {currentJobStatus.error_message && (
+                  <Alert color="red" variant="light" size="sm">
+                    <Text size="xs">Error: {currentJobStatus.error_message}</Text>
+                  </Alert>
+                )}
+
+                {currentJobStatus.status === 'completed' && currentJobStatus.overall_score && (
+                  <Group gap="xs">
+                    <Text size="sm" fw={500}>Final Score:</Text>
+                    <Badge size="lg" color="green" variant="filled">
+                      {Math.round(currentJobStatus.overall_score)}%
+                    </Badge>
+                  </Group>
+                )}
+              </Stack>
+            </Alert>
+          )}
+
           {recordings.length === 0 && !loadingRecordings ? (
             <Alert icon={<IconFileText size={16} />} color="gray">
               No completed recordings with transcripts found. Upload and process some recordings first.

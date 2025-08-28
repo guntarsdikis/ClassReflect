@@ -8,6 +8,49 @@ const router = Router();
 // Apply authentication to all routes
 router.use(authenticate);
 
+/**
+ * Validate that template criteria weights sum to 100%
+ * @param criteria Array of template criteria with weights
+ * @returns Object with isValid boolean and error message if invalid
+ */
+function validateCriteriaWeights(criteria: any[]): { isValid: boolean; error?: string; totalWeight?: number } {
+  if (!criteria || !Array.isArray(criteria) || criteria.length === 0) {
+    return { isValid: true }; // Empty criteria is valid (will be handled elsewhere)
+  }
+
+  // Calculate total weight
+  const totalWeight = criteria.reduce((sum, criterion) => {
+    const weight = parseFloat(criterion.weight) || 0;
+    return sum + weight;
+  }, 0);
+
+  // Round to 2 decimal places to avoid floating point precision issues
+  const roundedTotal = Math.round(totalWeight * 100) / 100;
+
+  // Check if total equals 100%
+  if (roundedTotal !== 100.00) {
+    return {
+      isValid: false,
+      error: `Template criteria weights must total 100%. Current total: ${roundedTotal}%`,
+      totalWeight: roundedTotal
+    };
+  }
+
+  // Check individual weight ranges
+  for (const criterion of criteria) {
+    const weight = parseFloat(criterion.weight) || 0;
+    if (weight < 0 || weight > 100) {
+      return {
+        isValid: false,
+        error: `Individual criterion weights must be between 0% and 100%. Found: ${weight}%`,
+        totalWeight: roundedTotal
+      };
+    }
+  }
+
+  return { isValid: true, totalWeight: roundedTotal };
+}
+
 // Get all templates accessible to user
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -206,6 +249,16 @@ router.post('/', authorize('school_manager', 'super_admin'), async (req: Request
 
     // Add criteria if provided
     if (criteria && Array.isArray(criteria)) {
+      // Validate that weights total 100%
+      const validation = validateCriteriaWeights(criteria);
+      if (!validation.isValid) {
+        return res.status(400).json({ 
+          error: validation.error,
+          totalWeight: validation.totalWeight,
+          expectedTotal: 100.00
+        });
+      }
+
       for (const criterion of criteria) {
         await pool.execute(`
           INSERT INTO template_criteria (
@@ -286,6 +339,16 @@ router.put('/:templateId', authorize('school_manager', 'super_admin'), async (re
 
     // Handle criteria updates
     if (updates.criteria !== undefined && Array.isArray(updates.criteria)) {
+      // Validate that weights total 100%
+      const validation = validateCriteriaWeights(updates.criteria);
+      if (!validation.isValid) {
+        return res.status(400).json({ 
+          error: validation.error,
+          totalWeight: validation.totalWeight,
+          expectedTotal: 100.00
+        });
+      }
+
       // First, deactivate all existing criteria
       await pool.execute(
         'UPDATE template_criteria SET is_active = FALSE WHERE template_id = ?',

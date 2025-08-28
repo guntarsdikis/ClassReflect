@@ -11,6 +11,150 @@ export const initializeAnalysisRoutes = (dbPool: Pool) => {
 };
 
 /**
+ * Background job processor for analysis tasks
+ * Handles the actual AI processing in the background
+ */
+async function processAnalysisJob(analysisJobId: string): Promise<void> {
+  console.log(`🔄 Starting background processing for analysis job ${analysisJobId}`);
+  
+  try {
+    // Update job status to processing
+    await pool.execute(`
+      UPDATE analysis_jobs 
+      SET status = 'processing', started_at = NOW(), progress_percent = 10 
+      WHERE id = ?
+    `, [analysisJobId]);
+
+    // Get job details with transcript and template information
+    const [jobRows] = await pool.execute(`
+      SELECT 
+        aj.*,
+        t.external_id,
+        t.transcript_text,
+        tpl.template_name,
+        tc.criteria_name,
+        tc.weight,
+        tc.criteria_description as prompt_template,
+        u.first_name,
+        u.last_name,
+        auj.class_name,
+        auj.subject,
+        auj.grade
+      FROM analysis_jobs aj
+      JOIN transcripts t ON aj.transcript_id = t.id
+      JOIN templates tpl ON aj.template_id = tpl.id
+      LEFT JOIN template_criteria tc ON tpl.id = tc.template_id AND tc.is_active = 1
+      JOIN users u ON aj.teacher_id = u.id
+      JOIN audio_jobs auj ON aj.job_id = auj.id
+      WHERE aj.id = ?
+      ORDER BY tc.order_index
+    `, [analysisJobId]);
+
+    if (!Array.isArray(jobRows) || jobRows.length === 0) {
+      throw new Error(`Analysis job ${analysisJobId} not found`);
+    }
+
+    const job = jobRows[0] as any;
+    const criterions = jobRows
+      .filter((row: any) => row.criteria_name)
+      .map((row: any) => ({
+        criteria_name: row.criteria_name,
+        weight: row.weight,
+        prompt_template: row.prompt_template
+      }));
+
+    if (criterions.length === 0) {
+      throw new Error('Template has no active criterions');
+    }
+
+    console.log(`📊 Processing analysis for transcript ${job.transcript_id} with template "${job.template_name}"`);
+    console.log(`📝 Using ${criterions.length} criterions:`, criterions.map((c: any) => c.criteria_name));
+
+    // Update progress
+    await pool.execute(`
+      UPDATE analysis_jobs SET progress_percent = 30 WHERE id = ?
+    `, [analysisJobId]);
+
+    // Perform AI analysis using LeMUR with template criterions
+    const analysisResults = await lemurService.analyzeWithTemplate(
+      job.external_id, // AssemblyAI transcript ID
+      job.template_name,
+      criterions,
+      {
+        className: job.class_name || 'Class',
+        subject: job.subject || 'Subject',
+        grade: job.grade || 'Grade',
+        teacherName: `${job.first_name} ${job.last_name}`
+      }
+    );
+
+    // Update progress
+    await pool.execute(`
+      UPDATE analysis_jobs SET progress_percent = 80 WHERE id = ?
+    `, [analysisJobId]);
+
+    // Save analysis results to both analysis_jobs and analysis_results tables
+    await pool.execute(`
+      UPDATE analysis_jobs 
+      SET 
+        status = 'completed',
+        progress_percent = 100,
+        completed_at = NOW(),
+        overall_score = ?,
+        strengths = ?,
+        improvements = ?,
+        detailed_feedback = ?
+      WHERE id = ?
+    `, [
+      analysisResults.overall_score,
+      JSON.stringify(analysisResults.strengths),
+      JSON.stringify(analysisResults.improvements),
+      JSON.stringify(analysisResults.detailed_feedback),
+      analysisJobId
+    ]);
+
+    // Also save to analysis_results for backward compatibility
+    await pool.execute(`
+      INSERT INTO analysis_results (
+        transcript_id, job_id, teacher_id, school_id, template_id, applied_by,
+        overall_score, strengths, improvements, detailed_feedback, ai_model
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'anthropic/claude-sonnet-4-20250514')
+    `, [
+      job.transcript_id,
+      job.job_id,
+      job.teacher_id,
+      job.school_id,
+      job.template_id,
+      job.applied_by,
+      analysisResults.overall_score,
+      JSON.stringify(analysisResults.strengths),
+      JSON.stringify(analysisResults.improvements),
+      JSON.stringify(analysisResults.detailed_feedback)
+    ]);
+
+    console.log(`✅ Analysis job ${analysisJobId} completed successfully`);
+
+  } catch (error) {
+    console.error(`❌ Analysis job ${analysisJobId} failed:`, error);
+    
+    // Update job status to failed
+    await pool.execute(`
+      UPDATE analysis_jobs 
+      SET 
+        status = 'failed',
+        completed_at = NOW(),
+        error_message = ?
+      WHERE id = ?
+    `, [
+      error instanceof Error ? error.message : String(error),
+      analysisJobId
+    ]);
+    
+    throw error;
+  }
+}
+
+/**
  * GET /api/analysis/recordings
  * Get recordings available for analysis (with transcripts)
  */
@@ -157,62 +301,46 @@ router.post('/apply-template',
       // or re-analyze with the same template to compare results over time
       console.log(`📊 Proceeding with analysis - multiple analyses per recording are allowed`);
 
-      // Perform AI analysis using LeMUR with template criterions
-      console.log(`🔍 Starting analysis for transcript ${transcriptId} with template "${template.template_name}"`);
-      console.log(`📝 Using ${criterions.length} criterions:`, criterions.map(c => c.criteria_name));
+      // Create background analysis job instead of processing immediately
+      console.log(`🔄 Creating background analysis job for transcript ${transcriptId} with template "${template.template_name}"`);
       
-      const analysisResults = await lemurService.analyzeWithTemplate(
-        transcript.external_id, // AssemblyAI transcript ID
-        template.template_name,
-        criterions,
-        {
-          className: transcript.class_name || 'Class',
-          subject: transcript.subject || 'Subject',
-          grade: transcript.grade || 'Grade',
-          teacherName: `${transcript.first_name} ${transcript.last_name}`
-        }
-      );
-
-      // Save analysis results
-      const [result] = await pool.execute(`
-        INSERT INTO analysis_results (
-          transcript_id, job_id, teacher_id, school_id, template_id, applied_by,
-          overall_score, strengths, improvements, detailed_feedback, ai_model
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'anthropic/claude-sonnet-4-20250514')
+      const [jobResult] = await pool.execute(`
+        INSERT INTO analysis_jobs (
+          transcript_id, template_id, teacher_id, school_id, job_id, applied_by,
+          status, progress_percent, queued_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'queued', 0, NOW())
       `, [
         transcriptId,
-        transcript.job_id,
+        templateId,
         transcript.teacher_id,
         transcript.school_id,
-        templateId,
-        req.user!.id,
-        analysisResults.overall_score,
-        JSON.stringify(analysisResults.strengths),
-        JSON.stringify(analysisResults.improvements),
-        JSON.stringify(analysisResults.detailed_feedback)
+        transcript.job_id,
+        req.user!.id
       ]);
 
-      const analysisId = (result as any).insertId;
+      const analysisJobId = (jobResult as any).insertId;
 
       // Update template usage count
       await pool.execute(`
         UPDATE templates SET usage_count = usage_count + 1 WHERE id = ?
       `, [templateId]);
 
-      console.log(`✅ Analysis completed and saved with ID ${analysisId}`);
+      console.log(`✅ Analysis job created with ID ${analysisJobId} and queued for processing`);
+
+      // Start background processing (fire-and-forget)
+      console.log(`🚀 Starting background processing for job ${analysisJobId}`);
+      processAnalysisJob(analysisJobId).catch(error => {
+        console.error(`❌ Background processing failed for job ${analysisJobId}:`, error);
+      });
 
       const response = {
-        analysisId,
-        message: 'Template analysis completed successfully',
-        results: {
-          overall_score: analysisResults.overall_score,
-          strengths: analysisResults.strengths,
-          improvements: analysisResults.improvements,
-          detailed_feedback: analysisResults.detailed_feedback
-        }
+        analysisJobId,
+        status: 'queued',
+        message: 'Analysis job created and queued for processing',
+        estimatedTimeMinutes: '1-3 minutes'
       };
 
-      console.log('🚀 Sending success response:', response);
+      console.log('🚀 Sending immediate response:', response);
       res.json(response);
 
     } catch (error) {
@@ -404,5 +532,128 @@ router.get('/school-summary',
     }
   }
 );
+
+/**
+ * GET /api/analysis/job-status/:jobId
+ * Get status of background analysis job
+ */
+router.get('/job-status/:jobId',
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+
+      const [rows] = await pool.execute(`
+        SELECT 
+          aj.id,
+          aj.status,
+          aj.progress_percent,
+          aj.queued_at,
+          aj.started_at,
+          aj.completed_at,
+          aj.error_message,
+          aj.overall_score,
+          tpl.template_name,
+          tpl.category as template_category,
+          u1.first_name as teacher_first_name,
+          u1.last_name as teacher_last_name,
+          u2.first_name as applied_by_first_name,
+          u2.last_name as applied_by_last_name,
+          tr.word_count,
+          auj.class_name,
+          auj.subject,
+          auj.grade
+        FROM analysis_jobs aj
+        LEFT JOIN templates tpl ON aj.template_id = tpl.id
+        LEFT JOIN users u1 ON aj.teacher_id = u1.id
+        LEFT JOIN users u2 ON aj.applied_by = u2.id
+        LEFT JOIN transcripts tr ON aj.transcript_id = tr.id
+        LEFT JOIN audio_jobs auj ON aj.job_id = auj.id
+        WHERE aj.id = ?
+      `, [jobId]);
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(404).json({ error: 'Analysis job not found' });
+      }
+
+      const job = rows[0] as any;
+
+      // Verify access rights
+      if (req.user!.role === 'teacher' && job.teacher_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user!.role === 'school_manager' && job.school_id !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Format the response
+      const response = {
+        id: job.id,
+        status: job.status,
+        progress: {
+          percent: job.progress_percent,
+          message: getProgressMessage(job.status, job.progress_percent)
+        },
+        timeline: {
+          queued_at: job.queued_at,
+          started_at: job.started_at,
+          completed_at: job.completed_at
+        },
+        template: {
+          name: job.template_name,
+          category: job.template_category
+        },
+        recording: {
+          class_name: job.class_name,
+          subject: job.subject,
+          grade: job.grade,
+          word_count: job.word_count
+        },
+        teacher: {
+          first_name: job.teacher_first_name,
+          last_name: job.teacher_last_name
+        },
+        applied_by: job.applied_by_first_name ? {
+          first_name: job.applied_by_first_name,
+          last_name: job.applied_by_last_name
+        } : null,
+        error_message: job.error_message,
+        overall_score: job.overall_score
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error('Get analysis job status error:', error);
+      res.status(500).json({ error: 'Failed to get job status' });
+    }
+  }
+);
+
+/**
+ * Helper function to generate progress messages
+ */
+function getProgressMessage(status: string, progressPercent: number): string {
+  switch (status) {
+    case 'queued':
+      return 'Analysis job is queued and waiting to be processed...';
+    case 'processing':
+      if (progressPercent < 20) {
+        return 'Preparing analysis parameters and template criteria...';
+      } else if (progressPercent < 40) {
+        return 'Sending transcript data to AI analysis service...';
+      } else if (progressPercent < 80) {
+        return 'AI is analyzing the teaching performance...';
+      } else {
+        return 'Finalizing analysis results and saving to database...';
+      }
+    case 'completed':
+      return 'Analysis completed successfully!';
+    case 'failed':
+      return 'Analysis job failed. Please check error message for details.';
+    default:
+      return 'Unknown status';
+  }
+}
 
 export default router;

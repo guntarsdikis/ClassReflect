@@ -118,6 +118,27 @@ export function TemplateManagement() {
 
   const [applySchoolId, setApplySchoolId] = useState<string>('');
 
+  // Weight calculation and validation
+  const calculateTotalWeight = (criteria: TemplateCriterion[]) => {
+    return criteria.reduce((total, criterion) => total + (criterion.weight || 0), 0);
+  };
+
+  const totalWeight = Number(calculateTotalWeight(formData.criteria || []));
+  const remainingWeight = Number((100 - totalWeight).toFixed(2));
+  const isWeightValid = Math.abs(totalWeight - 100) < 0.01; // Allow small floating point differences
+
+  const getWeightColor = () => {
+    if (Math.abs(totalWeight - 100) < 0.01) return 'green';
+    if (totalWeight < 100) return 'blue'; 
+    return 'red';
+  };
+
+  const getWeightLabel = () => {
+    if (Math.abs(totalWeight - 100) < 0.01) return 'Perfect (100%)';
+    if (totalWeight < 100) return `Need ${remainingWeight.toFixed(1)}% more`;
+    return `${(totalWeight - 100).toFixed(1)}% over limit`;
+  };
+
   // Load data on component mount and when school context changes
   useEffect(() => {
     if (currentUserSchoolId) {
@@ -249,6 +270,19 @@ export function TemplateManagement() {
           color: 'red',
         });
         return;
+      }
+
+      // Validate that weights total 100%
+      if (formData.criteria && formData.criteria.length > 0) {
+        const totalWeight = calculateTotalWeight(formData.criteria);
+        if (Math.abs(totalWeight - 100) > 0.01) {
+          notifications.show({
+            title: 'Weight Validation Error',
+            message: `Template criteria weights must total 100%. Current total: ${totalWeight.toFixed(1)}%`,
+            color: 'red',
+          });
+          return;
+        }
       }
 
       // For super admin, school_id is required when creating school-specific templates
@@ -735,16 +769,44 @@ export function TemplateManagement() {
           {/* Existing Criteria */}
           {formData.criteria && formData.criteria.length > 0 && (
             <Stack>
-              <Text fw={500} size="sm">Current Criteria ({formData.criteria.length})</Text>
+              <Group justify="space-between" align="center">
+                <Text fw={500} size="sm">Current Criteria ({formData.criteria.length})</Text>
+                <Group gap="xs">
+                  {formData.criteria.length > 1 && (
+                    <Button
+                      variant="light"
+                      size="xs"
+                      onClick={() => {
+                        const equalWeight = Number((100 / formData.criteria.length).toFixed(2));
+                        const newCriteria = formData.criteria.map((criterion, index) => ({
+                          ...criterion,
+                          weight: index === formData.criteria.length - 1 
+                            ? Number((100 - (equalWeight * (formData.criteria.length - 1))).toFixed(2))
+                            : equalWeight
+                        }));
+                        setFormData({ ...formData, criteria: newCriteria });
+                      }}
+                    >
+                      Distribute Equally
+                    </Button>
+                  )}
+                  <Badge
+                    size="lg"
+                    color={getWeightColor()}
+                    variant="filled"
+                  >
+                    {getWeightLabel()} ({totalWeight.toFixed(1)}%)
+                  </Badge>
+                </Group>
+              </Group>
               {formData.criteria.map((criterion, index) => (
                 <Paper key={index} p="md" withBorder>
-                  <Group justify="space-between">
-                    <div style={{ flex: 1 }}>
-                      <Text size="sm" fw={500}>{criterion.criteria_name}</Text>
-                      <Text size="xs" c="dimmed">{criterion.criteria_description}</Text>
-                    </div>
-                    <Group>
-                      <Badge variant="light">Weight: {criterion.weight}</Badge>
+                  <Stack gap="sm">
+                    <Group justify="space-between">
+                      <div style={{ flex: 1 }}>
+                        <Text size="sm" fw={500}>{criterion.criteria_name}</Text>
+                        <Text size="xs" c="dimmed">{criterion.criteria_description}</Text>
+                      </div>
                       <ActionIcon
                         color="red"
                         variant="subtle"
@@ -753,7 +815,27 @@ export function TemplateManagement() {
                         <IconX size={14} />
                       </ActionIcon>
                     </Group>
-                  </Group>
+                    <Group align="flex-end">
+                      <NumberInput
+                        label="Weight (%)"
+                        min={0.1}
+                        max={100}
+                        step={0.1}
+                        decimalScale={1}
+                        value={criterion.weight}
+                        onChange={(value) => {
+                          const newCriteria = [...formData.criteria];
+                          newCriteria[index] = { ...criterion, weight: Number(value) };
+                          setFormData({ ...formData, criteria: newCriteria });
+                        }}
+                        w={120}
+                        size="sm"
+                      />
+                      <Text size="xs" c="dimmed" style={{ marginBottom: '8px' }}>
+                        {((criterion.weight / Math.max(totalWeight, 1)) * 100).toFixed(1)}% of total
+                      </Text>
+                    </Group>
+                  </Stack>
                 </Paper>
               ))}
             </Stack>
@@ -778,24 +860,52 @@ export function TemplateManagement() {
               />
               <Group>
                 <NumberInput
-                  label="Weight"
+                  label={`Weight (%) ${remainingWeight > 0 ? `- ${remainingWeight.toFixed(1)}% remaining` : ''}`}
+                  min={0.1}
+                  max={100}
+                  step={0.1}
+                  decimalScale={1}
                   value={newCriterion.weight}
                   onChange={(value) => setNewCriterion({...newCriterion, weight: Number(value)})}
-                  min={0.1}
-                  max={3.0}
-                  step={0.1}
-                  w={120}
+                  description={remainingWeight > 0 ? `Suggestion: Use ${remainingWeight.toFixed(1)}% to complete the template` : totalWeight > 100 ? 'Template is over 100% weight limit' : 'Template weight is complete'}
+                  w={200}
                 />
-                <Button
-                  leftSection={<IconPlus size={16} />}
-                  onClick={addCriterion}
-                  mt="auto"
-                >
-                  Add Criterion
-                </Button>
+                {remainingWeight > 0 && (
+                  <Button
+                    variant="light"
+                    size="xs"
+                    onClick={() => setNewCriterion({...newCriterion, weight: Number(remainingWeight.toFixed(1))})}
+                  >
+                    Use Remaining ({remainingWeight.toFixed(1)}%)
+                  </Button>
+                )}
               </Group>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                onClick={addCriterion}
+                mt="md"
+                fullWidth
+              >
+                Add Criterion
+              </Button>
             </Stack>
           </Paper>
+
+          {/* Weight Validation Warning */}
+          {formData.criteria && formData.criteria.length > 0 && !isWeightValid && (
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              color={getWeightColor() === 'red' ? 'red' : 'blue'}
+              title="Weight Validation"
+            >
+              <Text size="sm">
+                {totalWeight < 100 
+                  ? `Template weights total ${totalWeight.toFixed(1)}%. Add ${remainingWeight.toFixed(1)}% more to complete the template.`
+                  : `Template weights total ${totalWeight.toFixed(1)}%, which exceeds 100%. Please adjust the weights to total exactly 100%.`
+                }
+              </Text>
+            </Alert>
+          )}
 
           <Space h="md" />
 
@@ -806,6 +916,7 @@ export function TemplateManagement() {
             <Button 
               onClick={handleSaveTemplate}
               leftSection={editingTemplate ? <IconCheck size={16} /> : <IconPlus size={16} />}
+              disabled={formData.criteria && formData.criteria.length > 0 && !isWeightValid}
             >
               {editingTemplate ? 'Update Template' : 'Create Template'}
             </Button>

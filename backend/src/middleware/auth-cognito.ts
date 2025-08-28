@@ -365,7 +365,7 @@ export function requireSchoolAccess(req: Request, res: Response, next: NextFunct
     // Check if request contains school-related parameters
     const schoolId = req.params.schoolId || req.query.schoolId || req.body?.schoolId;
     
-    if (schoolId && req.user && req.user.schoolId && schoolId !== req.user.schoolId) {
+    if (schoolId && req.user && req.user.schoolId && parseInt(schoolId as string) !== req.user.schoolId) {
       res.status(403).json({ error: 'Access denied - school restriction' });
       return;
     }

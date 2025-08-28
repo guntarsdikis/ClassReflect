@@ -14,6 +14,7 @@ import { TemplateManagement } from '@features/templates/components/TemplateManag
 import { TemplateCategoryManagement } from '@features/templates/components/TemplateCategoryManagement';
 import { UploadWizard } from '@features/uploads/components/UploadWizard';
 import { RecordingsList } from '@features/recordings/components/RecordingsList';
+import { AnalysisManager } from '@features/analysis/components/AnalysisManager';
 import { ProfilePage } from '@features/profile';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
 // import { TemplateEditor } from '@features/templates/components/TemplateEditor';
@@ -41,10 +42,11 @@ export function AppRouter() {
             {/* <Route path="/feedback/:jobId" element={<FeedbackView />} /> */}
           </Route>
           
-          {/* School Manager Routes */}
-          <Route element={<RoleRoute roles={['school_manager']} />}>
+          {/* School Manager and Super Admin Routes */}
+          <Route element={<RoleRoute roles={['school_manager', 'super_admin']} />}>
             <Route path="/upload" element={<UploadWizard />} />
             <Route path="/recordings" element={<RecordingsList />} />
+            <Route path="/analysis" element={<AnalysisManager />} />
             <Route path="/templates" element={<TemplateManagement />} />
             <Route path="/categories" element={<TemplateCategoryManagement />} />
             <Route path="/subjects" element={<SubjectManagement />} />
@@ -61,6 +63,7 @@ export function AppRouter() {
             <Route path="/admin/users/:id" element={<UserDetail />} />
             <Route path="/admin/users/new" element={<UserManagement />} />
             <Route path="/admin/recordings" element={<RecordingsList />} />
+            <Route path="/admin/analysis" element={<AnalysisManager />} />
             <Route path="/admin/templates" element={<TemplateManagement />} />
             <Route path="/admin/categories" element={<TemplateCategoryManagement />} />
             <Route path="/admin/subjects" element={<SubjectManagement />} />

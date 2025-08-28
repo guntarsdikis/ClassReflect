@@ -16,6 +16,7 @@ import jobsRoutes from './routes/jobs';
 import schoolsRoutes from './routes/schools';
 import teachersRoutes from './routes/teachers';
 import templatesRoutes from './routes/templates';
+import analysisRoutes, { initializeAnalysisRoutes } from './routes/analysis';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,16 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+  if (req.path.includes('/analysis')) {
+    console.log('   🎯 Analysis request detected!');
+    console.log('   Headers:', Object.keys(req.headers));
+  }
+  next();
+});
 
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ 
@@ -47,13 +58,17 @@ app.get('/', (req: Request, res: Response) => {
       jobs: '/api/jobs',
       schools: '/api/schools',
       teachers: '/api/teachers',
-      templates: '/api/templates'
+      templates: '/api/templates',
+      analysis: '/api/analysis'
     }
   });
 });
 
 // Initialize authentication system (Cognito or JWT based on config)
 const { authRoutes, usersRoutes } = initializeAuth(pool);
+
+// Initialize analysis routes
+initializeAnalysisRoutes(pool);
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -63,10 +78,13 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api/schools', schoolsRoutes);
 app.use('/api/teachers', teachersRoutes);
 app.use('/api/templates', templatesRoutes);
+console.log('🔧 Mounting analysis routes at /api/analysis');
+app.use('/api/analysis', analysisRoutes);
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error('Error:', err);
+  console.error('🚨 Express Error Handler:', err);
+  console.error('🚨 Request:', req.method, req.path);
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error'
   });

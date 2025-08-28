@@ -40,6 +40,9 @@ router.get('/', async (req: Request, res: Response) => {
       params.push(parseInt(school_id as string, 10));
     }
 
+    // Always filter for active templates only
+    conditions.push('t.is_active = TRUE');
+    
     // Access control: SuperAdmin sees all, School Manager sees only own school templates
     console.log('🏫 Template Access Control Debug:');
     console.log('   User:', {
@@ -53,8 +56,8 @@ router.get('/', async (req: Request, res: Response) => {
     
     if (user.role === 'super_admin') {
       if (!school_id) {
-        // Super admin without school filter - see all templates
-        console.log('   Access: Super Admin - seeing all templates');
+        // Super admin without school filter - see all active templates
+        console.log('   Access: Super Admin - seeing all active templates');
         conditions.push('(t.is_global = TRUE OR t.school_id IS NOT NULL)');
       } else {
         // Super admin with school filter - already added school_id condition above

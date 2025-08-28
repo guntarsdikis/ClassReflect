@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { Pool } from 'mysql2/promise';
-import { authenticate, authorize, authorizeSchool } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth-cognito';
 
 const router = Router();
 let pool: Pool;
@@ -242,7 +242,6 @@ router.post('/teachers/bulk',
 router.put('/teachers/:id',
   authenticate,
   authorize('school_manager', 'super_admin'),
-  authorizeSchool,
   async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -304,7 +303,6 @@ router.put('/teachers/:id',
 router.delete('/teachers/:id',
   authenticate,
   authorize('school_manager', 'super_admin'),
-  authorizeSchool,
   async (req: Request, res: Response) => {
     try {
       const { id } = req.params;

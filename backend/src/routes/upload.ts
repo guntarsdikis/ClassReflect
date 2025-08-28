@@ -52,7 +52,7 @@ router.post('/direct',
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { teacherId, schoolId } = req.body;
+    const { teacherId, schoolId, className, subject, grade, duration, notes } = req.body;
 
     if (!teacherId || !schoolId) {
       return res.status(400).json({ 
@@ -99,9 +99,9 @@ router.post('/direct',
 
     // Create job record in database (no S3 involved)
     await pool.execute<ResultSetHeader>(
-      `INSERT INTO audio_jobs (id, teacher_id, school_id, file_name, file_size, status) 
-       VALUES (?, ?, ?, ?, ?, 'queued')`,
-      [jobId, teacherId, schoolId, req.file.originalname, req.file.size]
+      `INSERT INTO audio_jobs (id, teacher_id, school_id, class_name, subject, grade, class_duration_minutes, notes, file_name, file_size, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
+      [jobId, teacherId, schoolId, className || null, subject || null, grade || null, duration || null, notes || null, req.file.originalname, req.file.size]
     );
 
     // Start AssemblyAI processing immediately with file buffer

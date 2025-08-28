@@ -34,6 +34,7 @@ import {
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
+import { useSchoolContextStore } from '@store/school-context.store';
 import { templatesService, Template } from '@features/templates/services/templates.service';
 import { usersService, User } from '@features/users/services/users.service';
 
@@ -48,11 +49,10 @@ interface CriterionConfig {
 export function UploadWizard() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const { selectedSchool } = useSchoolContextStore();
   const [active, setActive] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   
@@ -64,41 +64,28 @@ export function UploadWizard() {
   const [grade, setGrade] = useState('');
   const [duration, setDuration] = useState<number>(45);
   const [notes, setNotes] = useState('');
-  
-  // Template and criteria state
-  const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [criteria, setCriteria] = useState<CriterionConfig[]>([]);
-  const [customCriteria, setCustomCriteria] = useState<CriterionConfig[]>([]);
-  const [useStudentAudio, setUseStudentAudio] = useState(true);
-  const [focusAreas, setFocusAreas] = useState<string[]>([]);
+
+  // Determine which school ID to use
+  const getEffectiveSchoolId = () => {
+    if (user?.role === 'super_admin') {
+      return selectedSchool?.id || null;
+    }
+    return user?.schoolId || null;
+  };
+
+  const currentSchoolId = getEffectiveSchoolId();
 
   useEffect(() => {
-    loadTemplates();
-    loadTeachers();
-  }, []);
-
-  const loadTemplates = async () => {
-    try {
-      setLoading(true);
-      const templatesData = await templatesService.getTemplates();
-      console.log('Loaded templates:', templatesData);
-      setTemplates(templatesData);
-    } catch (error) {
-      console.error('Failed to load templates:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to load templates',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
+    if (currentSchoolId) {
+      loadTeachers();
     }
-  };
-  
+  }, [currentSchoolId, selectedSchool]);
+
   const loadTeachers = async () => {
     try {
       setLoadingTeachers(true);
-      const teachersData = await usersService.getTeachers();
+      const teachersData = await usersService.getTeachers(currentSchoolId);
+      console.log('Loaded teachers for school:', currentSchoolId, teachersData);
       setTeachers(teachersData);
     } catch (error) {
       console.error('Failed to load teachers:', error);
@@ -112,71 +99,8 @@ export function UploadWizard() {
     }
   };
   
-  const handleTemplateSelect = async (templateId: string) => {
-    console.log('Template selected:', templateId);
-    setSelectedTemplate(templateId);
-    
-    try {
-      // Get detailed template with criteria
-      const detailedTemplate = await templatesService.getTemplate(parseInt(templateId));
-      console.log('Detailed template loaded:', detailedTemplate);
-      
-      if (detailedTemplate.criteria && detailedTemplate.criteria.length > 0) {
-        console.log('Template criteria:', detailedTemplate.criteria);
-        const mappedCriteria = detailedTemplate.criteria.map(c => ({
-          id: c.id?.toString() || Math.random().toString(),
-          name: c.criteria_name,
-          weight: c.weight * 100, // Convert from 0-1 to percentage
-          enabled: true,
-          customPrompt: '',
-        }));
-        console.log('Mapped criteria:', mappedCriteria);
-        setCriteria(mappedCriteria);
-        setCustomCriteria([]);
-      } else {
-        console.log('No template criteria found - template has no configured criteria');
-        setCriteria([]);
-        setCustomCriteria([
-          { id: 'custom1', name: 'Teaching Quality', weight: 100, enabled: true },
-        ]);
-      }
-    } catch (error) {
-      console.error('Failed to load detailed template:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to load template details',
-        color: 'red',
-      });
-      setCriteria([]);
-      setCustomCriteria([]);
-    }
-  };
-  
-  const handleCriterionToggle = (criterionId: string) => {
-    setCriteria(prev =>
-      prev.map(c =>
-        c.id === criterionId ? { ...c, enabled: !c.enabled } : c
-      )
-    );
-  };
-  
-  const handleCriterionWeightChange = (criterionId: string, weight: number) => {
-    setCriteria(prev =>
-      prev.map(c =>
-        c.id === criterionId ? { ...c, weight } : c
-      )
-    );
-  };
-  
-  const addCustomCriterion = () => {
-    setCustomCriteria(prev => [
-      ...prev,
-      { id: `custom${prev.length + 1}`, name: '', weight: 25, enabled: true },
-    ]);
-  };
-  
   const handleSubmit = async () => {
-    if (!audioFile || !selectedTeacher || !user?.schoolId) {
+    if (!audioFile || !selectedTeacher || !currentSchoolId) {
       notifications.show({
         title: 'Error',
         message: 'Missing required information',
@@ -192,7 +116,7 @@ export function UploadWizard() {
       const formData = new FormData();
       formData.append('audio', audioFile);
       formData.append('teacherId', selectedTeacher);
-      formData.append('schoolId', user.schoolId.toString());
+      formData.append('schoolId', currentSchoolId.toString());
       
       // Add class information
       formData.append('className', className);
@@ -200,18 +124,6 @@ export function UploadWizard() {
       formData.append('grade', grade);
       formData.append('duration', duration.toString());
       formData.append('notes', notes);
-      
-      // Add template information
-      if (selectedTemplate !== 'custom') {
-        formData.append('templateId', selectedTemplate);
-      }
-      
-      // Add criteria configuration
-      const enabledCriteria = criteria.filter(c => c.enabled);
-      formData.append('criteria', JSON.stringify(enabledCriteria));
-      formData.append('customCriteria', JSON.stringify(customCriteria));
-      formData.append('useStudentAudio', useStudentAudio.toString());
-      formData.append('focusAreas', JSON.stringify(focusAreas));
 
       // Upload file
       const response = await fetch('/api/upload/direct', {
@@ -249,122 +161,52 @@ export function UploadWizard() {
     }
   };
   
-  const nextStep = () => setActive((current) => (current < 4 ? current + 1 : current));
+  const nextStep = () => setActive((current) => (current < 2 ? current + 1 : current));
   const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
   
   const isStepValid = () => {
     switch (active) {
       case 0:
-        return selectedTemplate;
+        return !!audioFile;
       case 1:
-        return selectedTeacher && audioFile;
+        return selectedTeacher && className && subject && grade;
       case 2:
-        return className && subject && grade;
-      case 3:
-        const enabledCriteria = criteria.filter(c => c.enabled);
-        const totalWeight = enabledCriteria.reduce((sum, c) => sum + c.weight, 0);
-        console.log('Step 3 validation:', { enabledCriteria, totalWeight, isValid: enabledCriteria.length > 0 && totalWeight === 100 });
-        return enabledCriteria.length > 0 && totalWeight === 100;
+        return true; // Review step
       default:
         return true;
     }
   };
+
+  // Show message for super admin when no school is selected
+  if (user?.role === 'super_admin' && !currentSchoolId) {
+    return (
+      <Container size="md" py="xl">
+        <Alert icon={<IconAlertCircle size="1rem" />} title="No School Selected" color="blue">
+          Please select a school from the school switcher above to upload recordings.
+        </Alert>
+      </Container>
+    );
+  }
   
   return (
     <Container size="lg">
       <Paper shadow="sm" radius="md" p="lg" withBorder>
-        <Title order={2} mb="xl">Upload Class Recording</Title>
+        <Title order={2} mb="xl">
+          Upload Class Recording
+          {user?.role === 'super_admin' && selectedSchool && (
+            <Text size="sm" c="dimmed" fw={400} mt={4}>
+              Uploading for {selectedSchool.name}
+            </Text>
+          )}
+        </Title>
         
         <Stepper active={active} onStepClick={setActive}>
           <Stepper.Step
-            label="Select Template"
-            description="Choose evaluation template"
-            icon={<IconTemplate size={18} />}
-          >
-            <Stack mt="xl">
-              <Text size="sm" c="dimmed" mb="md">
-                Select an evaluation template that best matches your needs
-              </Text>
-              
-              {loading ? (
-                <Text>Loading templates...</Text>
-              ) : (
-                <Radio.Group value={selectedTemplate} onChange={handleTemplateSelect}>
-                  <Stack>
-                    {templates.map((template) => (
-                      <Card key={template.id} withBorder p="md">
-                        <Radio
-                          value={template.id.toString()}
-                          label={
-                            <Group justify="space-between" style={{ flex: 1 }}>
-                              <div>
-                                <Text fw={500}>{template.template_name}</Text>
-                                <Text size="xs" c="dimmed">{template.description}</Text>
-                              </div>
-                              <Group gap="xs">
-                                <Badge variant="light">{template.category}</Badge>
-                                {template.grade_levels.length > 0 && (
-                                  <Badge variant="outline" size="sm">
-                                    Grades: {template.grade_levels.join(', ')}
-                                  </Badge>
-                                )}
-                              </Group>
-                            </Group>
-                          }
-                        />
-                        {template.criteria && template.criteria.length > 0 && (
-                          <Group gap={4} mt="xs" ml="xl">
-                            {template.criteria.map((criterion) => (
-                              <Badge key={criterion.id || criterion.criteria_name} size="xs" variant="dot">
-                                {criterion.criteria_name} ({Math.round(criterion.weight * 100)}%)
-                              </Badge>
-                            ))}
-                          </Group>
-                        )}
-                      </Card>
-                    ))}
-                    
-                    {/* Add custom option */}
-                    <Card withBorder p="md">
-                      <Radio
-                        value="custom"
-                        label={
-                          <Group justify="space-between" style={{ flex: 1 }}>
-                            <div>
-                              <Text fw={500}>Custom Evaluation</Text>
-                              <Text size="xs" c="dimmed">Create your own evaluation criteria</Text>
-                            </div>
-                            <Badge variant="light">Custom</Badge>
-                          </Group>
-                        }
-                      />
-                    </Card>
-                  </Stack>
-                </Radio.Group>
-              )}
-            </Stack>
-          </Stepper.Step>
-          
-          <Stepper.Step
-            label="Upload Recording"
-            description="Select teacher and audio file"
+            label="Upload File"
+            description="Select audio file"
             icon={<IconUpload size={18} />}
           >
             <Stack mt="xl">
-              <Select
-                label="Select Teacher"
-                placeholder={loadingTeachers ? "Loading teachers..." : "Choose a teacher"}
-                data={teachers.map(teacher => ({
-                  value: teacher.id.toString(),
-                  label: `${teacher.firstName} ${teacher.lastName}${teacher.subjects?.length ? ` - ${teacher.subjects.join(', ')}` : ''}${teacher.grades?.length ? ` (Grades ${teacher.grades.join(', ')})` : ''}`
-                }))}
-                value={selectedTeacher}
-                onChange={(value) => setSelectedTeacher(value || '')}
-                required
-                searchable
-                disabled={loadingTeachers}
-              />
-              
               <FileInput
                 label="Audio Recording"
                 placeholder="Click to select audio file"
@@ -391,6 +233,19 @@ export function UploadWizard() {
             icon={<IconInfoCircle size={18} />}
           >
             <Stack mt="xl">
+              <Select
+                label="Teacher"
+                placeholder={loadingTeachers ? "Loading teachers..." : "Select a teacher"}
+                data={teachers.map(teacher => ({
+                  value: teacher.id.toString(),
+                  label: `${teacher.firstName} ${teacher.lastName}${teacher.subjects?.length ? ` - ${teacher.subjects.join(', ')}` : ''}${teacher.grades?.length ? ` (Grades ${teacher.grades.join(', ')})` : ''}`
+                }))}
+                value={selectedTeacher}
+                onChange={(value) => setSelectedTeacher(value || '')}
+                required
+                disabled={loadingTeachers}
+              />
+              
               <TextInput
                 label="Class Name"
                 placeholder="e.g., Math Period 3"
@@ -428,147 +283,11 @@ export function UploadWizard() {
               
               <Textarea
                 label="Additional Notes (optional)"
-                placeholder="Any specific context or areas of focus for this evaluation"
+                placeholder="Any specific context or notes about this recording"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
               />
-            </Stack>
-          </Stepper.Step>
-          
-          <Stepper.Step
-            label="Configure Criteria"
-            description="Customize evaluation parameters"
-            icon={<IconSettings size={18} />}
-          >
-            <Stack mt="xl">
-              <Switch
-                label="Include student audio analysis"
-                description="Analyze student responses and participation"
-                checked={useStudentAudio}
-                onChange={(event) => setUseStudentAudio(event.currentTarget.checked)}
-              />
-              
-              <MultiSelect
-                label="Focus Areas (optional)"
-                placeholder="Select specific areas to emphasize"
-                data={[
-                  'Differentiated Instruction',
-                  'Technology Integration',
-                  'Critical Thinking',
-                  'Collaborative Learning',
-                  'Assessment Strategies',
-                  'Classroom Management',
-                  'Student Engagement',
-                  'Clear Communication',
-                ]}
-                value={focusAreas}
-                onChange={setFocusAreas}
-              />
-              
-              {criteria.length > 0 && (
-                <>
-                  <Text fw={500} mt="md">Evaluation Criteria</Text>
-                  <Text size="xs" c="dimmed">
-                    Adjust weights to total 100%. Disable criteria you don't want to evaluate.
-                  </Text>
-                  
-                  <Stack gap="xs">
-                    {criteria.map((criterion) => (
-                      <Paper key={criterion.id} p="sm" withBorder>
-                        <Group justify="space-between">
-                          <Checkbox
-                            label={criterion.name}
-                            checked={criterion.enabled}
-                            onChange={() => handleCriterionToggle(criterion.id)}
-                          />
-                          <NumberInput
-                            value={criterion.weight}
-                            onChange={(value) => handleCriterionWeightChange(criterion.id, Number(value))}
-                            min={0}
-                            max={100}
-                            step={5}
-                            suffix="%"
-                            disabled={!criterion.enabled}
-                            style={{ width: 100 }}
-                          />
-                        </Group>
-                        {criterion.enabled && (
-                          <Textarea
-                            placeholder="Optional: Add specific instructions for this criterion"
-                            value={criterion.customPrompt}
-                            onChange={(e) => {
-                              setCriteria(prev =>
-                                prev.map(c =>
-                                  c.id === criterion.id
-                                    ? { ...c, customPrompt: e.target.value }
-                                    : c
-                                )
-                              );
-                            }}
-                            mt="xs"
-                            rows={2}
-                          />
-                        )}
-                      </Paper>
-                    ))}
-                  </Stack>
-                  
-                  <Text size="sm" fw={500}>
-                    Total Weight: {criteria.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0)}%
-                  </Text>
-                  
-                  {criteria.filter(c => c.enabled).reduce((sum, c) => sum + c.weight, 0) !== 100 && (
-                    <Alert icon={<IconAlertCircle size={16} />} color="yellow">
-                      Weights must total exactly 100%
-                    </Alert>
-                  )}
-                </>
-              )}
-              
-              {selectedTemplate === 'custom' && (
-                <>
-                  <Text fw={500} mt="md">Custom Criteria</Text>
-                  <Stack gap="xs">
-                    {customCriteria.map((criterion, index) => (
-                      <Paper key={criterion.id} p="sm" withBorder>
-                        <Group>
-                          <TextInput
-                            placeholder="Criterion name"
-                            value={criterion.name}
-                            onChange={(e) => {
-                              setCustomCriteria(prev =>
-                                prev.map((c, i) =>
-                                  i === index ? { ...c, name: e.target.value } : c
-                                )
-                              );
-                            }}
-                            style={{ flex: 1 }}
-                          />
-                          <NumberInput
-                            value={criterion.weight}
-                            onChange={(value) => {
-                              setCustomCriteria(prev =>
-                                prev.map((c, i) =>
-                                  i === index ? { ...c, weight: Number(value) } : c
-                                )
-                              );
-                            }}
-                            min={0}
-                            max={100}
-                            step={5}
-                            suffix="%"
-                            style={{ width: 100 }}
-                          />
-                        </Group>
-                      </Paper>
-                    ))}
-                  </Stack>
-                  <Button variant="outline" onClick={addCustomCriterion} size={32}>
-                    Add Criterion
-                  </Button>
-                </>
-              )}
             </Stack>
           </Stepper.Step>
           
@@ -602,13 +321,8 @@ export function UploadWizard() {
                         <Text size="sm">{className} - {subject} (Grade {grade})</Text>
                       </Group>
                       <Group justify="space-between">
-                        <Text size="sm" fw={500}>Template:</Text>
-                        <Text size="sm">
-                          {selectedTemplate === 'custom' 
-                            ? 'Custom Evaluation' 
-                            : templates.find(t => t.id.toString() === selectedTemplate)?.template_name
-                          }
-                        </Text>
+                        <Text size="sm" fw={500}>Duration:</Text>
+                        <Text size="sm">{duration} minutes</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm" fw={500}>File:</Text>
@@ -631,7 +345,7 @@ export function UploadWizard() {
           </Stepper.Completed>
         </Stepper>
         
-        {active < 4 && (
+        {active < 3 && (
           <Group justify="space-between" mt="xl">
             <Button variant="default" onClick={prevStep} disabled={active === 0}>
               Back

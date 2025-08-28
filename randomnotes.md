@@ -10,8 +10,7 @@
 how to implement in our current app "Teach Like a Champion" principles. here is the documentation.
 you have to check our current app settings and suggest what is best option to integrate it. is it by using template criterions? i dont want hard coded, i want to be able to apply template of "teach like a champion" but also there can be other templates. so to one transcript can be applied different templates. basically templates have finetuned prompts, the list of prompts, which are criterions, how would you suggest update current app. think
 
-then we need to add section for superadmin , and manager to apply template and get results based on template and to be saved in database.
 
-i think we dont need to save to ask template when uploaded file, need to save all other information, like teacher, subject, level, class duration and that is it for now. need update current app accordingly. think
+
 
 

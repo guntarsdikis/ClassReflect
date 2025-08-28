@@ -25,7 +25,10 @@ import {
   IconEye,
   IconAlertCircle,
   IconCheck,
-  IconClock
+  IconClock,
+  IconTrash,
+  IconMusic,
+  IconInfoCircle
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
@@ -282,6 +285,42 @@ export function AnalysisManager() {
     setModalOpen(true);
   };
 
+  const handleDeleteRecording = async (recording: RecordingForAnalysis) => {
+    // Confirm deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the recording "${recording.class_name}"?\n\n` +
+      `This will permanently delete:\n` +
+      `• Audio file: ${recording.file_name}\n` +
+      `• Transcript (${recording.word_count?.toLocaleString() || 0} words)\n` +
+      `• All analysis results (${recording.analysis_count} analyses)\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await analysisService.deleteRecording(recording.job_id);
+      
+      notifications.show({
+        title: 'Recording Deleted',
+        message: `"${recording.class_name}" has been permanently deleted`,
+        color: 'green',
+        icon: <IconCheck />,
+      });
+
+      // Refresh the recordings list
+      await loadRecordings();
+      
+    } catch (error: any) {
+      console.error('Failed to delete recording:', error);
+      notifications.show({
+        title: 'Deletion Failed',
+        message: error.message || 'Failed to delete the recording. Please try again.',
+        color: 'red',
+      });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -428,22 +467,53 @@ export function AnalysisManager() {
                   <Table.Tr key={recording.job_id}>
                     <Table.Td>
                       <Stack gap="xs">
-                        <Text fw={500} size="sm">
-                          {recording.class_name}
-                        </Text>
+                        <Group align="center" gap="xs">
+                          <IconMusic size={14} color="#666" />
+                          <Text fw={500} size="sm">
+                            {recording.class_name}
+                          </Text>
+                        </Group>
+                        
                         <Group gap="xs">
-                          <Badge size="xs" variant="outline">
+                          <Badge size="xs" variant="outline" color="blue">
                             {recording.subject}
                           </Badge>
-                          <Badge size="xs" variant="outline">
+                          <Badge size="xs" variant="outline" color="green">
                             Grade {recording.grade}
                           </Badge>
-                          <Badge size="xs" variant="outline">
+                          <Badge size="xs" variant="outline" color="orange">
                             {recording.class_duration_minutes}min
                           </Badge>
                         </Group>
+
+                        {/* File Information */}
+                        <Group gap="xs" align="center">
+                          <IconFileText size={12} color="#888" />
+                          <Text size="xs" c="dimmed" truncate style={{ maxWidth: 200 }}>
+                            {recording.file_name || 'Unknown file'}
+                          </Text>
+                        </Group>
+
+                        {/* Notes if available */}
+                        {recording.notes && (
+                          <Group gap="xs" align="flex-start">
+                            <IconInfoCircle size={12} color="#888" style={{ marginTop: 2, flexShrink: 0 }} />
+                            <Text size="xs" c="dimmed" style={{ 
+                              maxWidth: 200, 
+                              wordBreak: 'break-word',
+                              lineHeight: 1.3
+                            }}>
+                              {recording.notes.length > 100 
+                                ? `${recording.notes.substring(0, 100)}...` 
+                                : recording.notes
+                              }
+                            </Text>
+                          </Group>
+                        )}
+
+                        {/* Upload Information */}
                         <Text size="xs" c="dimmed">
-                          {formatDate(recording.uploaded_at)}
+                          Uploaded {formatDate(recording.uploaded_at)}
                         </Text>
                       </Stack>
                     </Table.Td>
@@ -454,21 +524,45 @@ export function AnalysisManager() {
                     </Table.Td>
                     <Table.Td>
                       <Stack gap="xs">
-                        <Text size="sm">
-                          {recording.word_count?.toLocaleString() || 0} words
-                        </Text>
+                        <Group gap="xs" align="center">
+                          <IconFileText size={14} color="#666" />
+                          <Text size="sm" fw={500}>
+                            {recording.word_count?.toLocaleString() || 0} words
+                          </Text>
+                        </Group>
+                        
                         {recording.confidence_score && (
-                          <Group gap="xs">
+                          <div>
+                            <Group justify="space-between" mb={4}>
+                              <Text size="xs" c="dimmed">Accuracy</Text>
+                              <Text size="xs" fw={500} c={recording.confidence_score > 0.8 ? 'green' : recording.confidence_score > 0.6 ? 'orange' : 'red'}>
+                                {Math.round(recording.confidence_score * 100)}%
+                              </Text>
+                            </Group>
                             <Progress 
                               value={recording.confidence_score * 100} 
-                              size="xs" 
-                              style={{ flex: 1, maxWidth: 100 }} 
+                              size="sm" 
+                              color={recording.confidence_score > 0.8 ? 'green' : recording.confidence_score > 0.6 ? 'orange' : 'red'}
                             />
-                            <Text size="xs" c="dimmed">
-                              {Math.round(recording.confidence_score * 100)}%
-                            </Text>
-                          </Group>
+                          </div>
                         )}
+
+                        {/* Transcript Quality Indicator */}
+                        <Badge 
+                          size="xs" 
+                          variant="light"
+                          color={
+                            !recording.confidence_score ? 'gray' :
+                            recording.confidence_score > 0.8 ? 'green' :
+                            recording.confidence_score > 0.6 ? 'yellow' : 'red'
+                          }
+                        >
+                          {
+                            !recording.confidence_score ? 'No score' :
+                            recording.confidence_score > 0.8 ? 'High quality' :
+                            recording.confidence_score > 0.6 ? 'Good quality' : 'Low quality'
+                          }
+                        </Badge>
                       </Stack>
                     </Table.Td>
                     <Table.Td>
@@ -502,6 +596,16 @@ export function AnalysisManager() {
                             disabled={!recording.has_analysis}
                           >
                             <IconChartBar size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+
+                        <Tooltip label="Delete Recording">
+                          <ActionIcon 
+                            variant="light" 
+                            color="red"
+                            onClick={() => handleDeleteRecording(recording)}
+                          >
+                            <IconTrash size={16} />
                           </ActionIcon>
                         </Tooltip>
                       </Group>

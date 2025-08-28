@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import pool from '../database';
 import { RowDataPacket } from 'mysql2';
 import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } from '../middleware/auth-cognito';
+import AWS from 'aws-sdk';
 
 const router = Router();
 
@@ -333,6 +334,158 @@ router.get('/stats/:schoolId',
   } catch (error) {
     console.error('Error fetching statistics:', error);
     res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Delete recording and all associated data
+// Only managers and super admins can delete, with proper access controls
+router.delete('/:jobId', 
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+
+    // First, get the recording details to check permissions and get file info
+    const [jobRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT 
+        aj.*,
+        u.first_name,
+        u.last_name,
+        s.name as school_name,
+        tr.id as transcript_id,
+        tr.external_id as assemblyai_external_id
+      FROM audio_jobs aj
+      JOIN users u ON aj.teacher_id = u.id
+      JOIN schools s ON aj.school_id = s.id
+      LEFT JOIN transcripts tr ON aj.id = tr.job_id
+      WHERE aj.id = ?`,
+      [jobId]
+    );
+
+    if (jobRows.length === 0) {
+      return res.status(404).json({ error: 'Recording not found' });
+    }
+
+    const job = jobRows[0] as any;
+    
+    // Role-based access control - only school managers can delete recordings from their school
+    if (req.user!.role === 'school_manager') {
+      if (job.school_id !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied - recording not in your school' });
+      }
+    }
+    // Super admins can delete any recording (no additional checks)
+
+    console.log(`🗑️ Starting deletion of recording ${jobId}:`, {
+      class_name: job.class_name,
+      teacher: `${job.first_name} ${job.last_name}`,
+      school: job.school_name,
+      file_name: job.file_name,
+      s3_key: job.s3_key,
+      has_transcript: !!job.transcript_id
+    });
+
+    // Start transaction for database operations
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Delete analysis results first (if any)
+      const [analysisResult] = await connection.execute(
+        'DELETE FROM analysis_results WHERE job_id = ?',
+        [jobId]
+      );
+      console.log(`📊 Deleted ${(analysisResult as any).affectedRows} analysis results`);
+
+      // Delete analysis jobs (if any)
+      const [analysisJobsResult] = await connection.execute(
+        'DELETE FROM analysis_jobs WHERE job_id = ?',
+        [jobId]
+      );
+      console.log(`🔄 Deleted ${(analysisJobsResult as any).affectedRows} analysis jobs`);
+
+      // Delete transcript (if exists)
+      if (job.transcript_id) {
+        const [transcriptResult] = await connection.execute(
+          'DELETE FROM transcripts WHERE job_id = ?',
+          [jobId]
+        );
+        console.log(`📝 Deleted ${(transcriptResult as any).affectedRows} transcript records`);
+      }
+
+      // Delete the main audio job record
+      const [jobResult] = await connection.execute(
+        'DELETE FROM audio_jobs WHERE id = ?',
+        [jobId]
+      );
+
+      if ((jobResult as any).affectedRows === 0) {
+        throw new Error('Failed to delete audio job record');
+      }
+
+      console.log(`🎵 Deleted audio job record ${jobId}`);
+
+      // Commit database transaction
+      await connection.commit();
+      console.log('✅ Database deletion completed successfully');
+
+    } catch (dbError) {
+      // Rollback transaction on database error
+      await connection.rollback();
+      console.error('❌ Database deletion failed, rolling back:', dbError);
+      throw dbError;
+    } finally {
+      connection.release();
+    }
+
+    // Delete file from S3 (if s3_key exists)
+    if (job.s3_key) {
+      try {
+        const s3 = new AWS.S3();
+        
+        await s3.deleteObject({
+          Bucket: process.env.S3_BUCKET || 'classreflect-audio-files-573524060586',
+          Key: job.s3_key
+        }).promise();
+        
+        console.log(`🗑️ Successfully deleted S3 file: ${job.s3_key}`);
+      } catch (s3Error) {
+        console.error(`⚠️ Failed to delete S3 file ${job.s3_key}:`, s3Error);
+        // Don't fail the entire operation if S3 deletion fails
+        // The database records are already deleted, so this is just cleanup
+      }
+    } else {
+      console.log('ℹ️ No S3 key found, skipping file deletion');
+    }
+
+    // Log the deletion for audit purposes
+    console.log(`✅ Recording deletion completed:`, {
+      jobId,
+      class_name: job.class_name,
+      teacher: `${job.first_name} ${job.last_name}`,
+      school: job.school_name,
+      deleted_by: req.user!.id,
+      deleted_by_email: req.user!.email,
+      deleted_at: new Date().toISOString()
+    });
+
+    res.json({
+      message: 'Recording deleted successfully',
+      deletedRecording: {
+        jobId,
+        class_name: job.class_name,
+        teacher_name: `${job.first_name} ${job.last_name}`,
+        file_name: job.file_name
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Recording deletion failed:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete recording',
+      details: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 

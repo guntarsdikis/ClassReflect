@@ -12,5 +12,5 @@ you have to check our current app settings and suggest what is best option to in
 
 
 can you make record details column to be more informative in http://localhost:3000/analysis? think
-
+and can you make recordings deleteable?
 

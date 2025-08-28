@@ -29,9 +29,12 @@ import {
   IconUser,
   IconSchool,
   IconAlertCircle,
+  IconTrash,
+  IconCheck,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
 import { RecordingsService, type Recording, type RecordingsFilters } from '../services/recordings.service';
 import { schoolsService } from '@features/schools/services/schools.service';
@@ -115,6 +118,59 @@ export function RecordingsList() {
   const viewTranscript = (recording: Recording) => {
     setSelectedRecording(recording);
     setTranscriptModalOpened(true);
+  };
+
+  // Handle recording deletion
+  const handleDeleteRecording = async (recording: Recording) => {
+    // Only allow school managers and super admins to delete recordings
+    if (!['school_manager', 'super_admin'].includes(user?.role || '')) {
+      notifications.show({
+        title: 'Access Denied',
+        message: 'You do not have permission to delete recordings',
+        color: 'red',
+      });
+      return;
+    }
+
+    // Confirm deletion with detailed warning
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this recording?\n\n` +
+      `File: ${recording.file_name}\n` +
+      `Teacher: ${recording.teacher_name}\n` +
+      `Size: ${recording.file_size_mb} MB\n` +
+      `Status: ${recording.status}\n` +
+      `${recording.has_transcript ? `Transcript: ${recording.word_count} words\n` : ''}` +
+      `\nThis will permanently delete:\n` +
+      `• Audio file from server storage\n` +
+      `• Transcript data (if available)\n` +
+      `• All analysis results\n` +
+      `• All processing history\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await RecordingsService.deleteRecording(recording.id);
+      
+      notifications.show({
+        title: 'Recording Deleted',
+        message: `"${recording.file_name}" has been permanently deleted`,
+        color: 'green',
+        icon: <IconCheck />,
+      });
+
+      // Refresh the recordings list
+      await refetch();
+      
+    } catch (error: any) {
+      console.error('Failed to delete recording:', error);
+      notifications.show({
+        title: 'Deletion Failed',
+        message: error?.response?.data?.error || 'Failed to delete the recording. Please try again.',
+        color: 'red',
+      });
+    }
   };
 
   const totalPages = recordingsData ? Math.ceil(recordingsData.total / ITEMS_PER_PAGE) : 0;
@@ -372,6 +428,18 @@ export function RecordingsList() {
                               title="View transcript"
                             >
                               <IconEye size={16} />
+                            </ActionIcon>
+                          )}
+                          
+                          {/* Only show delete button for school managers and super admins */}
+                          {(['school_manager', 'super_admin'].includes(user?.role || '')) && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={() => handleDeleteRecording(recording)}
+                              title="Delete recording"
+                            >
+                              <IconTrash size={16} />
                             </ActionIcon>
                           )}
                         </Group>

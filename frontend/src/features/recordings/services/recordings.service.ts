@@ -105,6 +105,14 @@ export class RecordingsService {
   }
 
   /**
+   * Delete a recording and all associated data
+   */
+  static async deleteRecording(jobId: string): Promise<{ message: string; deletedRecording: any }> {
+    const response = await apiClient.delete(`/jobs/${jobId}`);
+    return response.data;
+  }
+
+  /**
    * Helper function to get status color for UI
    */
   static getStatusColor(status: string): string {

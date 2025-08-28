@@ -226,6 +226,13 @@ export class AnalysisService {
       poll();
     });
   }
+
+  /**
+   * Delete a recording and all associated data
+   */
+  async deleteRecording(jobId: string): Promise<{ message: string }> {
+    return this.api.delete<{ message: string }>(`/jobs/${jobId}`);
+  }
 }
 
 // Export singleton instance

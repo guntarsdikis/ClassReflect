@@ -409,4 +409,238 @@ router.delete('/:schoolId/criteria/:criterionId', authorize('school_manager', 's
   }
 });
 
+// Get all subjects for a school
+router.get('/:schoolId/subjects', async (req: Request, res: Response) => {
+  try {
+    const { schoolId } = req.params;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get school subjects
+    const [subjects] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        ss.id,
+        ss.subject_name,
+        ss.description,
+        ss.category,
+        ss.is_active,
+        ss.created_at,
+        ss.updated_at,
+        u.first_name as created_by_first_name,
+        u.last_name as created_by_last_name
+      FROM school_subjects ss
+      LEFT JOIN users u ON ss.created_by = u.id
+      WHERE ss.school_id = ? AND ss.is_active = TRUE
+      ORDER BY ss.category, ss.subject_name
+    `, [schoolId]);
+
+    res.json(subjects);
+  } catch (error) {
+    console.error('Error fetching school subjects:', error);
+    res.status(500).json({ error: 'Failed to fetch subjects' });
+  }
+});
+
+
+// Add new subject for school
+router.post('/:schoolId/subjects', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId } = req.params;
+    const { subject_name, description, category = 'Custom' } = req.body;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!subject_name) {
+      return res.status(400).json({ 
+        error: 'Subject name is required' 
+      });
+    }
+
+    // Check if subject already exists for this school
+    const [existing] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM school_subjects WHERE school_id = ? AND subject_name = ?',
+      [schoolId, subject_name]
+    );
+
+    if (Array.isArray(existing) && existing.length > 0) {
+      return res.status(409).json({ 
+        error: 'Subject already exists for this school' 
+      });
+    }
+
+    const [result] = await pool.execute<ResultSetHeader>(`
+      INSERT INTO school_subjects (school_id, subject_name, description, category, created_by) 
+      VALUES (?, ?, ?, ?, ?)
+    `, [schoolId, subject_name, description, category, user.id]);
+
+    res.status(201).json({
+      id: result.insertId,
+      schoolId,
+      subject_name,
+      description,
+      category,
+      message: 'School subject created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating subject:', error);
+    res.status(500).json({ error: 'Failed to create subject' });
+  }
+});
+
+// Update subject for school
+router.put('/:schoolId/subjects/:subjectId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId, subjectId } = req.params;
+    const { subject_name, description, is_active } = req.body;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if subject exists and belongs to this school
+    const [subjectRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM school_subjects WHERE id = ? AND school_id = ?',
+      [subjectId, schoolId]
+    );
+
+    if (!Array.isArray(subjectRows) || subjectRows.length === 0) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    // Build dynamic update query
+    const updateFields: string[] = [];
+    const values: any[] = [];
+
+    if (subject_name !== undefined) {
+      updateFields.push('subject_name = ?');
+      values.push(subject_name);
+    }
+
+    if (description !== undefined) {
+      updateFields.push('description = ?');
+      values.push(description);
+    }
+
+    if (is_active !== undefined) {
+      updateFields.push('is_active = ?');
+      values.push(is_active);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    values.push(subjectId);
+
+    await pool.execute(
+      `UPDATE school_subjects SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+      values
+    );
+
+    res.json({
+      id: subjectId,
+      schoolId,
+      message: 'Subject updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating subject:', error);
+    res.status(500).json({ error: 'Failed to update subject' });
+  }
+});
+
+// Delete subject for school (soft delete)
+router.delete('/:schoolId/subjects/:subjectId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId, subjectId } = req.params;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if subject exists and belongs to this school
+    const [subjectRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id, subject_name FROM school_subjects WHERE id = ? AND school_id = ?',
+      [subjectId, schoolId]
+    );
+
+    if (!Array.isArray(subjectRows) || subjectRows.length === 0) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    // Soft delete by setting is_active to false
+    await pool.execute(
+      'UPDATE school_subjects SET is_active = FALSE, updated_at = NOW() WHERE id = ?',
+      [subjectId]
+    );
+
+    res.json({
+      id: subjectId,
+      schoolId,
+      message: 'Subject deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting subject:', error);
+    res.status(500).json({ error: 'Failed to delete subject' });
+  }
+});
+
+// Get categories for a school
+router.get('/:schoolId/categories', async (req: Request, res: Response) => {
+  try {
+    const { schoolId } = req.params;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const [categories] = await pool.execute<RowDataPacket[]>(`
+      SELECT DISTINCT category, COUNT(*) as subject_count
+      FROM school_subjects 
+      WHERE school_id = ? AND is_active = TRUE AND category IS NOT NULL AND category != ''
+      GROUP BY category
+      ORDER BY subject_count DESC, category ASC
+    `, [schoolId]);
+
+    const defaultCategories = [
+      'Core',
+      'Sciences', 
+      'Social Sciences',
+      'Arts',
+      'Languages',
+      'Technology',
+      'Health',
+      'Custom'
+    ];
+
+    // Merge with existing categories
+    const existingCategories = categories.map((c: any) => c.category);
+    const allCategories = Array.from(new Set([
+      ...existingCategories,
+      ...defaultCategories
+    ]));
+
+    res.json({
+      categories: allCategories,
+      usage: categories
+    });
+  } catch (error) {
+    console.error('Error fetching school categories:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
 export default router;

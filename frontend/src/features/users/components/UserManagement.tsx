@@ -47,6 +47,7 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { usersService, User, CreateTeacherRequest, CreateSchoolManagerRequest } from '../services/users.service';
 import { schoolsService, School } from '@features/schools/services/schools.service';
+import { subjectsService, SchoolSubject } from '@features/schools/services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
 
 interface TeacherFormData extends CreateTeacherRequest {
@@ -77,6 +78,7 @@ export function UserManagement() {
   
   const [users, setUsers] = useState<User[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
+  const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
@@ -131,6 +133,13 @@ export function UserManagement() {
         });
         setUsers(usersData);
         setSchools(schoolsData);
+        
+        // Load subjects for current user's school (or first school)
+        if (currentUserSchoolId) {
+          await loadSchoolSubjects(currentUserSchoolId);
+        } else if (schoolsData.length > 0) {
+          await loadSchoolSubjects(schoolsData[0].id);
+        }
       } else if (isSchoolManager) {
         // School manager can only see users from their school
         console.log('School Manager - Loading data for school:', currentUserSchoolId);
@@ -155,6 +164,9 @@ export function UserManagement() {
         
         // Auto-set school filter for school managers
         setFilterSchool(currentUserSchoolId.toString());
+        
+        // Load subjects for the school manager's school
+        await loadSchoolSubjects(currentUserSchoolId);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -166,6 +178,25 @@ export function UserManagement() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSchoolSubjects = async (schoolId: number) => {
+    try {
+      const subjects = await subjectsService.getSchoolSubjects(schoolId);
+      setSchoolSubjects(subjects);
+    } catch (error) {
+      console.error('Failed to load school subjects:', error);
+      // Fall back to empty array - user can still create teachers without subjects
+      setSchoolSubjects([]);
+    }
+  };
+
+  // Load subjects when school changes in the form (for super admins)
+  const handleSchoolChange = async (schoolId: number) => {
+    setTeacherFormData({...teacherFormData, schoolId});
+    if (isSuperAdmin && schoolId > 0) {
+      await loadSchoolSubjects(schoolId);
     }
   };
 
@@ -795,7 +826,7 @@ export function UserManagement() {
             label="School"
             placeholder="Select school"
             value={teacherFormData.schoolId.toString()}
-            onChange={(value) => setTeacherFormData({...teacherFormData, schoolId: parseInt(value || '0')})}
+            onChange={(value) => handleSchoolChange(parseInt(value || '0'))}
             data={schools.map(school => ({
               value: school.id.toString(),
               label: school.name,
@@ -815,13 +846,19 @@ export function UserManagement() {
           <Group grow>
             <MultiSelect
               label="Subjects"
-              placeholder="Select subjects"
+              placeholder={schoolSubjects.length > 0 ? "Select subjects" : "No subjects available - school manager can add subjects"}
               value={teacherFormData.subjects}
               onChange={(subjects) => setTeacherFormData({...teacherFormData, subjects})}
-              data={[
-                'Mathematics', 'English', 'Science', 'History', 'Geography',
-                'Art', 'Music', 'Physical Education', 'Computer Science', 'Other'
-              ]}
+              data={schoolSubjects.map(subject => ({
+                value: subject.subject_name,
+                label: subject.subject_name
+              }))}
+              disabled={schoolSubjects.length === 0}
+              description={
+                schoolSubjects.length === 0 && isSchoolManager 
+                  ? "Add subjects in Subject Management to assign them to teachers"
+                  : undefined
+              }
             />
             <MultiSelect
               label="Grades"

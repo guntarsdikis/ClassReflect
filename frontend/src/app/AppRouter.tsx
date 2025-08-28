@@ -7,6 +7,7 @@ import { AppShell } from '@shared/components/Layout/AppShell';
 import { DashboardRouter } from '@features/dashboard/components/DashboardRouter';
 import { SchoolManagement } from '@features/schools/components/SchoolManagement';
 import { SchoolDetail } from '@features/schools/components/SchoolDetail';
+import { SubjectManagement } from '@features/schools/components/SubjectManagement';
 import { UserManagement } from '@features/users/components/UserManagement';
 import { UserDetail } from '@features/users/components/UserDetail';
 import { TemplateManagement } from '@features/templates/components/TemplateManagement';
@@ -44,6 +45,7 @@ export function AppRouter() {
             <Route path="/upload" element={<UploadWizard />} />
             <Route path="/templates" element={<TemplateManagement />} />
             <Route path="/categories" element={<CategoriesManagement />} />
+            <Route path="/subjects" element={<SubjectManagement />} />
             <Route path="/teachers" element={<UserManagement />} />
             {/* <Route path="/analytics" element={<SchoolAnalytics />} /> */}
           </Route>
@@ -58,6 +60,7 @@ export function AppRouter() {
             <Route path="/admin/users/new" element={<UserManagement />} />
             <Route path="/admin/templates" element={<TemplateManagement />} />
             <Route path="/admin/categories" element={<CategoriesManagement />} />
+            <Route path="/admin/subjects" element={<SubjectManagement />} />
             <Route path="/admin/jobs" element={<JobManagement />} />
           </Route>
           

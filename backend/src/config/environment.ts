@@ -13,9 +13,8 @@ export interface EnvironmentConfig {
     localPath?: string;
   };
   processing: {
-    type: 'sqs-ec2' | 'local-docker';
-    sqsQueueUrl?: string;
-    dockerServiceUrl?: string;
+    type: 'assemblyai';
+    assemblyaiApiKey?: string;
   };
   database: {
     host: string;
@@ -59,8 +58,8 @@ export function getEnvironmentConfig(): EnvironmentConfig {
         s3Bucket: process.env.S3_BUCKET_NAME || 'classreflect-audio-files-573524060586'
       },
       processing: {
-        type: 'sqs-ec2',
-        sqsQueueUrl: process.env.SQS_QUEUE_URL || 'https://sqs.eu-west-2.amazonaws.com/573524060586/classreflect-processing-queue'
+        type: 'assemblyai',
+        assemblyaiApiKey: process.env.ASSEMBLYAI_API_KEY
       },
       database: {
         host: process.env.DATABASE_HOST || 'gdwd.cluster-cjjl7f5jormj.eu-west-2.rds.amazonaws.com',
@@ -77,8 +76,8 @@ export function getEnvironmentConfig(): EnvironmentConfig {
         localPath: process.env.LOCAL_AUDIO_PATH || '/tmp/classreflect-audio'
       },
       processing: {
-        type: 'local-docker',
-        dockerServiceUrl: process.env.WHISPER_DOCKER_URL || 'http://localhost:8000'
+        type: 'assemblyai',
+        assemblyaiApiKey: process.env.ASSEMBLYAI_API_KEY
       },
       database: {
         host: process.env.DATABASE_HOST || 'localhost',

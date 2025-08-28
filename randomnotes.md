@@ -3,12 +3,16 @@
   3. 🏗️ Build manager dashboard (teacher management, upload interface)
   4. 🏗️ Build teacher dashboard (view transcripts & results)
 
-  can you check why it says audio job failed for the 4771b246-8486-43da-bbcb-864c48d4be52
-  but status was given before file was completed, why is that? it just a guess, but maybe when files are uploaded, maybe need to rename them locally as well. the transcript at the end was created successfully, it took more time, that is it. can you check why it updated status failed for the job, if job was not completed yet. think
 
 
+i would like to create template which would go along the principles from the "Teach Like a Champion" book, how do i do it? can you help me with this? think
 
+i dont think http://localhost:3000/admin/jobs is needed in superadmin, and where I can see files which are processing and how will assemblyai will return results, or should i get results myself?
 
-i would like to create template which would go along the principles from the "Teach Like a Champion" book, how do i do it?
+based on changes in app due to implementing assemblyai, can you check does all tables in database for project is still used and check unused services which can be cleaned up. for example: can you remove s3 acesss script and also ec2 automatic starting for whisperer process? check AWS CLI access to default profile. think
 
-categories should be manageable, each school should be able to create their own categories. superadmin and school manager should be able to create categories. think
+what for is table analysis_criteria? i dont think it is used. think
+
+can you make sure superadmin dashboard, manager dashboard teacher dashboard does not have mock data showing. if there is nothing to show then comming soon should be displayed. 
+
+can you sort out all files in /Users/guntarsdikis/websites/ClassReflect/ directory. please check if .sh files are still needed, if needed then move to appropriate directory. also md files if revelant then move to docs folder and test- files maybe not needed anymore, lets do major clean up. think 

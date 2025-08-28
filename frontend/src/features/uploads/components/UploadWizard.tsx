@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -33,67 +33,9 @@ import {
   IconAlertCircle,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-// import { useAuthStore } from '@store/auth.store'; // Will use when needed
-
-// Mock data for templates
-const mockTemplates = [
-  {
-    id: 'k12-math',
-    name: 'K-12 Math Assessment',
-    category: 'Mathematics',
-    grades: ['K-5', '6-8'],
-    description: 'Comprehensive math teaching evaluation focusing on problem-solving and student engagement',
-    criteria: [
-      { id: 'clarity', name: 'Clarity of Instruction', weight: 25 },
-      { id: 'engagement', name: 'Student Engagement', weight: 30 },
-      { id: 'assessment', name: 'Formative Assessment', weight: 25 },
-      { id: 'management', name: 'Classroom Management', weight: 20 },
-    ],
-  },
-  {
-    id: 'science-inquiry',
-    name: 'Science Inquiry Template',
-    category: 'Science',
-    grades: ['3-5', '6-8', '9-12'],
-    description: 'Evaluates inquiry-based science teaching methods and lab safety',
-    criteria: [
-      { id: 'inquiry', name: 'Inquiry Process', weight: 35 },
-      { id: 'safety', name: 'Lab Safety', weight: 20 },
-      { id: 'engagement', name: 'Student Participation', weight: 25 },
-      { id: 'explanation', name: 'Scientific Explanation', weight: 20 },
-    ],
-  },
-  {
-    id: 'language-arts',
-    name: 'Language Arts Standard',
-    category: 'English',
-    grades: ['K-2', '3-5', '6-8', '9-12'],
-    description: 'Focus on reading comprehension, writing skills, and discussion facilitation',
-    criteria: [
-      { id: 'discussion', name: 'Discussion Facilitation', weight: 30 },
-      { id: 'feedback', name: 'Student Feedback', weight: 25 },
-      { id: 'literacy', name: 'Literacy Strategies', weight: 25 },
-      { id: 'differentiation', name: 'Differentiation', weight: 20 },
-    ],
-  },
-  {
-    id: 'custom',
-    name: 'Custom Evaluation',
-    category: 'Custom',
-    grades: ['All'],
-    description: 'Create your own evaluation criteria',
-    criteria: [],
-  },
-];
-
-// Mock teachers for selection
-const mockTeachers = [
-  { value: '1', label: 'Sarah Johnson - Math, Science (Grades 3-4)' },
-  { value: '2', label: 'John Smith - Science (Grades 5-6)' },
-  { value: '3', label: 'Emily Brown - English, History (Grades 7-8)' },
-  { value: '4', label: 'Michael Davis - Math (Grades 9-10)' },
-  { value: '5', label: 'Lisa Wilson - Art, Music (Grades K-2)' },
-];
+import { useAuthStore } from '@store/auth.store';
+import { templatesService, Template } from '@features/templates/services/templates.service';
+import { usersService, User } from '@features/users/services/users.service';
 
 interface CriterionConfig {
   id: string;
@@ -105,10 +47,14 @@ interface CriterionConfig {
 
 export function UploadWizard() {
   const navigate = useNavigate();
-  // const user = useAuthStore((state) => state.user); // Will use when needed
+  const user = useAuthStore((state) => state.user);
   const [active, setActive] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [teachers, setTeachers] = useState<User[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(true);
   
   // Form state
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
@@ -125,24 +71,84 @@ export function UploadWizard() {
   const [customCriteria, setCustomCriteria] = useState<CriterionConfig[]>([]);
   const [useStudentAudio, setUseStudentAudio] = useState(true);
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadTemplates();
+    loadTeachers();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      const templatesData = await templatesService.getTemplates();
+      console.log('Loaded templates:', templatesData);
+      setTemplates(templatesData);
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load templates',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
-  const handleTemplateSelect = (templateId: string) => {
+  const loadTeachers = async () => {
+    try {
+      setLoadingTeachers(true);
+      const teachersData = await usersService.getTeachers();
+      setTeachers(teachersData);
+    } catch (error) {
+      console.error('Failed to load teachers:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load teachers',
+        color: 'red',
+      });
+    } finally {
+      setLoadingTeachers(false);
+    }
+  };
+  
+  const handleTemplateSelect = async (templateId: string) => {
+    console.log('Template selected:', templateId);
     setSelectedTemplate(templateId);
-    const template = mockTemplates.find(t => t.id === templateId);
-    if (template && template.id !== 'custom') {
-      setCriteria(
-        template.criteria.map(c => ({
-          ...c,
+    
+    try {
+      // Get detailed template with criteria
+      const detailedTemplate = await templatesService.getTemplate(parseInt(templateId));
+      console.log('Detailed template loaded:', detailedTemplate);
+      
+      if (detailedTemplate.criteria && detailedTemplate.criteria.length > 0) {
+        console.log('Template criteria:', detailedTemplate.criteria);
+        const mappedCriteria = detailedTemplate.criteria.map(c => ({
+          id: c.id?.toString() || Math.random().toString(),
+          name: c.criteria_name,
+          weight: c.weight * 100, // Convert from 0-1 to percentage
           enabled: true,
           customPrompt: '',
-        }))
-      );
-      setCustomCriteria([]);
-    } else if (template?.id === 'custom') {
+        }));
+        console.log('Mapped criteria:', mappedCriteria);
+        setCriteria(mappedCriteria);
+        setCustomCriteria([]);
+      } else {
+        console.log('No template criteria found - template has no configured criteria');
+        setCriteria([]);
+        setCustomCriteria([
+          { id: 'custom1', name: 'Teaching Quality', weight: 100, enabled: true },
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to load detailed template:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load template details',
+        color: 'red',
+      });
       setCriteria([]);
-      setCustomCriteria([
-        { id: 'custom1', name: '', weight: 25, enabled: true },
-      ]);
+      setCustomCriteria([]);
     }
   };
   
@@ -170,22 +176,58 @@ export function UploadWizard() {
   };
   
   const handleSubmit = async () => {
+    if (!audioFile || !selectedTeacher || !user?.schoolId) {
+      notifications.show({
+        title: 'Error',
+        message: 'Missing required information',
+        color: 'red',
+      });
+      return;
+    }
+
     setIsUploading(true);
     
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 10;
+    try {
+      // Prepare form data for upload
+      const formData = new FormData();
+      formData.append('audio', audioFile);
+      formData.append('teacherId', selectedTeacher);
+      formData.append('schoolId', user.schoolId.toString());
+      
+      // Add class information
+      formData.append('className', className);
+      formData.append('subject', subject);
+      formData.append('grade', grade);
+      formData.append('duration', duration.toString());
+      formData.append('notes', notes);
+      
+      // Add template information
+      if (selectedTemplate !== 'custom') {
+        formData.append('templateId', selectedTemplate);
+      }
+      
+      // Add criteria configuration
+      const enabledCriteria = criteria.filter(c => c.enabled);
+      formData.append('criteria', JSON.stringify(enabledCriteria));
+      formData.append('customCriteria', JSON.stringify(customCriteria));
+      formData.append('useStudentAudio', useStudentAudio.toString());
+      formData.append('focusAreas', JSON.stringify(focusAreas));
+
+      // Upload file
+      const response = await fetch('/api/upload/direct', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData
       });
-    }, 500);
-    
-    // Simulate API call
-    setTimeout(() => {
-      clearInterval(interval);
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
       setIsUploading(false);
       notifications.show({
         title: 'Upload Successful',
@@ -193,8 +235,18 @@ export function UploadWizard() {
         color: 'green',
         icon: <IconCheck />,
       });
+      
       navigate('/dashboard');
-    }, 5000);
+      
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      setIsUploading(false);
+      notifications.show({
+        title: 'Upload Failed',
+        message: error.message || 'Failed to upload recording',
+        color: 'red',
+      });
+    }
   };
   
   const nextStep = () => setActive((current) => (current < 4 ? current + 1 : current));
@@ -203,14 +255,15 @@ export function UploadWizard() {
   const isStepValid = () => {
     switch (active) {
       case 0:
-        return selectedTeacher && audioFile;
-      case 1:
-        return className && subject && grade;
-      case 2:
         return selectedTemplate;
+      case 1:
+        return selectedTeacher && audioFile;
+      case 2:
+        return className && subject && grade;
       case 3:
         const enabledCriteria = criteria.filter(c => c.enabled);
         const totalWeight = enabledCriteria.reduce((sum, c) => sum + c.weight, 0);
+        console.log('Step 3 validation:', { enabledCriteria, totalWeight, isValid: enabledCriteria.length > 0 && totalWeight === 100 });
         return enabledCriteria.length > 0 && totalWeight === 100;
       default:
         return true;
@@ -224,6 +277,75 @@ export function UploadWizard() {
         
         <Stepper active={active} onStepClick={setActive}>
           <Stepper.Step
+            label="Select Template"
+            description="Choose evaluation template"
+            icon={<IconTemplate size={18} />}
+          >
+            <Stack mt="xl">
+              <Text size="sm" c="dimmed" mb="md">
+                Select an evaluation template that best matches your needs
+              </Text>
+              
+              {loading ? (
+                <Text>Loading templates...</Text>
+              ) : (
+                <Radio.Group value={selectedTemplate} onChange={handleTemplateSelect}>
+                  <Stack>
+                    {templates.map((template) => (
+                      <Card key={template.id} withBorder p="md">
+                        <Radio
+                          value={template.id.toString()}
+                          label={
+                            <Group justify="space-between" style={{ flex: 1 }}>
+                              <div>
+                                <Text fw={500}>{template.template_name}</Text>
+                                <Text size="xs" c="dimmed">{template.description}</Text>
+                              </div>
+                              <Group gap="xs">
+                                <Badge variant="light">{template.category}</Badge>
+                                {template.grade_levels.length > 0 && (
+                                  <Badge variant="outline" size="sm">
+                                    Grades: {template.grade_levels.join(', ')}
+                                  </Badge>
+                                )}
+                              </Group>
+                            </Group>
+                          }
+                        />
+                        {template.criteria && template.criteria.length > 0 && (
+                          <Group gap={4} mt="xs" ml="xl">
+                            {template.criteria.map((criterion) => (
+                              <Badge key={criterion.id || criterion.criteria_name} size="xs" variant="dot">
+                                {criterion.criteria_name} ({Math.round(criterion.weight * 100)}%)
+                              </Badge>
+                            ))}
+                          </Group>
+                        )}
+                      </Card>
+                    ))}
+                    
+                    {/* Add custom option */}
+                    <Card withBorder p="md">
+                      <Radio
+                        value="custom"
+                        label={
+                          <Group justify="space-between" style={{ flex: 1 }}>
+                            <div>
+                              <Text fw={500}>Custom Evaluation</Text>
+                              <Text size="xs" c="dimmed">Create your own evaluation criteria</Text>
+                            </div>
+                            <Badge variant="light">Custom</Badge>
+                          </Group>
+                        }
+                      />
+                    </Card>
+                  </Stack>
+                </Radio.Group>
+              )}
+            </Stack>
+          </Stepper.Step>
+          
+          <Stepper.Step
             label="Upload Recording"
             description="Select teacher and audio file"
             icon={<IconUpload size={18} />}
@@ -231,12 +353,16 @@ export function UploadWizard() {
             <Stack mt="xl">
               <Select
                 label="Select Teacher"
-                placeholder="Choose a teacher"
-                data={mockTeachers}
+                placeholder={loadingTeachers ? "Loading teachers..." : "Choose a teacher"}
+                data={teachers.map(teacher => ({
+                  value: teacher.id.toString(),
+                  label: `${teacher.firstName} ${teacher.lastName}${teacher.subjects?.length ? ` - ${teacher.subjects.join(', ')}` : ''}${teacher.grades?.length ? ` (Grades ${teacher.grades.join(', ')})` : ''}`
+                }))}
                 value={selectedTeacher}
                 onChange={(value) => setSelectedTeacher(value || '')}
                 required
                 searchable
+                disabled={loadingTeachers}
               />
               
               <FileInput
@@ -307,53 +433,6 @@ export function UploadWizard() {
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
               />
-            </Stack>
-          </Stepper.Step>
-          
-          <Stepper.Step
-            label="Select Template"
-            description="Choose evaluation template"
-            icon={<IconTemplate size={18} />}
-          >
-            <Stack mt="xl">
-              <Text size="sm" c="dimmed" mb="md">
-                Select an evaluation template that best matches your needs
-              </Text>
-              
-              <Radio.Group value={selectedTemplate} onChange={handleTemplateSelect}>
-                <Stack>
-                  {mockTemplates.map((template) => (
-                    <Card key={template.id} withBorder p="md">
-                      <Radio
-                        value={template.id}
-                        label={
-                          <Group justify="space-between" style={{ flex: 1 }}>
-                            <div>
-                              <Text fw={500}>{template.name}</Text>
-                              <Text size="xs" c="dimmed">{template.description}</Text>
-                            </div>
-                            <Group gap="xs">
-                              <Badge variant="light">{template.category}</Badge>
-                              <Badge variant="outline" size="sm">
-                                Grades: {template.grades.join(', ')}
-                              </Badge>
-                            </Group>
-                          </Group>
-                        }
-                      />
-                      {template.criteria.length > 0 && (
-                        <Group gap={4} mt="xs" ml="xl">
-                          {template.criteria.map((criterion) => (
-                            <Badge key={criterion.id} size="xs" variant="dot">
-                              {criterion.name} ({criterion.weight}%)
-                            </Badge>
-                          ))}
-                        </Group>
-                      )}
-                    </Card>
-                  ))}
-                </Stack>
-              </Radio.Group>
             </Stack>
           </Stepper.Step>
           
@@ -513,7 +592,10 @@ export function UploadWizard() {
                     <Stack gap="xs">
                       <Group justify="space-between">
                         <Text size="sm" fw={500}>Teacher:</Text>
-                        <Text size="sm">{mockTeachers.find(t => t.value === selectedTeacher)?.label}</Text>
+                        <Text size="sm">{(() => {
+                          const teacher = teachers.find(t => t.id.toString() === selectedTeacher);
+                          return teacher ? `${teacher.firstName} ${teacher.lastName}${teacher.subjects?.length ? ` - ${teacher.subjects.join(', ')}` : ''}${teacher.grades?.length ? ` (Grades ${teacher.grades.join(', ')})` : ''}` : 'Selected teacher';
+                        })()}</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm" fw={500}>Class:</Text>
@@ -521,7 +603,12 @@ export function UploadWizard() {
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm" fw={500}>Template:</Text>
-                        <Text size="sm">{mockTemplates.find(t => t.id === selectedTemplate)?.name}</Text>
+                        <Text size="sm">
+                          {selectedTemplate === 'custom' 
+                            ? 'Custom Evaluation' 
+                            : templates.find(t => t.id.toString() === selectedTemplate)?.template_name
+                          }
+                        </Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm" fw={500}>File:</Text>

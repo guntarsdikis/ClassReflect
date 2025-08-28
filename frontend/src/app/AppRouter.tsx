@@ -13,7 +13,6 @@ import { UserDetail } from '@features/users/components/UserDetail';
 import { TemplateManagement } from '@features/templates/components/TemplateManagement';
 import { TemplateCategoryManagement } from '@features/templates/components/TemplateCategoryManagement';
 import { UploadWizard } from '@features/uploads/components/UploadWizard';
-import { JobManagement } from '@features/admin/components/JobManagement';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
 // import { TemplateEditor } from '@features/templates/components/TemplateEditor';
 // import { SchoolAnalytics } from '@features/analytics/components/SchoolAnalytics';
@@ -61,7 +60,6 @@ export function AppRouter() {
             <Route path="/admin/templates" element={<TemplateManagement />} />
             <Route path="/admin/categories" element={<TemplateCategoryManagement />} />
             <Route path="/admin/subjects" element={<SubjectManagement />} />
-            <Route path="/admin/jobs" element={<JobManagement />} />
           </Route>
           
           {/* Shared Routes - Super Admin and School Manager */}

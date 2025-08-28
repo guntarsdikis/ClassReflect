@@ -52,7 +52,6 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
     { label: 'Templates', icon: IconTemplate, href: '/admin/templates' },
     { label: 'Categories', icon: IconTag, href: '/admin/categories' },
     { label: 'Subjects', icon: IconBook, href: '/admin/subjects' },
-    { label: 'Jobs', icon: IconClock, href: '/admin/jobs' },
   ],
 };
 

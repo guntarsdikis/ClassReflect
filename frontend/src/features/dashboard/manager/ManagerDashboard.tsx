@@ -32,107 +32,49 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
 import { format } from 'date-fns';
 
-// Mock data for development
-const mockStats = {
-  totalTeachers: 12,
-  activeRecordings: 3,
-  completedThisMonth: 28,
-  averageScore: 84,
+// TODO: Replace with real API calls when backend endpoints are ready
+// const { data: stats, isLoading: statsLoading } = useQuery(['school-stats']);
+// const { data: recentUploads, isLoading: uploadsLoading } = useQuery(['recent-uploads']);
+// const { data: teachers, isLoading: teachersLoading } = useQuery(['school-teachers']);
+
+// Placeholder stats - will be replaced with real data
+const stats = {
+  totalTeachers: 0,
+  activeRecordings: 0,
+  completedThisMonth: 0,
+  averageScore: 0,
 };
 
-const mockRecentUploads = [
-  {
-    id: '1',
-    teacherName: 'Sarah Johnson',
-    className: 'Math Class - Grade 3',
-    uploadDate: new Date('2024-10-25T10:30:00'),
-    status: 'completed',
-    duration: '45 min',
-    score: 85,
-    template: 'K-12 Math Assessment',
-  },
-  {
-    id: '2',
-    teacherName: 'John Smith',
-    className: 'Science Lab - Grade 5',
-    uploadDate: new Date('2024-10-25T09:15:00'),
-    status: 'processing',
-    duration: '50 min',
-    progress: 65,
-    template: 'Science Inquiry Template',
-  },
-  {
-    id: '3',
-    teacherName: 'Emily Brown',
-    className: 'English Literature',
-    uploadDate: new Date('2024-10-24T14:20:00'),
-    status: 'completed',
-    duration: '40 min',
-    score: 92,
-    template: 'Language Arts Standard',
-  },
-];
-
-const mockTeachers = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@school.edu',
-    subjects: ['Math', 'Science'],
-    grades: ['3', '4'],
-    evaluations: 8,
-    averageScore: 87,
-    lastActive: new Date('2024-10-25'),
-  },
-  {
-    id: '2',
-    name: 'John Smith',
-    email: 'john.smith@school.edu',
-    subjects: ['Science'],
-    grades: ['5', '6'],
-    evaluations: 5,
-    averageScore: 82,
-    lastActive: new Date('2024-10-25'),
-  },
-  {
-    id: '3',
-    name: 'Emily Brown',
-    email: 'emily.brown@school.edu',
-    subjects: ['English', 'History'],
-    grades: ['7', '8'],
-    evaluations: 10,
-    averageScore: 91,
-    lastActive: new Date('2024-10-24'),
-  },
-];
+const recentUploads: any[] = [];
+const teachers: any[] = [];
 
 export function ManagerDashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
 
-  const stats = [
+  const statsCards = [
     {
       title: 'Total Teachers',
-      value: mockStats.totalTeachers.toString(),
+      value: stats.totalTeachers.toString(),
       icon: IconUsers,
       color: 'blue',
       action: () => navigate('/teachers'),
     },
     {
       title: 'Active Recordings',
-      value: mockStats.activeRecordings.toString(),
+      value: stats.activeRecordings.toString(),
       icon: IconClock,
       color: 'orange',
     },
     {
       title: 'Completed This Month',
-      value: mockStats.completedThisMonth.toString(),
+      value: stats.completedThisMonth.toString(),
       icon: IconFileText,
       color: 'green',
     },
     {
       title: 'Average Score',
-      value: `${mockStats.averageScore}%`,
+      value: stats.averageScore > 0 ? `${stats.averageScore}%` : 'N/A',
       icon: IconChartBar,
       color: 'teal',
       action: () => navigate('/analytics'),
@@ -165,7 +107,7 @@ export function ManagerDashboard() {
 
       {/* Stats Cards */}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg" mb="xl">
-        {stats.map((stat) => (
+        {statsCards.map((stat) => (
           <Card
             key={stat.title}
             shadow="sm"
@@ -208,48 +150,56 @@ export function ManagerDashboard() {
               </Button>
             </Group>
 
-            <Stack gap="md">
-              {mockRecentUploads.map((upload) => (
-                <Paper key={upload.id} p="md" withBorder>
-                  <Group justify="space-between" mb="xs">
-                    <div>
-                      <Group gap="xs" mb={4}>
-                        <Text fw={600}>{upload.teacherName}</Text>
-                        <Badge size="sm" variant="dot">
-                          {upload.className}
-                        </Badge>
-                      </Group>
-                      <Text size="sm" c="dimmed">
-                        {format(upload.uploadDate, 'MMM dd, yyyy • HH:mm')} • {upload.duration}
-                      </Text>
-                      <Text size="xs" c="dimmed" mt={4}>
-                        Template: {upload.template}
-                      </Text>
-                    </div>
-                    {upload.status === 'completed' ? (
-                      <Group gap="xs">
-                        <Badge color="green" variant="light">
-                          Score: {upload.score}%
-                        </Badge>
-                        <ActionIcon variant="subtle" color="blue">
-                          <IconEye size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="gray">
-                          <IconDownload size={16} />
-                        </ActionIcon>
-                      </Group>
-                    ) : (
-                      <div style={{ width: 120 }}>
-                        <Text size="xs" c="dimmed" mb={4}>
-                          Processing: {upload.progress}%
+            {recentUploads.length > 0 ? (
+              <Stack gap="md">
+                {recentUploads.map((upload) => (
+                  <Paper key={upload.id} p="md" withBorder>
+                    <Group justify="space-between" mb="xs">
+                      <div>
+                        <Group gap="xs" mb={4}>
+                          <Text fw={600}>{upload.teacherName}</Text>
+                          <Badge size="sm" variant="dot">
+                            {upload.className}
+                          </Badge>
+                        </Group>
+                        <Text size="sm" c="dimmed">
+                          {format(upload.uploadDate, 'MMM dd, yyyy • HH:mm')} • {upload.duration}
                         </Text>
-                        <Progress value={upload.progress!} size="sm" />
+                        <Text size="xs" c="dimmed" mt={4}>
+                          Template: {upload.template}
+                        </Text>
                       </div>
-                    )}
-                  </Group>
-                </Paper>
-              ))}
-            </Stack>
+                      {upload.status === 'completed' ? (
+                        <Group gap="xs">
+                          <Badge color="green" variant="light">
+                            Score: {upload.score}%
+                          </Badge>
+                          <ActionIcon variant="subtle" color="blue">
+                            <IconEye size={16} />
+                          </ActionIcon>
+                          <ActionIcon variant="subtle" color="gray">
+                            <IconDownload size={16} />
+                          </ActionIcon>
+                        </Group>
+                      ) : (
+                        <div style={{ width: 120 }}>
+                          <Text size="xs" c="dimmed" mb={4}>
+                            Processing: {upload.progress}%
+                          </Text>
+                          <Progress value={upload.progress!} size="sm" />
+                        </div>
+                      )}
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
+            ) : (
+              <Paper p="xl" ta="center">
+                <Text c="dimmed" size="sm">
+                  No uploads yet. Start by uploading your first class recording!
+                </Text>
+              </Paper>
+            )}
 
             <Button
               fullWidth
@@ -325,28 +275,36 @@ export function ManagerDashboard() {
               </Button>
             </Group>
 
-            <Stack gap="sm">
-              {mockTeachers.slice(0, 3).map((teacher, index) => (
-                <Paper key={teacher.id} p="sm" withBorder>
-                  <Group justify="space-between">
-                    <div>
-                      <Text size="sm" fw={500}>
-                        {index + 1}. {teacher.name}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {teacher.evaluations} evaluations
-                      </Text>
-                    </div>
-                    <Badge
-                      color={teacher.averageScore >= 90 ? 'green' : teacher.averageScore >= 80 ? 'blue' : 'yellow'}
-                      variant="light"
-                    >
-                      {teacher.averageScore}%
-                    </Badge>
-                  </Group>
-                </Paper>
-              ))}
-            </Stack>
+            {teachers.length > 0 ? (
+              <Stack gap="sm">
+                {teachers.slice(0, 3).map((teacher, index) => (
+                  <Paper key={teacher.id} p="sm" withBorder>
+                    <Group justify="space-between">
+                      <div>
+                        <Text size="sm" fw={500}>
+                          {index + 1}. {teacher.name}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {teacher.evaluations} evaluations
+                        </Text>
+                      </div>
+                      <Badge
+                        color={teacher.averageScore >= 90 ? 'green' : teacher.averageScore >= 80 ? 'blue' : 'yellow'}
+                        variant="light"
+                      >
+                        {teacher.averageScore}%
+                      </Badge>
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
+            ) : (
+              <Paper p="md" ta="center">
+                <Text c="dimmed" size="sm">
+                  No teacher data available yet.
+                </Text>
+              </Paper>
+            )}
           </Card>
         </Grid.Col>
       </Grid>
@@ -374,66 +332,84 @@ export function ManagerDashboard() {
           </Group>
         </Group>
 
-        <Table>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Name</Table.Th>
-              <Table.Th>Subjects</Table.Th>
-              <Table.Th>Grades</Table.Th>
-              <Table.Th>Evaluations</Table.Th>
-              <Table.Th>Avg Score</Table.Th>
-              <Table.Th>Last Active</Table.Th>
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {mockTeachers.map((teacher) => (
-              <Table.Tr key={teacher.id}>
-                <Table.Td>
-                  <div>
-                    <Text size="sm" fw={500}>{teacher.name}</Text>
-                    <Text size="xs" c="dimmed">{teacher.email}</Text>
-                  </div>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4}>
-                    {teacher.subjects.map((subject) => (
-                      <Badge key={subject} size="sm" variant="light">
-                        {subject}
-                      </Badge>
-                    ))}
-                  </Group>
-                </Table.Td>
-                <Table.Td>{teacher.grades.join(', ')}</Table.Td>
-                <Table.Td>{teacher.evaluations}</Table.Td>
-                <Table.Td>
-                  <Badge
-                    color={teacher.averageScore >= 90 ? 'green' : teacher.averageScore >= 80 ? 'blue' : 'yellow'}
-                    variant="light"
-                  >
-                    {teacher.averageScore}%
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{format(teacher.lastActive, 'MMM dd')}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4}>
-                    <ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/teachers/${teacher.id}`)}>
-                      <IconEye size={16} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="gray">
-                      <IconEdit size={16} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="red">
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Table.Td>
+        {teachers.length > 0 ? (
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Name</Table.Th>
+                <Table.Th>Subjects</Table.Th>
+                <Table.Th>Grades</Table.Th>
+                <Table.Th>Evaluations</Table.Th>
+                <Table.Th>Avg Score</Table.Th>
+                <Table.Th>Last Active</Table.Th>
+                <Table.Th>Actions</Table.Th>
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {teachers.map((teacher) => (
+                <Table.Tr key={teacher.id}>
+                  <Table.Td>
+                    <div>
+                      <Text size="sm" fw={500}>{teacher.name}</Text>
+                      <Text size="xs" c="dimmed">{teacher.email}</Text>
+                    </div>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4}>
+                      {teacher.subjects?.map((subject: string) => (
+                        <Badge key={subject} size="sm" variant="light">
+                          {subject}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>{teacher.grades?.join(', ') || 'N/A'}</Table.Td>
+                  <Table.Td>{teacher.evaluations || 0}</Table.Td>
+                  <Table.Td>
+                    {teacher.averageScore ? (
+                      <Badge
+                        color={teacher.averageScore >= 90 ? 'green' : teacher.averageScore >= 80 ? 'blue' : 'yellow'}
+                        variant="light"
+                      >
+                        {teacher.averageScore}%
+                      </Badge>
+                    ) : (
+                      <Text size="sm" c="dimmed">N/A</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{teacher.lastActive ? format(new Date(teacher.lastActive), 'MMM dd') : 'N/A'}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4}>
+                      <ActionIcon variant="subtle" color="blue" onClick={() => navigate(`/teachers/${teacher.id}`)}>
+                        <IconEye size={16} />
+                      </ActionIcon>
+                      <ActionIcon variant="subtle" color="gray">
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon variant="subtle" color="red">
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        ) : (
+          <Paper p="xl" ta="center">
+            <Text c="dimmed" mb="md">
+              No teachers added yet. Add your first teacher to get started!
+            </Text>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => navigate('/teachers/new')}
+            >
+              Add First Teacher
+            </Button>
+          </Paper>
+        )}
       </Card>
     </Container>
   );

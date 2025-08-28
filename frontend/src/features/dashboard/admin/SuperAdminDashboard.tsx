@@ -55,13 +55,6 @@ export function SuperAdminDashboard() {
       action: () => navigate('/admin/users'),
     },
     {
-      title: 'Processing Jobs',
-      value: '0',
-      icon: IconClock,
-      color: 'orange',
-      action: () => navigate('/admin/jobs'),
-    },
-    {
       title: 'Monthly Revenue',
       value: '$0',
       icon: IconChartBar,

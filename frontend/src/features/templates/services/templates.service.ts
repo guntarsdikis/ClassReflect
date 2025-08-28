@@ -53,11 +53,6 @@ export interface TemplateFilters {
 }
 
 
-export interface ApplyTemplateResponse {
-  message: string;
-  criteriaAdded: number;
-  totalCriteria: number;
-}
 
 export class TemplatesService {
   private static instance: TemplatesService;
@@ -132,12 +127,6 @@ export class TemplatesService {
     }[]>(`/schools/${schoolId}/template-categories`);
   }
 
-  /**
-   * Apply a template to a school (copies criteria to analysis_criteria)
-   */
-  async applyTemplate(templateId: number, schoolId?: number): Promise<ApplyTemplateResponse> {
-    return this.api.post(`/templates/${templateId}/apply`, schoolId ? { school_id: schoolId } : {});
-  }
 
   /**
    * Get template statistics for dashboard

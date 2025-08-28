@@ -476,10 +476,22 @@ router.post('/:schoolId/subjects', authorize('school_manager', 'super_admin'), a
       });
     }
 
+    // Find the category ID if category is provided
+    let categoryId = null;
+    if (category) {
+      const [categoryRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ? AND is_active = TRUE',
+        [schoolId, category]
+      );
+      if (Array.isArray(categoryRows) && categoryRows.length > 0) {
+        categoryId = (categoryRows[0] as any).id;
+      }
+    }
+
     const [result] = await pool.execute<ResultSetHeader>(`
-      INSERT INTO school_subjects (school_id, subject_name, description, category, created_by) 
-      VALUES (?, ?, ?, ?, ?)
-    `, [schoolId, subject_name, description, category, user.id]);
+      INSERT INTO school_subjects (school_id, subject_name, description, category, category_id, created_by) 
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [schoolId, subject_name, description, category, categoryId, user.id]);
 
     res.status(201).json({
       id: result.insertId,
@@ -499,7 +511,7 @@ router.post('/:schoolId/subjects', authorize('school_manager', 'super_admin'), a
 router.put('/:schoolId/subjects/:subjectId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId, subjectId } = req.params;
-    const { subject_name, description, is_active } = req.body;
+    const { subject_name, description, category, is_active } = req.body;
     const user = (req as any).user;
 
     // Check permissions
@@ -529,6 +541,24 @@ router.put('/:schoolId/subjects/:subjectId', authorize('school_manager', 'super_
     if (description !== undefined) {
       updateFields.push('description = ?');
       values.push(description);
+    }
+
+    if (category !== undefined) {
+      // Find the category ID if category is provided
+      let categoryId = null;
+      if (category) {
+        const [categoryRows] = await pool.execute<RowDataPacket[]>(
+          'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ? AND is_active = TRUE',
+          [schoolId, category]
+        );
+        if (Array.isArray(categoryRows) && categoryRows.length > 0) {
+          categoryId = (categoryRows[0] as any).id;
+        }
+      }
+      updateFields.push('category = ?');
+      updateFields.push('category_id = ?');
+      values.push(category);
+      values.push(categoryId);
     }
 
     if (is_active !== undefined) {
@@ -607,39 +637,207 @@ router.get('/:schoolId/categories', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // Get categories with subject counts
     const [categories] = await pool.execute<RowDataPacket[]>(`
-      SELECT DISTINCT category, COUNT(*) as subject_count
-      FROM school_subjects 
-      WHERE school_id = ? AND is_active = TRUE AND category IS NOT NULL AND category != ''
-      GROUP BY category
-      ORDER BY subject_count DESC, category ASC
+      SELECT 
+        sc.id,
+        sc.category_name,
+        sc.description,
+        sc.color,
+        sc.is_active,
+        sc.created_at,
+        sc.updated_at,
+        u.first_name as created_by_first_name,
+        u.last_name as created_by_last_name,
+        COUNT(ss.id) as subject_count
+      FROM school_categories sc
+      LEFT JOIN users u ON sc.created_by = u.id
+      LEFT JOIN school_subjects ss ON sc.id = ss.category_id AND ss.is_active = TRUE
+      WHERE sc.school_id = ? AND sc.is_active = TRUE
+      GROUP BY sc.id, sc.category_name, sc.description, sc.color, sc.is_active, 
+               sc.created_at, sc.updated_at, u.first_name, u.last_name
+      ORDER BY subject_count DESC, sc.category_name ASC
     `, [schoolId]);
 
-    const defaultCategories = [
-      'Core',
-      'Sciences', 
-      'Social Sciences',
-      'Arts',
-      'Languages',
-      'Technology',
-      'Health',
-      'Custom'
-    ];
-
-    // Merge with existing categories
-    const existingCategories = categories.map((c: any) => c.category);
-    const allCategories = Array.from(new Set([
-      ...existingCategories,
-      ...defaultCategories
-    ]));
-
-    res.json({
-      categories: allCategories,
-      usage: categories
-    });
+    res.json(categories);
   } catch (error) {
     console.error('Error fetching school categories:', error);
     res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Create new category for school
+router.post('/:schoolId/categories', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId } = req.params;
+    const { category_name, description, color } = req.body;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!category_name) {
+      return res.status(400).json({ 
+        error: 'Category name is required' 
+      });
+    }
+
+    // Check if category already exists for this school
+    const [existing] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ?',
+      [schoolId, category_name]
+    );
+
+    if (Array.isArray(existing) && existing.length > 0) {
+      return res.status(409).json({ 
+        error: 'Category already exists for this school' 
+      });
+    }
+
+    const [result] = await pool.execute<ResultSetHeader>(`
+      INSERT INTO school_categories (school_id, category_name, description, color, created_by) 
+      VALUES (?, ?, ?, ?, ?)
+    `, [schoolId, category_name, description, color, user.id]);
+
+    res.status(201).json({
+      id: result.insertId,
+      schoolId,
+      category_name,
+      description,
+      color,
+      message: 'Category created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+// Update category for school
+router.put('/:schoolId/categories/:categoryId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId, categoryId } = req.params;
+    const { category_name, description, color, is_active } = req.body;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if category exists and belongs to this school
+    const [categoryRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id, category_name FROM school_categories WHERE id = ? AND school_id = ?',
+      [categoryId, schoolId]
+    );
+
+    if (!Array.isArray(categoryRows) || categoryRows.length === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    // Build dynamic update query
+    const updateFields: string[] = [];
+    const values: any[] = [];
+
+    if (category_name !== undefined) {
+      // Check if new name conflicts with existing categories
+      const [existing] = await pool.execute<RowDataPacket[]>(
+        'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ? AND id != ?',
+        [schoolId, category_name, categoryId]
+      );
+      if (Array.isArray(existing) && existing.length > 0) {
+        return res.status(409).json({ error: 'Category name already exists for this school' });
+      }
+      updateFields.push('category_name = ?');
+      values.push(category_name);
+    }
+
+    if (description !== undefined) {
+      updateFields.push('description = ?');
+      values.push(description);
+    }
+
+    if (color !== undefined) {
+      updateFields.push('color = ?');
+      values.push(color);
+    }
+
+    if (is_active !== undefined) {
+      updateFields.push('is_active = ?');
+      values.push(is_active);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    values.push(categoryId);
+
+    await pool.execute(
+      `UPDATE school_categories SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+      values
+    );
+
+    res.json({
+      id: categoryId,
+      message: 'Category updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+// Delete category for school (soft delete)
+router.delete('/:schoolId/categories/:categoryId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId, categoryId } = req.params;
+    const user = (req as any).user;
+
+    // Check permissions
+    if (user.role !== 'super_admin' && user.schoolId !== parseInt(schoolId)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if category exists and belongs to this school
+    const [categoryRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id, category_name FROM school_categories WHERE id = ? AND school_id = ?',
+      [categoryId, schoolId]
+    );
+
+    if (!Array.isArray(categoryRows) || categoryRows.length === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    // Check if category is being used by any subjects
+    const [subjectRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as count FROM school_subjects WHERE category_id = ? AND is_active = TRUE',
+      [categoryId]
+    );
+
+    const subjectCount = (subjectRows[0] as any).count;
+    if (subjectCount > 0) {
+      return res.status(409).json({ 
+        error: `Cannot delete category. ${subjectCount} subject(s) are using this category. Please reassign subjects to other categories first.`,
+        subjectCount
+      });
+    }
+
+    // Soft delete by setting is_active to false
+    await pool.execute(
+      'UPDATE school_categories SET is_active = FALSE, updated_at = NOW() WHERE id = ?',
+      [categoryId]
+    );
+
+    res.json({
+      id: categoryId,
+      message: 'Category deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ error: 'Failed to delete category' });
   }
 });
 

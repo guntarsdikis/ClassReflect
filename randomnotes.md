@@ -12,5 +12,3 @@
 i would like to create template which would go along the principles from the "Teach Like a Champion" book, how do i do it?
 
 categories should be manageable, each school should be able to create their own categories. superadmin and school manager should be able to create categories. think
-
-subject should be manageable for the school individually

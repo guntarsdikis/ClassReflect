@@ -6,6 +6,7 @@ export interface SchoolSubject {
   subject_name: string;
   description?: string;
   category?: string;
+  category_id?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -13,16 +14,44 @@ export interface SchoolSubject {
   created_by_last_name?: string;
 }
 
+export interface SchoolCategory {
+  id: number;
+  category_name: string;
+  description?: string;
+  color?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by_first_name?: string;
+  created_by_last_name?: string;
+  subject_count: number;
+}
+
 export interface CreateSubjectRequest {
   subject_name: string;
   description?: string;
   category?: string;
+  category_id?: number;
 }
 
 export interface UpdateSubjectRequest {
   subject_name?: string;
   description?: string;
   category?: string;
+  category_id?: number;
+  is_active?: boolean;
+}
+
+export interface CreateCategoryRequest {
+  category_name: string;
+  description?: string;
+  color?: string;
+}
+
+export interface UpdateCategoryRequest {
+  category_name?: string;
+  description?: string;
+  color?: string;
   is_active?: boolean;
 }
 
@@ -84,13 +113,44 @@ export class SubjectsService {
   }
 
   /**
-   * Get subject categories for a school
+   * Get all categories for a school
    */
-  async getSubjectCategories(schoolId: number): Promise<{
-    categories: string[];
-    usage: { category: string; subject_count: number }[];
+  async getSchoolCategories(schoolId: number): Promise<SchoolCategory[]> {
+    return this.api.get<SchoolCategory[]>(`/schools/${schoolId}/categories`);
+  }
+
+  /**
+   * Create a new category for a school
+   */
+  async createCategory(schoolId: number, data: CreateCategoryRequest): Promise<{
+    id: number;
+    schoolId: number;
+    category_name: string;
+    description?: string;
+    color?: string;
+    message: string;
   }> {
-    return this.api.get(`/schools/${schoolId}/categories`);
+    return this.api.post(`/schools/${schoolId}/categories`, data);
+  }
+
+  /**
+   * Update an existing category
+   */
+  async updateCategory(schoolId: number, categoryId: number, data: UpdateCategoryRequest): Promise<{
+    id: number;
+    message: string;
+  }> {
+    return this.api.put(`/schools/${schoolId}/categories/${categoryId}`, data);
+  }
+
+  /**
+   * Delete a category (soft delete)
+   */
+  async deleteCategory(schoolId: number, categoryId: number): Promise<{
+    id: number;
+    message: string;
+  }> {
+    return this.api.delete(`/schools/${schoolId}/categories/${categoryId}`);
   }
 
   /**

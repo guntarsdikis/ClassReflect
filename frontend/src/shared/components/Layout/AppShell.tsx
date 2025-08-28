@@ -24,6 +24,7 @@ import {
   IconSchool,
   IconClock,
   IconBook,
+  IconTag,
 } from '@tabler/icons-react';
 import { useAuthStore, type UserRole } from '@store/auth.store';
 import { useLogout } from '@features/auth/services/auth.service';
@@ -40,6 +41,7 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
     { label: 'Upload Recording', icon: IconUpload, href: '/upload' },
     { label: 'Teachers', icon: IconUsers, href: '/teachers' },
     { label: 'Templates', icon: IconTemplate, href: '/templates' },
+    { label: 'Categories', icon: IconTag, href: '/categories' },
     { label: 'Subjects', icon: IconBook, href: '/subjects' },
     { label: 'Analytics', icon: IconChartBar, href: '/analytics' },
   ],
@@ -48,6 +50,7 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
     { label: 'Schools', icon: IconSchool, href: '/admin/schools' },
     { label: 'Users', icon: IconUsers, href: '/admin/users' },
     { label: 'Templates', icon: IconTemplate, href: '/admin/templates' },
+    { label: 'Categories', icon: IconTag, href: '/admin/categories' },
     { label: 'Subjects', icon: IconBook, href: '/admin/subjects' },
     { label: 'Jobs', icon: IconClock, href: '/admin/jobs' },
   ],

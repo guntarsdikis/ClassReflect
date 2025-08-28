@@ -923,17 +923,6 @@ export function UserManagement() {
               value={managerFormData.domain}
               onChange={(e) => setManagerFormData({...managerFormData, domain: e.target.value})}
             />
-            <Select
-              label="Subscription Tier"
-              value={managerFormData.subscriptionTier}
-              onChange={(value) => setManagerFormData({...managerFormData, subscriptionTier: value as any})}
-              data={[
-                { value: 'basic', label: 'Basic' },
-                { value: 'professional', label: 'Professional' },
-                { value: 'enterprise', label: 'Enterprise' },
-              ]}
-              required
-            />
           </Group>
 
           <Title order={5} mt="md">Manager Details</Title>

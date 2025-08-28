@@ -14,18 +14,6 @@ export interface SchoolSubject {
   created_by_last_name?: string;
 }
 
-export interface SchoolCategory {
-  id: number;
-  category_name: string;
-  description?: string;
-  color?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by_first_name?: string;
-  created_by_last_name?: string;
-  subject_count: number;
-}
 
 export interface CreateSubjectRequest {
   subject_name: string;
@@ -42,18 +30,6 @@ export interface UpdateSubjectRequest {
   is_active?: boolean;
 }
 
-export interface CreateCategoryRequest {
-  category_name: string;
-  description?: string;
-  color?: string;
-}
-
-export interface UpdateCategoryRequest {
-  category_name?: string;
-  description?: string;
-  color?: string;
-  is_active?: boolean;
-}
 
 export class SubjectsService {
   private static instance: SubjectsService;
@@ -112,46 +88,6 @@ export class SubjectsService {
     return this.api.delete(`/schools/${schoolId}/subjects/${subjectId}`);
   }
 
-  /**
-   * Get all categories for a school
-   */
-  async getSchoolCategories(schoolId: number): Promise<SchoolCategory[]> {
-    return this.api.get<SchoolCategory[]>(`/schools/${schoolId}/categories`);
-  }
-
-  /**
-   * Create a new category for a school
-   */
-  async createCategory(schoolId: number, data: CreateCategoryRequest): Promise<{
-    id: number;
-    schoolId: number;
-    category_name: string;
-    description?: string;
-    color?: string;
-    message: string;
-  }> {
-    return this.api.post(`/schools/${schoolId}/categories`, data);
-  }
-
-  /**
-   * Update an existing category
-   */
-  async updateCategory(schoolId: number, categoryId: number, data: UpdateCategoryRequest): Promise<{
-    id: number;
-    message: string;
-  }> {
-    return this.api.put(`/schools/${schoolId}/categories/${categoryId}`, data);
-  }
-
-  /**
-   * Delete a category (soft delete)
-   */
-  async deleteCategory(schoolId: number, categoryId: number): Promise<{
-    id: number;
-    message: string;
-  }> {
-    return this.api.delete(`/schools/${schoolId}/categories/${categoryId}`);
-  }
 
   /**
    * Get default/recommended subjects for testing purposes

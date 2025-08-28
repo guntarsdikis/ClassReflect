@@ -70,7 +70,13 @@ export function TemplateManagement() {
   
   const [templates, setTemplates] = useState<Template[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{
+    id: number;
+    category_name: string;
+    description?: string;
+    color?: string;
+    template_count: number;
+  }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<TemplateFilters>({});
@@ -106,14 +112,20 @@ export function TemplateManagement() {
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      const schoolId = isSchoolManager ? currentUserSchoolId : user?.schoolId;
+      if (!schoolId) {
+        throw new Error('School ID is required');
+      }
+
       // Load real data from backend
       const [templatesData, categoriesData] = await Promise.all([
         templatesService.getTemplates(filters),
-        templatesService.getTemplateCategories(),
+        templatesService.getTemplateCategories(schoolId),
       ]);
       
       setTemplates(templatesData);
-      setCategories(categoriesData.categories);
+      setCategories(categoriesData);
 
       // Load schools if super admin
       if (user?.role === 'super_admin') {
@@ -444,7 +456,7 @@ export function TemplateManagement() {
             onChange={(value) => setFilters({...filters, category: value || undefined})}
             data={[
               { value: '', label: 'All Categories' },
-              ...categories.map(cat => ({ value: cat, label: cat })),
+              ...categories.map(cat => ({ value: cat.category_name, label: cat.category_name })),
             ]}
             w={200}
           />
@@ -629,11 +641,10 @@ export function TemplateManagement() {
               placeholder="Select category"
               value={formData.category}
               onChange={(value) => setFormData({...formData, category: value || ''})}
-              data={[
-                ...templatesService.getDefaultCategories(),
-                ...(formData.category && !templatesService.getDefaultCategories().includes(formData.category) 
-                  ? [formData.category] : [])
-              ]}
+              data={categories.map(cat => ({
+                value: cat.category_name,
+                label: cat.category_name
+              }))}
               searchable
               allowDeselect={false}
               required

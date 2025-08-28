@@ -32,7 +32,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
-import { subjectsService, SchoolSubject, SchoolCategory, CreateSubjectRequest } from '../services/subjects.service';
+import { subjectsService, SchoolSubject, CreateSubjectRequest } from '../services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
 
 interface SubjectFormData extends CreateSubjectRequest {}
@@ -42,7 +42,6 @@ export function SubjectManagement() {
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   
   const [subjects, setSubjects] = useState<SchoolSubject[]>([]);
-  const [categories, setCategories] = useState<SchoolCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingSubject, setEditingSubject] = useState<SchoolSubject | null>(null);
   
@@ -60,7 +59,6 @@ export function SubjectManagement() {
   useEffect(() => {
     if (currentSchoolId) {
       loadSubjects();
-      loadCategories();
     }
   }, [currentSchoolId]);
 
@@ -83,17 +81,6 @@ export function SubjectManagement() {
     }
   };
 
-  const loadCategories = async () => {
-    try {
-      if (currentSchoolId) {
-        const data = await subjectsService.getSchoolCategories(currentSchoolId);
-        setCategories(data);
-      }
-    } catch (error) {
-      console.error('Failed to load categories:', error);
-      // Don't show error notification for categories as it's not critical
-    }
-  };
 
   const handleCreateSubject = () => {
     setEditingSubject(null);
@@ -410,14 +397,26 @@ export function SubjectManagement() {
 
           <Select
             label="Category"
-            placeholder="Select a category"
+            placeholder="Select or type a category"
             value={formData.category}
             onChange={(value) => setFormData({...formData, category: value || 'Custom'})}
-            data={categories.map(cat => ({
-              value: cat.category_name,
-              label: cat.category_name
-            }))}
+            data={[
+              'Core',
+              'Sciences',
+              'Social Sciences',
+              'Arts',
+              'Languages',
+              'Technology',
+              'Health',
+              'Custom'
+            ]}
             searchable
+            creatable
+            getCreateLabel={(query) => `+ Create "${query}"`}
+            onCreate={(query) => {
+              setFormData({...formData, category: query});
+              return query;
+            }}
           />
 
           <Space h="md" />

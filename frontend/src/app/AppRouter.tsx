@@ -11,7 +11,7 @@ import { SubjectManagement } from '@features/schools/components/SubjectManagemen
 import { UserManagement } from '@features/users/components/UserManagement';
 import { UserDetail } from '@features/users/components/UserDetail';
 import { TemplateManagement } from '@features/templates/components/TemplateManagement';
-import { CategoriesManagement } from '@features/categories/components/CategoriesManagement';
+import { TemplateCategoryManagement } from '@features/templates/components/TemplateCategoryManagement';
 import { UploadWizard } from '@features/uploads/components/UploadWizard';
 import { JobManagement } from '@features/admin/components/JobManagement';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
@@ -44,7 +44,7 @@ export function AppRouter() {
           <Route element={<RoleRoute roles={['school_manager']} />}>
             <Route path="/upload" element={<UploadWizard />} />
             <Route path="/templates" element={<TemplateManagement />} />
-            <Route path="/categories" element={<CategoriesManagement />} />
+            <Route path="/categories" element={<TemplateCategoryManagement />} />
             <Route path="/subjects" element={<SubjectManagement />} />
             <Route path="/teachers" element={<UserManagement />} />
             {/* <Route path="/analytics" element={<SchoolAnalytics />} /> */}
@@ -59,7 +59,7 @@ export function AppRouter() {
             <Route path="/admin/users/:id" element={<UserDetail />} />
             <Route path="/admin/users/new" element={<UserManagement />} />
             <Route path="/admin/templates" element={<TemplateManagement />} />
-            <Route path="/admin/categories" element={<CategoriesManagement />} />
+            <Route path="/admin/categories" element={<TemplateCategoryManagement />} />
             <Route path="/admin/subjects" element={<SubjectManagement />} />
             <Route path="/admin/jobs" element={<JobManagement />} />
           </Route>

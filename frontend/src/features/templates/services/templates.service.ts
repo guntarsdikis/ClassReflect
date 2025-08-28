@@ -52,13 +52,6 @@ export interface TemplateFilters {
   grade?: string;
 }
 
-export interface TemplateCategories {
-  categories: string[];
-  usage: Array<{
-    category: string;
-    template_count: number;
-  }>;
-}
 
 export interface ApplyTemplateResponse {
   message: string;
@@ -121,10 +114,22 @@ export class TemplatesService {
   }
 
   /**
-   * Get available template categories
+   * Get available template categories for a school
    */
-  async getTemplateCategories(): Promise<TemplateCategories> {
-    return this.api.get<TemplateCategories>('/templates/meta/categories');
+  async getTemplateCategories(schoolId: number): Promise<{
+    id: number;
+    category_name: string;
+    description?: string;
+    color?: string;
+    template_count: number;
+  }[]> {
+    return this.api.get<{
+      id: number;
+      category_name: string;
+      description?: string;
+      color?: string;
+      template_count: number;
+    }[]>(`/schools/${schoolId}/template-categories`);
   }
 
   /**
@@ -201,22 +206,6 @@ export class TemplatesService {
     return ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
   }
 
-  /**
-   * Get default template categories
-   */
-  getDefaultCategories(): string[] {
-    return [
-      'General Teaching',
-      'Subject-Specific',
-      'Assessment',
-      'Classroom Management',
-      'Student Engagement',
-      'Professional Development',
-      'Special Education',
-      'Technology Integration',
-      'Other'
-    ];
-  }
 }
 
 // Export singleton instance

@@ -626,8 +626,8 @@ router.delete('/:schoolId/subjects/:subjectId', authorize('school_manager', 'sup
   }
 });
 
-// Get categories for a school
-router.get('/:schoolId/categories', async (req: Request, res: Response) => {
+// Get template categories for a school
+router.get('/:schoolId/template-categories', async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
     const user = (req as any).user;
@@ -637,37 +637,37 @@ router.get('/:schoolId/categories', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Get categories with subject counts
+    // Get template categories with template counts
     const [categories] = await pool.execute<RowDataPacket[]>(`
       SELECT 
-        sc.id,
-        sc.category_name,
-        sc.description,
-        sc.color,
-        sc.is_active,
-        sc.created_at,
-        sc.updated_at,
+        tc.id,
+        tc.category_name,
+        tc.description,
+        tc.color,
+        tc.is_active,
+        tc.created_at,
+        tc.updated_at,
         u.first_name as created_by_first_name,
         u.last_name as created_by_last_name,
-        COUNT(ss.id) as subject_count
-      FROM school_categories sc
-      LEFT JOIN users u ON sc.created_by = u.id
-      LEFT JOIN school_subjects ss ON sc.id = ss.category_id AND ss.is_active = TRUE
-      WHERE sc.school_id = ? AND sc.is_active = TRUE
-      GROUP BY sc.id, sc.category_name, sc.description, sc.color, sc.is_active, 
-               sc.created_at, sc.updated_at, u.first_name, u.last_name
-      ORDER BY subject_count DESC, sc.category_name ASC
+        COUNT(t.id) as template_count
+      FROM template_categories tc
+      LEFT JOIN users u ON tc.created_by = u.id
+      LEFT JOIN templates t ON tc.id = t.category_id AND t.is_active = TRUE
+      WHERE tc.school_id = ? AND tc.is_active = TRUE
+      GROUP BY tc.id, tc.category_name, tc.description, tc.color, tc.is_active, 
+               tc.created_at, tc.updated_at, u.first_name, u.last_name
+      ORDER BY template_count DESC, tc.category_name ASC
     `, [schoolId]);
 
     res.json(categories);
   } catch (error) {
-    console.error('Error fetching school categories:', error);
-    res.status(500).json({ error: 'Failed to fetch categories' });
+    console.error('Error fetching template categories:', error);
+    res.status(500).json({ error: 'Failed to fetch template categories' });
   }
 });
 
-// Create new category for school
-router.post('/:schoolId/categories', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+// Create new template category for school
+router.post('/:schoolId/template-categories', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
     const { category_name, description, color } = req.body;
@@ -686,18 +686,18 @@ router.post('/:schoolId/categories', authorize('school_manager', 'super_admin'),
 
     // Check if category already exists for this school
     const [existing] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ?',
+      'SELECT id FROM template_categories WHERE school_id = ? AND category_name = ?',
       [schoolId, category_name]
     );
 
     if (Array.isArray(existing) && existing.length > 0) {
       return res.status(409).json({ 
-        error: 'Category already exists for this school' 
+        error: 'Template category already exists for this school' 
       });
     }
 
     const [result] = await pool.execute<ResultSetHeader>(`
-      INSERT INTO school_categories (school_id, category_name, description, color, created_by) 
+      INSERT INTO template_categories (school_id, category_name, description, color, created_by) 
       VALUES (?, ?, ?, ?, ?)
     `, [schoolId, category_name, description, color, user.id]);
 
@@ -707,16 +707,16 @@ router.post('/:schoolId/categories', authorize('school_manager', 'super_admin'),
       category_name,
       description,
       color,
-      message: 'Category created successfully'
+      message: 'Template category created successfully'
     });
   } catch (error) {
-    console.error('Error creating category:', error);
-    res.status(500).json({ error: 'Failed to create category' });
+    console.error('Error creating template category:', error);
+    res.status(500).json({ error: 'Failed to create template category' });
   }
 });
 
-// Update category for school
-router.put('/:schoolId/categories/:categoryId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+// Update template category for school
+router.put('/:schoolId/template-categories/:categoryId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId, categoryId } = req.params;
     const { category_name, description, color, is_active } = req.body;
@@ -729,12 +729,12 @@ router.put('/:schoolId/categories/:categoryId', authorize('school_manager', 'sup
 
     // Check if category exists and belongs to this school
     const [categoryRows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id, category_name FROM school_categories WHERE id = ? AND school_id = ?',
+      'SELECT id, category_name FROM template_categories WHERE id = ? AND school_id = ?',
       [categoryId, schoolId]
     );
 
     if (!Array.isArray(categoryRows) || categoryRows.length === 0) {
-      return res.status(404).json({ error: 'Category not found' });
+      return res.status(404).json({ error: 'Template category not found' });
     }
 
     // Build dynamic update query
@@ -744,11 +744,11 @@ router.put('/:schoolId/categories/:categoryId', authorize('school_manager', 'sup
     if (category_name !== undefined) {
       // Check if new name conflicts with existing categories
       const [existing] = await pool.execute<RowDataPacket[]>(
-        'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ? AND id != ?',
+        'SELECT id FROM template_categories WHERE school_id = ? AND category_name = ? AND id != ?',
         [schoolId, category_name, categoryId]
       );
       if (Array.isArray(existing) && existing.length > 0) {
-        return res.status(409).json({ error: 'Category name already exists for this school' });
+        return res.status(409).json({ error: 'Template category name already exists for this school' });
       }
       updateFields.push('category_name = ?');
       values.push(category_name);
@@ -776,22 +776,22 @@ router.put('/:schoolId/categories/:categoryId', authorize('school_manager', 'sup
     values.push(categoryId);
 
     await pool.execute(
-      `UPDATE school_categories SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+      `UPDATE template_categories SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
       values
     );
 
     res.json({
       id: categoryId,
-      message: 'Category updated successfully'
+      message: 'Template category updated successfully'
     });
   } catch (error) {
-    console.error('Error updating category:', error);
-    res.status(500).json({ error: 'Failed to update category' });
+    console.error('Error updating template category:', error);
+    res.status(500).json({ error: 'Failed to update template category' });
   }
 });
 
-// Delete category for school (soft delete)
-router.delete('/:schoolId/categories/:categoryId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
+// Delete template category for school (soft delete)
+router.delete('/:schoolId/template-categories/:categoryId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId, categoryId } = req.params;
     const user = (req as any).user;
@@ -803,41 +803,41 @@ router.delete('/:schoolId/categories/:categoryId', authorize('school_manager', '
 
     // Check if category exists and belongs to this school
     const [categoryRows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id, category_name FROM school_categories WHERE id = ? AND school_id = ?',
+      'SELECT id, category_name FROM template_categories WHERE id = ? AND school_id = ?',
       [categoryId, schoolId]
     );
 
     if (!Array.isArray(categoryRows) || categoryRows.length === 0) {
-      return res.status(404).json({ error: 'Category not found' });
+      return res.status(404).json({ error: 'Template category not found' });
     }
 
-    // Check if category is being used by any subjects
-    const [subjectRows] = await pool.execute<RowDataPacket[]>(
-      'SELECT COUNT(*) as count FROM school_subjects WHERE category_id = ? AND is_active = TRUE',
+    // Check if category is being used by any templates
+    const [templateRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as count FROM templates WHERE category_id = ? AND is_active = TRUE',
       [categoryId]
     );
 
-    const subjectCount = (subjectRows[0] as any).count;
-    if (subjectCount > 0) {
+    const templateCount = (templateRows[0] as any).count;
+    if (templateCount > 0) {
       return res.status(409).json({ 
-        error: `Cannot delete category. ${subjectCount} subject(s) are using this category. Please reassign subjects to other categories first.`,
-        subjectCount
+        error: `Cannot delete template category. ${templateCount} template(s) are using this category. Please reassign templates to other categories first.`,
+        templateCount
       });
     }
 
     // Soft delete by setting is_active to false
     await pool.execute(
-      'UPDATE school_categories SET is_active = FALSE, updated_at = NOW() WHERE id = ?',
+      'UPDATE template_categories SET is_active = FALSE, updated_at = NOW() WHERE id = ?',
       [categoryId]
     );
 
     res.json({
       id: categoryId,
-      message: 'Category deleted successfully'
+      message: 'Template category deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting category:', error);
-    res.status(500).json({ error: 'Failed to delete category' });
+    console.error('Error deleting template category:', error);
+    res.status(500).json({ error: 'Failed to delete template category' });
   }
 });
 

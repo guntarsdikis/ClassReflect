@@ -39,19 +39,25 @@ import {
   IconSearch,
   IconKey,
   IconCopy,
+  IconUser,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
-import { usersService, User, CreateTeacherRequest, CreateSchoolManagerRequest } from '../services/users.service';
+import { usersService, User, CreateTeacherRequest, CreateSchoolManagerRequest, CreateUserRequest, UpdateUserRoleRequest } from '../services/users.service';
 import { schoolsService, School } from '@features/schools/services/schools.service';
 import { subjectsService, SchoolSubject } from '@features/schools/services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
 
 interface TeacherFormData extends CreateTeacherRequest {
   schoolId: number;
+  role?: 'teacher' | 'school_manager'; // For super admin user creation
+}
+
+interface UserFormData extends CreateUserRequest {
+  // All fields from CreateUserRequest
 }
 
 interface ManagerFormData extends CreateSchoolManagerRequest {}
@@ -84,6 +90,7 @@ export function UserManagement() {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterSchool, setFilterSchool] = useState<string>('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [changingRole, setChangingRole] = useState<User | null>(null);
   
   const [teacherFormData, setTeacherFormData] = useState<TeacherFormData>({
     email: '',
@@ -93,6 +100,7 @@ export function UserManagement() {
     grades: [],
     schoolId: 0,
     sendInviteEmail: true,
+    role: 'teacher', // Default to teacher
   });
 
   const [managerFormData, setManagerFormData] = useState<ManagerFormData>({
@@ -131,6 +139,7 @@ export function UserManagement() {
           usersCount: usersData.length, 
           schoolsCount: schoolsData.length 
         });
+        console.log('Super Admin - User roles:', usersData.map(u => `${u.email}: ${u.role}`));
         setUsers(usersData);
         setSchools(schoolsData);
         
@@ -141,25 +150,18 @@ export function UserManagement() {
           await loadSchoolSubjects(schoolsData[0].id);
         }
       } else if (isSchoolManager) {
-        // School manager can only see users from their school
+        // School manager can only see teachers from their school
         console.log('School Manager - Loading data for school:', currentUserSchoolId);
         
-        const [usersData, schoolData] = await Promise.all([
-          usersService.getAllUsers(), // TODO: Add endpoint to get users by schoolId
+        const [teachersData, schoolData] = await Promise.all([
+          usersService.getTeachers(), // Use teachers endpoint which supports school managers
           schoolsService.getSchool(currentUserSchoolId),
         ]);
         
-        console.log('School Manager - Raw users data:', usersData);
+        console.log('School Manager - Teachers data:', teachersData);
         console.log('School Manager - School data:', schoolData);
         
-        // Filter users to only show teachers from their school
-        const filteredUsers = usersData.filter(user => 
-          user.schoolId === currentUserSchoolId && user.role === 'teacher'
-        );
-        
-        console.log('School Manager - Filtered users:', filteredUsers);
-        
-        setUsers(filteredUsers);
+        setUsers(teachersData);
         setSchools([schoolData]);
         
         // Auto-set school filter for school managers
@@ -228,6 +230,51 @@ export function UserManagement() {
       });
       openTeacherModal();
     }
+  };
+
+  const handleRoleChange = async (user: User, newRole: 'teacher' | 'school_manager') => {
+    try {
+      const roleData: UpdateUserRoleRequest = {
+        role: newRole,
+        schoolId: user.schoolId
+      };
+
+      await usersService.updateUserRole(user.id, roleData);
+      
+      notifications.show({
+        title: 'Role Updated',
+        message: `${user.firstName} ${user.lastName} is now a ${newRole === 'school_manager' ? 'School Manager' : 'Teacher'}`,
+        color: 'green',
+      });
+
+      // Refresh users list
+      await loadData();
+    } catch (error) {
+      console.error('Failed to update user role:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to update user role',
+        color: 'red',
+      });
+    }
+  };
+
+  const confirmRoleChange = (user: User, newRole: 'teacher' | 'school_manager') => {
+    const roleName = newRole === 'school_manager' ? 'School Manager' : 'Teacher';
+    
+    modals.openConfirmModal({
+      title: 'Change User Role',
+      children: (
+        <Text>
+          Are you sure you want to change <strong>{user.firstName} {user.lastName}</strong> from{' '}
+          <strong>{user.role === 'school_manager' ? 'School Manager' : 'Teacher'}</strong> to{' '}
+          <strong>{roleName}</strong>?
+        </Text>
+      ),
+      labels: { confirm: `Change to ${roleName}`, cancel: 'Cancel' },
+      confirmProps: { color: 'blue' },
+      onConfirm: () => handleRoleChange(user, newRole),
+    });
   };
 
   const handleSaveTeacher = async () => {
@@ -557,7 +604,7 @@ export function UserManagement() {
             leftSection={<IconUserPlus size={16} />}
             onClick={handleCreateTeacher}
           >
-            Create Teacher
+            {isSuperAdmin ? 'Create User' : 'Create Teacher'}
           </Button>
         </Group>
       </Group>
@@ -769,6 +816,31 @@ export function UserManagement() {
                             <IconTrash size={16} />
                           </ActionIcon>
                         )}
+                        {/* Role Change Buttons - Super Admin Only */}
+                        {isSuperAdmin && user.role !== 'super_admin' && (
+                          <>
+                            {user.role === 'teacher' && (
+                              <ActionIcon 
+                                variant="subtle" 
+                                color="green"
+                                onClick={() => confirmRoleChange(user, 'school_manager')}
+                                title="Promote to Manager"
+                              >
+                                <IconUsers size={16} />
+                              </ActionIcon>
+                            )}
+                            {user.role === 'school_manager' && (
+                              <ActionIcon 
+                                variant="subtle" 
+                                color="blue"
+                                onClick={() => confirmRoleChange(user, 'teacher')}
+                                title="Change to Teacher"
+                              >
+                                <IconUser size={16} />
+                              </ActionIcon>
+                            )}
+                          </>
+                        )}
                       </Group>
                     </Table.Td>
                   </Table.Tr>
@@ -787,13 +859,33 @@ export function UserManagement() {
           <Group>
             <IconUserPlus size={20} />
             <Text fw={600}>
-              {editingUser ? 'Edit Teacher' : 'Create New Teacher'}
+              {editingUser ? 'Edit Teacher' : `Create New ${teacherFormData.role === 'school_manager' ? 'School Manager' : 'Teacher'}`}
             </Text>
           </Group>
         }
         size="lg"
       >
         <Stack>
+          {/* Role Selection - Super Admin Only, Create Mode Only */}
+          {isSuperAdmin && !editingUser && (
+            <Select
+              label="User Role"
+              value={teacherFormData.role || 'teacher'}
+              onChange={(value) => setTeacherFormData({
+                ...teacherFormData, 
+                role: value as 'teacher' | 'school_manager',
+                // Reset subjects and grades when switching to manager
+                subjects: value === 'school_manager' ? [] : teacherFormData.subjects,
+                grades: value === 'school_manager' ? [] : teacherFormData.grades
+              })}
+              data={[
+                { value: 'teacher', label: 'Teacher' },
+                { value: 'school_manager', label: 'School Manager' }
+              ]}
+              required
+            />
+          )}
+          
           <Group grow>
             <TextInput
               label="First Name"
@@ -843,33 +935,36 @@ export function UserManagement() {
             }
           />
 
-          <Group grow>
-            <MultiSelect
-              label="Subjects"
-              placeholder={schoolSubjects.length > 0 ? "Select subjects" : "No subjects available - school manager can add subjects"}
-              value={teacherFormData.subjects}
-              onChange={(subjects) => setTeacherFormData({...teacherFormData, subjects})}
-              data={schoolSubjects.map(subject => ({
-                value: subject.subject_name,
-                label: subject.subject_name
-              }))}
-              disabled={schoolSubjects.length === 0}
-              description={
-                schoolSubjects.length === 0 && isSchoolManager 
-                  ? "Add subjects in Subject Management to assign them to teachers"
-                  : undefined
-              }
-            />
-            <MultiSelect
-              label="Grades"
-              placeholder="Select grades"
-              value={teacherFormData.grades}
-              onChange={(grades) => setTeacherFormData({...teacherFormData, grades})}
-              data={[
-                'K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'
-              ]}
-            />
-          </Group>
+          {/* Subjects and Grades - Only for Teachers */}
+          {(!teacherFormData.role || teacherFormData.role === 'teacher') && (
+            <Group grow>
+              <MultiSelect
+                label="Subjects"
+                placeholder={schoolSubjects.length > 0 ? "Select subjects" : "No subjects available - school manager can add subjects"}
+                value={teacherFormData.subjects}
+                onChange={(subjects) => setTeacherFormData({...teacherFormData, subjects})}
+                data={schoolSubjects.map(subject => ({
+                  value: subject.subject_name,
+                  label: subject.subject_name
+                }))}
+                disabled={schoolSubjects.length === 0}
+                description={
+                  schoolSubjects.length === 0 && isSchoolManager 
+                    ? "Add subjects in Subject Management to assign them to teachers"
+                    : undefined
+                }
+              />
+              <MultiSelect
+                label="Grades"
+                placeholder="Select grades"
+                value={teacherFormData.grades}
+                onChange={(grades) => setTeacherFormData({...teacherFormData, grades})}
+                data={[
+                  'K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'
+                ]}
+              />
+            </Group>
+          )}
 
           {!editingUser && (
             <Switch
@@ -889,7 +984,10 @@ export function UserManagement() {
               onClick={handleSaveTeacher}
               leftSection={editingUser ? <IconCheck size={16} /> : <IconUserPlus size={16} />}
             >
-              {editingUser ? 'Update Teacher' : 'Create Teacher'}
+              {editingUser 
+                ? 'Update Teacher' 
+                : `Create ${teacherFormData.role === 'school_manager' ? 'School Manager' : 'Teacher'}`
+              }
             </Button>
           </Flex>
         </Stack>

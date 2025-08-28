@@ -5,6 +5,114 @@ import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } fr
 
 const router = Router();
 
+// Get all recordings list (admin/manager view)
+// Super admin sees all recordings, manager sees only their school's recordings
+router.get('/recordings', 
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+  try {
+    const { status, schoolId, limit = '50', offset = '0', search } = req.query;
+
+    // Ensure we have valid numbers for limit and offset
+    const limitNum = parseInt(limit as string, 10) || 50;
+    const offsetNum = parseInt(offset as string, 10) || 0;
+
+    // Build the WHERE clause based on role
+    let whereClause = '1=1';
+
+    // Role-based filtering
+    if (req.user!.role === 'school_manager') {
+      // Managers can only see recordings from their school
+      whereClause += ` AND aj.school_id = ${pool.escape(req.user!.schoolId)}`;
+    } else if (req.user!.role === 'super_admin' && schoolId) {
+      // Super admin can optionally filter by school
+      whereClause += ` AND aj.school_id = ${pool.escape(parseInt(schoolId as string, 10))}`;
+    }
+
+    // Status filtering
+    if (status) {
+      whereClause += ` AND aj.status = ${pool.escape(status)}`;
+    }
+
+    // Search filtering (teacher name or file name)
+    if (search) {
+      const searchPattern = `%${search}%`;
+      whereClause += ` AND (CONCAT(u.first_name, " ", u.last_name) LIKE ${pool.escape(searchPattern)} OR aj.file_name LIKE ${pool.escape(searchPattern)})`;
+    }
+
+    // Main query
+    const queryStr = `
+      SELECT 
+        aj.id,
+        aj.teacher_id,
+        aj.school_id,
+        aj.file_name,
+        aj.file_size,
+        aj.status,
+        aj.created_at,
+        aj.processing_started_at,
+        aj.processing_completed_at,
+        aj.error_message,
+        aj.assemblyai_upload_url,
+        aj.assemblyai_transcript_id,
+        u.first_name,
+        u.last_name,
+        u.email as teacher_email,
+        s.name as school_name,
+        tr.transcript_text,
+        tr.word_count,
+        tr.confidence_score,
+        tr.external_id as assemblyai_external_id
+      FROM audio_jobs aj
+      JOIN users u ON aj.teacher_id = u.id
+      JOIN schools s ON aj.school_id = s.id
+      LEFT JOIN transcripts tr ON aj.id = tr.job_id
+      WHERE ${whereClause}
+      ORDER BY aj.created_at DESC 
+      LIMIT ${pool.escape(limitNum)} OFFSET ${pool.escape(offsetNum)}
+    `;
+
+    console.log('🔍 SQL Debug:');
+    console.log('   Final Query:', queryStr);
+
+    const [rows] = await pool.query<RowDataPacket[]>(queryStr);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM audio_jobs aj
+      JOIN users u ON aj.teacher_id = u.id
+      JOIN schools s ON aj.school_id = s.id
+      WHERE ${whereClause}
+    `;
+    
+    const [countResult] = await pool.query<RowDataPacket[]>(countQuery);
+
+    // Format the response
+    const formattedRows = rows.map((row: any) => ({
+      ...row,
+      teacher_name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+      has_transcript: !!row.transcript_text,
+      file_size_mb: row.file_size ? (row.file_size / (1024 * 1024)).toFixed(2) : null
+    }));
+
+    res.json({
+      recordings: formattedRows,
+      count: formattedRows.length,
+      total: countResult[0].total,
+      pagination: {
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + limitNum < countResult[0].total
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching recordings list:', error);
+    res.status(500).json({ error: 'Failed to fetch recordings list' });
+  }
+});
+
 // Get all jobs for a teacher
 // Teachers can only see their own jobs, managers can see jobs for teachers in their school
 router.get('/teacher/:teacherId', 

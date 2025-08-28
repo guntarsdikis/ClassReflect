@@ -17,6 +17,60 @@ export const initializeCognitoUserRoutes = (dbPool: Pool) => {
 };
 
 /**
+ * GET /api/users
+ * Get all users (Super Admin only)
+ */
+router.get('/',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      console.log(`🔍 Super admin ${req.user!.email} (id: ${req.user!.id}) requesting all users`);
+      
+      const [rows] = await pool.execute(`
+        SELECT 
+          u.id,
+          u.email,
+          u.first_name as firstName,
+          u.last_name as lastName,
+          u.role,
+          u.school_id as schoolId,
+          u.is_active as isActive,
+          u.created_at as createdAt,
+          u.last_login as lastLogin,
+          s.name as schoolName
+        FROM users u
+        LEFT JOIN schools s ON u.school_id = s.id
+        ORDER BY u.created_at DESC
+      `);
+
+      console.log(`📋 Database query returned ${Array.isArray(rows) ? rows.length : 0} users`);
+      
+      // Debug: Log all roles returned
+      if (Array.isArray(rows)) {
+        const roleBreakdown = rows.reduce((acc: any, row: any) => {
+          acc[row.role] = (acc[row.role] || 0) + 1;
+          return acc;
+        }, {});
+        console.log('📊 Role breakdown from database:', roleBreakdown);
+        
+        // Log first few users for debugging
+        console.log('🔍 First 3 users returned:', rows.slice(0, 3).map((row: any) => ({
+          id: row.id,
+          email: row.email,
+          role: row.role
+        })));
+      }
+
+      res.json(rows);
+    } catch (error) {
+      console.error('❌ Failed to fetch all users:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  }
+);
+
+/**
  * POST /api/users/teachers
  * Create new teacher account (School Manager only)
  */
@@ -780,6 +834,83 @@ router.post('/admin/schools',
       }
 
       res.status(500).json({ error: 'Failed to create school' });
+    }
+  }
+);
+
+/**
+ * PATCH /api/users/:userId/role
+ * Update user role (Super Admin only)
+ */
+router.patch('/:userId/role',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { role, schoolId } = req.body;
+
+      // Validate inputs
+      if (!role || !['teacher', 'school_manager'].includes(role)) {
+        res.status(400).json({ error: 'Invalid role. Must be "teacher" or "school_manager"' });
+        return;
+      }
+
+      if (isNaN(userId)) {
+        res.status(400).json({ error: 'Invalid user ID' });
+        return;
+      }
+
+      // Get current user details
+      const [userRows] = await pool.execute(
+        'SELECT id, email, role, school_id, first_name, last_name FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (!Array.isArray(userRows) || userRows.length === 0) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const user = userRows[0] as any;
+
+      // Prevent changing super admin roles
+      if (user.role === 'super_admin') {
+        res.status(403).json({ error: 'Cannot change super admin role' });
+        return;
+      }
+
+      // If role is already the same, no need to change
+      if (user.role === role) {
+        res.status(200).json({ 
+          message: `User ${user.first_name} ${user.last_name} is already a ${role === 'school_manager' ? 'school manager' : 'teacher'}` 
+        });
+        return;
+      }
+
+      // Use existing school if schoolId not provided
+      const targetSchoolId = schoolId || user.school_id;
+      
+      if (!targetSchoolId) {
+        res.status(400).json({ error: 'School ID is required' });
+        return;
+      }
+
+      // Update user role in database
+      await pool.execute(
+        'UPDATE users SET role = ?, school_id = ? WHERE id = ?',
+        [role, targetSchoolId, userId]
+      );
+
+      console.log(`✅ User role changed: ${user.email} (${user.role} → ${role})`);
+      
+      res.status(200).json({
+        message: `Successfully changed ${user.first_name} ${user.last_name} from ${user.role === 'school_manager' ? 'school manager' : 'teacher'} to ${role === 'school_manager' ? 'school manager' : 'teacher'}`
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to update user role:', error);
+      res.status(500).json({ error: 'Failed to update user role' });
     }
   }
 );

@@ -22,9 +22,9 @@ import {
   IconChartBar,
   IconTemplate,
   IconSchool,
-  IconClock,
   IconBook,
   IconTag,
+  IconFileText,
 } from '@tabler/icons-react';
 import { useAuthStore, type UserRole } from '@store/auth.store';
 import { useLogout } from '@features/auth/services/auth.service';
@@ -39,6 +39,7 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
   school_manager: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
     { label: 'Upload Recording', icon: IconUpload, href: '/upload' },
+    { label: 'All Recordings', icon: IconFileText, href: '/recordings' },
     { label: 'Teachers', icon: IconUsers, href: '/teachers' },
     { label: 'Templates', icon: IconTemplate, href: '/templates' },
     { label: 'Categories', icon: IconTag, href: '/categories' },
@@ -49,6 +50,7 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
     { label: 'Schools', icon: IconSchool, href: '/admin/schools' },
     { label: 'Users', icon: IconUsers, href: '/admin/users' },
+    { label: 'All Recordings', icon: IconFileText, href: '/admin/recordings' },
     { label: 'Templates', icon: IconTemplate, href: '/admin/templates' },
     { label: 'Categories', icon: IconTag, href: '/admin/categories' },
     { label: 'Subjects', icon: IconBook, href: '/admin/subjects' },

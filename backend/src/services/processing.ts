@@ -12,9 +12,10 @@ export interface AudioJobData {
   teacherId: number;
   schoolId: number;
   fileName: string;
-  filePath: string;
+  filePath?: string; // Optional for S3-based uploads
   fileSize: number;
   contentType: string;
+  audioBuffer?: Buffer; // Optional for direct buffer uploads
 }
 
 /**
@@ -29,17 +30,23 @@ class AssemblyAIProcessingService {
     console.log(`🎙️ Processing job ${jobData.jobId} with AssemblyAI`);
     
     // Process immediately using AssemblyAI
-    this.processJob(jobData.jobId).catch(error => {
+    this.processJob(jobData.jobId, jobData.audioBuffer).catch(error => {
       console.error(`Failed to process job ${jobData.jobId}:`, error);
       this.markJobFailed(jobData.jobId, error.message);
     });
   }
 
-  async processJob(jobId: string): Promise<void> {
+  async processJob(jobId: string, audioBuffer?: Buffer): Promise<void> {
     try {
       console.log(`🎙️ Starting AssemblyAI processing for job ${jobId}`);
       
-      await assemblyAIService.transcribeJob(jobId);
+      if (!audioBuffer) {
+        throw new Error(`No audio buffer provided for job ${jobId} - S3 support removed`);
+      }
+
+      // Direct buffer transcription only
+      await assemblyAIService.transcribeBuffer(jobId, audioBuffer);
+      
       console.log(`✅ Job ${jobId} completed successfully`);
 
     } catch (error: any) {

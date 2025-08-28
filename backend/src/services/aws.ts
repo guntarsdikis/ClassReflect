@@ -65,6 +65,30 @@ export async function generatePresignedDownloadUrl(
   return await getSignedUrl(s3Client, command, { expiresIn });
 }
 
+// Get file content from S3 as Buffer
+export async function getObject(key: string): Promise<Buffer> {
+  const command = new GetObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key
+  });
+
+  const response = await s3Client.send(command);
+  
+  if (!response.Body) {
+    throw new Error(`File not found in S3: ${key}`);
+  }
+
+  // Convert stream to buffer
+  const chunks: Buffer[] = [];
+  const stream = response.Body as NodeJS.ReadableStream;
+  
+  return new Promise((resolve, reject) => {
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+}
+
 // Send message to SQS queue
 export async function sendToProcessingQueue(jobData: {
   jobId: string;

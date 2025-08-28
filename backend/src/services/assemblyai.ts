@@ -32,11 +32,12 @@ class AssemblyAIService {
   }
 
   /**
-   * Start transcription for a job
+   * Transcribe audio buffer directly with AssemblyAI
    */
-  async transcribeJob(jobId: string): Promise<void> {
+  async transcribeBuffer(jobId: string, audioBuffer: Buffer): Promise<void> {
     try {
       console.log(`🎙️ Starting AssemblyAI transcription for job ${jobId}`);
+      console.log(`📊 Audio buffer size: ${audioBuffer.length} bytes`);
 
       // Get job details
       const [jobRows] = await pool.execute<RowDataPacket[]>(
@@ -49,20 +50,6 @@ class AssemblyAIService {
       }
 
       const job = jobRows[0];
-      let audioUrl: string;
-
-      // Use S3 URL for production or local file URL for development
-      if (job.file_url && job.file_url.startsWith('http')) {
-        // Production: use S3 URL
-        audioUrl = job.file_url;
-      } else if (job.s3_key) {
-        // Generate S3 URL from key
-        audioUrl = `https://classreflect-audio-files-573524060586.s3.eu-west-2.amazonaws.com/${job.s3_key}`;
-      } else {
-        throw new Error(`No valid audio URL found for job ${jobId}`);
-      }
-
-      console.log(`📁 Audio URL: ${audioUrl}`);
 
       // Update job status to processing
       await pool.execute(
@@ -70,45 +57,67 @@ class AssemblyAIService {
         ['processing', jobId]
       );
 
-      // Configure transcription parameters
-      const params = {
-        audio: audioUrl,
-        speech_model: 'best' as const, // Use the best available model
-        language_detection: true,
-        punctuate: true,
-        format_text: true,
-        dual_channel: false,
-        // Educational features
-        auto_chapters: false,
-        speaker_labels: false, // Could enable this for teacher/student identification
-        word_timestamps: true,
-        filter_profanity: false, // Keep unfiltered for accurate analysis
-        redact_pii: false,
-        redact_pii_audio: false,
-        redact_pii_policies: []
-        // redact_pii_sub removed since redact_pii is false
-      };
+      // Step 1: Upload audio buffer to AssemblyAI
+      console.log(`📤 Uploading audio buffer to AssemblyAI...`);
+      let uploadUrl: string;
+      try {
+        uploadUrl = await this.client.files.upload(audioBuffer);
+        console.log(`✅ Audio file uploaded to AssemblyAI: ${uploadUrl}`);
 
-      // Submit transcription request
-      const transcript = await this.client.transcripts.transcribe(params);
+        // Store the upload URL in database for retry logic (valid 24h)
+        await pool.execute(
+          'UPDATE audio_jobs SET assemblyai_upload_url = ? WHERE id = ?',
+          [uploadUrl, jobId]
+        );
+        console.log(`💾 AssemblyAI upload URL stored in database`);
 
-      console.log(`📝 Transcription submitted with ID: ${transcript.id}`);
-      console.log(`⏳ Status: ${transcript.status}`);
-
-      if (transcript.status === 'error') {
-        throw new Error(`Transcription failed: ${transcript.error}`);
+      } catch (uploadError: any) {
+        console.error(`❌ AssemblyAI upload failed for job ${jobId}:`, uploadError.message);
+        throw new Error(`File upload failed: ${uploadError.message}`);
       }
 
-      // Store transcript
-      await this.storeTranscript(jobId, transcript, job);
+      // Step 2: Submit transcription request
+      try {
+        const params = {
+          audio_url: uploadUrl,
+          speech_model: 'best' as const,
+          language_detection: true,
+          punctuate: true,
+          format_text: true
+        };
 
-      // Mark job as completed
-      await pool.execute(
-        'UPDATE audio_jobs SET status = ?, processing_completed_at = NOW() WHERE id = ?',
-        ['completed', jobId]
-      );
+        console.log(`📝 Submitting transcription request to AssemblyAI...`);
+        const transcript = await this.client.transcripts.transcribe(params);
 
-      console.log(`✅ AssemblyAI transcription completed for job ${jobId}`);
+        console.log(`📝 Transcription submitted with ID: ${transcript.id}`);
+        console.log(`⏳ Status: ${transcript.status}`);
+
+        if (transcript.status === 'error') {
+          throw new Error(`Transcription failed: ${transcript.error}`);
+        }
+
+        // Store the transcript ID in database for future reference
+        await pool.execute(
+          'UPDATE audio_jobs SET assemblyai_transcript_id = ? WHERE id = ?',
+          [transcript.id, jobId]
+        );
+        console.log(`💾 AssemblyAI transcript ID stored in database`);
+
+        // Store transcript results
+        await this.storeTranscript(jobId, transcript, job);
+
+        // Mark job as completed
+        await pool.execute(
+          'UPDATE audio_jobs SET status = ?, processing_completed_at = NOW() WHERE id = ?',
+          ['completed', jobId]
+        );
+
+        console.log(`✅ AssemblyAI transcription completed for job ${jobId}`);
+
+      } catch (transcriptionError: any) {
+        console.error(`❌ AssemblyAI transcription failed for job ${jobId}:`, transcriptionError.message);
+        throw new Error(`Transcription failed: ${transcriptionError.message}`);
+      }
 
     } catch (error: any) {
       console.error(`❌ AssemblyAI transcription failed for job ${jobId}:`, error);
@@ -116,6 +125,79 @@ class AssemblyAIService {
       throw error;
     }
   }
+
+  /**
+   * Retry transcription using stored AssemblyAI upload URL (valid 24h)
+   */
+  async retryTranscription(jobId: string): Promise<void> {
+    try {
+      console.log(`🔄 Retrying transcription for job ${jobId}`);
+
+      // Get job details including stored upload URL
+      const [jobRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT * FROM audio_jobs WHERE id = ? AND assemblyai_upload_url IS NOT NULL',
+        [jobId]
+      );
+
+      if (!jobRows || jobRows.length === 0) {
+        throw new Error(`Job ${jobId} not found or no stored upload URL`);
+      }
+
+      const job = jobRows[0];
+      
+      if (!job.assemblyai_upload_url) {
+        throw new Error(`No AssemblyAI upload URL stored for job ${jobId}`);
+      }
+
+      console.log(`📤 Using stored AssemblyAI URL: ${job.assemblyai_upload_url}`);
+
+      // Reset job status
+      await pool.execute(
+        'UPDATE audio_jobs SET status = ?, error_message = NULL, processing_started_at = NOW() WHERE id = ?',
+        ['processing', jobId]
+      );
+
+      // Configure transcription parameters (simplified)
+      const params = {
+        audio_url: job.assemblyai_upload_url,
+        speech_model: 'best' as const,
+        language_detection: true,
+        punctuate: true,
+        format_text: true,
+        word_timestamps: true
+      };
+
+      // Submit transcription request
+      console.log(`📝 Retrying transcription request to AssemblyAI...`);
+      const transcript = await this.client.transcripts.transcribe(params);
+
+      if (transcript.status === 'error') {
+        throw new Error(`Transcription failed: ${transcript.error}`);
+      }
+
+      // Store transcript ID and results
+      await pool.execute(
+        'UPDATE audio_jobs SET assemblyai_transcript_id = ? WHERE id = ?',
+        [transcript.id, jobId]
+      );
+
+      await this.storeTranscript(jobId, transcript, job);
+
+      await pool.execute(
+        'UPDATE audio_jobs SET status = ?, processing_completed_at = NOW() WHERE id = ?',
+        ['completed', jobId]
+      );
+
+      console.log(`✅ Retry successful for job ${jobId}`);
+
+    } catch (error: any) {
+      console.error(`❌ Retry failed for job ${jobId}:`, error);
+      await this.markJobFailed(jobId, error.message);
+      throw error;
+    }
+  }
+
+  // Note: Legacy S3-based transcription method removed - AssemblyAI-only system
 
   /**
    * Get transcript by AssemblyAI ID

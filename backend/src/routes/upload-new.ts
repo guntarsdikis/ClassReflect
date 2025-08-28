@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
 import multer, { FileFilterCallback } from 'multer';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs/promises';
-import path from 'path';
+// import fs from 'fs/promises'; // Removed - no file storage
+// import path from 'path'; // Removed - no file paths needed
 import pool from '../database';
-import { storageService } from '../services/storage';
+// import { storageService } from '../services/storage'; // Removed - AssemblyAI-only system
 import { processingService } from '../services/processing';
 import { config } from '../config/environment';
 import { authenticate, authorize } from '../middleware/auth-cognito';
@@ -38,62 +38,11 @@ const upload = multer({
   }
 });
 
-/**
- * Generate pre-signed URL for direct upload
- * Supports both S3 (production) and local filesystem (development)
- */
-router.post('/presigned-url', 
-  authenticate,
-  authorize('teacher', 'school_manager', 'super_admin'),
-  async (req: Request, res: Response) => {
-    try {
-      const { fileName, fileType, teacherId, schoolId } = req.body;
-
-      if (!fileName || !fileType || !teacherId || !schoolId) {
-        return res.status(400).json({ 
-          error: 'Missing required fields: fileName, fileType, teacherId, schoolId' 
-        });
-      }
-
-      // Role-based access control
-      const accessCheckResult = await validateUploadAccess(req, teacherId, schoolId);
-      if (!accessCheckResult.allowed) {
-        return res.status(403).json({ error: accessCheckResult.error });
-      }
-
-      // Generate unique job ID and file key
-      const jobId = uuidv4();
-      const fileExtension = fileName.split('.').pop() || 'mp3';
-      const fileKey = `audio-files/${schoolId}/${teacherId}/${jobId}.${fileExtension}`;
-
-      // Create job record in database
-      const [result] = await pool.execute<ResultSetHeader>(
-        `INSERT INTO audio_jobs (id, teacher_id, school_id, file_name, s3_key, status, created_at) 
-         VALUES (?, ?, ?, ?, ?, 'uploading', NOW())`,
-        [jobId, teacherId, schoolId, fileName, fileKey]
-      );
-
-      // Generate upload URL using storage service
-      const uploadUrl = await storageService.generatePresignedUrl(fileKey, fileType);
-
-      res.json({
-        jobId,
-        uploadUrl,
-        fileKey,
-        environment: config.env,
-        expiresIn: 3600 // 1 hour
-      });
-
-    } catch (error) {
-      console.error('Error generating upload URL:', error);
-      res.status(500).json({ error: 'Failed to generate upload URL' });
-    }
-  }
-);
+// Note: Presigned URL endpoint removed - AssemblyAI-only direct uploads
 
 /**
  * Direct file upload endpoint
- * Handles both S3 and local storage based on environment
+ * AssemblyAI-only processing (no file storage)
  */
 router.post('/direct', 
   authenticate,
@@ -119,46 +68,25 @@ router.post('/direct',
         return res.status(403).json({ error: accessCheckResult.error });
       }
 
-      // Generate unique job ID and file key
+      // Generate unique job ID
       const jobId = uuidv4();
-      const fileExtension = req.file.originalname.split('.').pop() || 'mp3';
-      const fileKey = `audio-files/${schoolId}/${teacherId}/${jobId}.${fileExtension}`;
 
-      // Create job record in database
+      // Create job record in database (AssemblyAI-only, no S3/storage)
       await pool.execute<ResultSetHeader>(
-        `INSERT INTO audio_jobs (id, teacher_id, school_id, file_name, s3_key, file_size, status, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, 'uploading', NOW())`,
-        [jobId, teacherId, schoolId, req.file.originalname, fileKey, req.file.size]
+        `INSERT INTO audio_jobs (id, teacher_id, school_id, file_name, file_size, status) 
+         VALUES (?, ?, ?, ?, ?, 'queued')`,
+        [jobId, teacherId, schoolId, req.file.originalname, req.file.size]
       );
 
-      // Upload file using storage service
-      const fileUrl = await storageService.upload(
-        fileKey,
-        req.file.buffer,
-        req.file.mimetype,
-        {
-          'teacher-id': teacherId.toString(),
-          'school-id': schoolId.toString(),
-          'job-id': jobId,
-          'original-name': req.file.originalname
-        }
-      );
-
-      // Update job with file URL and mark as queued
-      await pool.execute(
-        'UPDATE audio_jobs SET file_url = ?, status = ? WHERE id = ?',
-        [fileUrl, 'queued', jobId]
-      );
-
-      // Queue for processing using processing service
+      // Process directly with AssemblyAI using file buffer
       await processingService.enqueueJob({
         jobId,
         teacherId: parseInt(teacherId),
         schoolId: parseInt(schoolId),
         fileName: req.file.originalname,
-        filePath: config.env === 'local' ? fileKey : fileUrl,
         fileSize: req.file.size,
-        contentType: req.file.mimetype
+        contentType: req.file.mimetype,
+        audioBuffer: req.file.buffer // Pass buffer directly to AssemblyAI
       });
 
       res.json({
@@ -166,8 +94,7 @@ router.post('/direct',
         status: 'queued',
         fileName: req.file.originalname,
         fileSize: req.file.size,
-        environment: config.env,
-        message: `File uploaded successfully and queued for processing (${config.processing.type})`
+        message: 'File queued for AssemblyAI processing (no storage needed)'
       });
 
     } catch (error) {
@@ -177,140 +104,9 @@ router.post('/direct',
   }
 );
 
-/**
- * Local upload endpoint for pre-signed URLs (development only)
- */
-router.post('/local/:fileKey', async (req: Request, res: Response) => {
-  if (config.env !== 'local') {
-    return res.status(404).json({ error: 'Endpoint not available in production' });
-  }
+// Note: Local upload endpoint removed - AssemblyAI-only system
 
-  try {
-    const { fileKey } = req.params;
-    const contentType = req.query.contentType as string || 'audio/mpeg';
-    
-    if (!fileKey) {
-      return res.status(400).json({ error: 'File key is required' });
-    }
-
-    // Get the file buffer from request body
-    const chunks: Buffer[] = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end', async () => {
-      try {
-        const fileBuffer = Buffer.concat(chunks);
-        
-        // Upload using storage service
-        const fileUrl = await storageService.upload(
-          decodeURIComponent(fileKey),
-          fileBuffer,
-          contentType
-        );
-
-        // Update job status to queued and start processing
-        const jobId = path.basename(fileKey, path.extname(fileKey));
-        
-        await pool.execute(
-          'UPDATE audio_jobs SET file_url = ?, file_size = ?, status = ? WHERE id = ?',
-          [fileUrl, fileBuffer.length, 'queued', jobId]
-        );
-
-        // Get job details for processing
-        const [jobRows] = await pool.execute<RowDataPacket[]>(
-          'SELECT * FROM audio_jobs WHERE id = ?',
-          [jobId]
-        );
-
-        if (jobRows.length > 0) {
-          const job = jobRows[0];
-          await processingService.enqueueJob({
-            jobId,
-            teacherId: job.teacher_id,
-            schoolId: job.school_id,
-            fileName: job.file_name,
-            filePath: fileUrl,
-            fileSize: fileBuffer.length,
-            contentType
-          });
-        }
-
-        res.json({
-          message: 'File uploaded successfully',
-          jobId,
-          status: 'queued'
-        });
-
-      } catch (error) {
-        console.error('Local upload error:', error);
-        res.status(500).json({ error: 'Upload failed' });
-      }
-    });
-
-  } catch (error) {
-    console.error('Local upload setup error:', error);
-    res.status(500).json({ error: 'Upload setup failed' });
-  }
-});
-
-/**
- * Upload completion webhook (for pre-signed URL uploads)
- */
-router.post('/complete/:jobId', 
-  authenticate,
-  async (req: Request, res: Response) => {
-    try {
-      const { jobId } = req.params;
-      const { fileSize } = req.body;
-
-      if (!jobId) {
-        return res.status(400).json({ error: 'Job ID is required' });
-      }
-
-      // Get job details
-      const [jobRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT * FROM audio_jobs WHERE id = ? AND status = "uploading"',
-        [jobId]
-      );
-
-      if (!jobRows || jobRows.length === 0) {
-        return res.status(404).json({ error: 'Job not found or not in uploading state' });
-      }
-
-      const job = jobRows[0];
-      
-      // Update job status to queued
-      await pool.execute(
-        'UPDATE audio_jobs SET status = ?, file_size = ? WHERE id = ?',
-        ['queued', fileSize || null, jobId]
-      );
-
-      // Queue for processing
-      const filePath = config.env === 'local' 
-        ? path.join(config.storage.localPath!, job.s3_key)
-        : job.s3_key;
-
-      await processingService.enqueueJob({
-        jobId,
-        teacherId: job.teacher_id,
-        schoolId: job.school_id,
-        fileName: job.file_name,
-        filePath,
-        fileSize: fileSize || job.file_size || 0,
-        contentType: 'audio/mpeg'
-      });
-
-      res.json({
-        jobId,
-        status: 'queued',
-        message: `Upload completed and queued for processing (${config.processing.type})`
-      });
-
-    } catch (error) {
-      console.error('Upload completion error:', error);
-      res.status(500).json({ error: 'Failed to complete upload' });
-    }
-  }
-);
+// Note: Upload completion webhook removed - no presigned URLs in AssemblyAI-only system
 
 /**
  * Get upload/processing status

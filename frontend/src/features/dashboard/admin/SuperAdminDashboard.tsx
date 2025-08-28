@@ -29,6 +29,7 @@ import {
   IconShield,
   IconDatabase,
   IconCloudUpload,
+  IconFileText,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
@@ -180,6 +181,14 @@ export function SuperAdminDashboard() {
                 onClick={() => navigate('/admin/system')}
               >
                 Database Status
+              </Button>
+              <Button
+                variant="subtle"
+                justify="space-between"
+                rightSection={<IconFileText size={16} />}
+                onClick={() => navigate('/admin/recordings')}
+              >
+                All Recordings
               </Button>
               <Button
                 variant="subtle"

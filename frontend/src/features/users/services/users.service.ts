@@ -25,6 +25,17 @@ export interface CreateTeacherRequest {
   sendInviteEmail?: boolean;
 }
 
+export interface CreateUserRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'teacher' | 'school_manager';
+  schoolId?: number; // Required for both roles
+  subjects?: string[]; // Only for teachers
+  grades?: string[]; // Only for teachers
+  sendInviteEmail?: boolean;
+}
+
 export interface CreateSchoolManagerRequest {
   schoolName: string;
   domain?: string;
@@ -39,6 +50,11 @@ export interface UpdateTeacherRequest {
   grades?: string[];
   isActive?: boolean;
   schoolId?: number; // Super Admin only - to reassign teachers to different schools
+}
+
+export interface UpdateUserRoleRequest {
+  role: 'teacher' | 'school_manager';
+  schoolId?: number; // Required when promoting to school_manager
 }
 
 export interface BulkCreateTeachersRequest {
@@ -80,6 +96,13 @@ export class UsersService {
   }
 
   /**
+   * Get all users (Super Admin only)
+   */
+  async getAllUsers(): Promise<User[]> {
+    return this.api.get<User[]>('/users');
+  }
+
+  /**
    * Get all teachers (filtered by school for managers, all for super admin)
    */
   async getTeachers(schoolId?: number): Promise<User[]> {
@@ -98,6 +121,19 @@ export class UsersService {
     cognitoUsername: string;
   }> {
     return this.api.post('/users/teachers', data);
+  }
+
+  /**
+   * Create user with role selection (Super Admin only)
+   */
+  async createUser(data: CreateUserRequest): Promise<{
+    message: string;
+    userId: number;
+    email: string;
+    temporaryPassword?: string;
+    cognitoUsername: string;
+  }> {
+    return this.api.post('/users', data);
   }
 
   /**
@@ -128,6 +164,13 @@ export class UsersService {
   }
 
   /**
+   * Update user role (Super Admin only)
+   */
+  async updateUserRole(userId: number, data: UpdateUserRoleRequest): Promise<{ message: string }> {
+    return this.api.patch(`/users/${userId}/role`, data);
+  }
+
+  /**
    * Delete/deactivate teacher
    */
   async deleteTeacher(teacherId: number): Promise<{ 
@@ -152,13 +195,6 @@ export class UsersService {
     return this.api.post('/users/admin/schools', data);
   }
 
-  /**
-   * Get all users across platform (Super Admin only)
-   */
-  async getAllUsers(): Promise<User[]> {
-    // This will get all teachers, but we could expand to include managers too
-    return this.api.get<User[]>('/users/teachers');
-  }
 
   /**
    * Get user statistics for dashboard

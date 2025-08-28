@@ -230,6 +230,14 @@ export function ManagerDashboard() {
               <Button
                 variant="subtle"
                 justify="space-between"
+                rightSection={<IconFileText size={16} />}
+                onClick={() => navigate('/recordings')}
+              >
+                View All Recordings
+              </Button>
+              <Button
+                variant="subtle"
+                justify="space-between"
                 rightSection={<IconPlus size={16} />}
                 onClick={() => navigate('/teachers/new')}
               >

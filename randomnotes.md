@@ -5,14 +5,15 @@
 
 
 
-i would like to create template which would go along the principles from the "Teach Like a Champion" book, how do i do it? can you help me with this? think
 
-i dont think http://localhost:3000/admin/jobs is needed in superadmin, and where I can see files which are processing and how will assemblyai will return results, or should i get results myself?
 
-based on changes in app due to implementing assemblyai, can you check does all tables in database for project is still used and check unused services which can be cleaned up. for example: can you remove s3 acesss script and also ec2 automatic starting for whisperer process? check AWS CLI access to default profile. think
+how to implement in our current app "Teach Like a Champion" principles. here is the documentation.
+you have to check our current app settings and suggest what is best option to integrate it. is it by using template criterions? i dont want hard coded, i want to be able to apply template of "teach like a champion" but also there can be other templates. so to one transcript can be applied different templates. basically templates have finetuned prompts, the list of prompts, which are criterions, how would you suggest update current app. think
 
-what for is table analysis_criteria? i dont think it is used. think
+i think we dont need to save to ask template when uploaded file, need to save all other information, like teacher, subject, level, class duration and that is it for now. need update current app accordingly. think
 
-can you make sure superadmin dashboard, manager dashboard teacher dashboard does not have mock data showing. if there is nothing to show then comming soon should be displayed. 
+then we need to add section for superadmin , and manager to apply template and get results based on template and to be saved in database.
 
-can you sort out all files in /Users/guntarsdikis/websites/ClassReflect/ directory. please check if .sh files are still needed, if needed then move to appropriate directory. also md files if revelant then move to docs folder and test- files maybe not needed anymore, lets do major clean up. think 
+as superadmin i should be able to filter recordings by the school http://localhost:3000/recordings. think
+
+in profile http://localhost:3000/profile i should be able to change name and email address, can you update frontend and backend accordingly? think

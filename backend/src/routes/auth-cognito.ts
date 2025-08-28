@@ -426,6 +426,120 @@ router.get('/profile', authenticate, async (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /api/auth/profile
+ * Update current user profile (authenticated)
+ */
+router.put('/profile', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { firstName, lastName, email } = req.body;
+    
+    // Validate required fields
+    if (!firstName || !lastName || !email) {
+      res.status(400).json({ error: 'First name, last name, and email are required' });
+      return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ error: 'Invalid email format' });
+      return;
+    }
+    
+    // Check if email is already taken by another user
+    const [existingUsers] = await pool.execute(
+      'SELECT id FROM users WHERE email = ? AND id != ? AND is_active = true',
+      [email, req.user!.id]
+    );
+    
+    if (Array.isArray(existingUsers) && existingUsers.length > 0) {
+      res.status(400).json({ error: 'Email is already in use by another user' });
+      return;
+    }
+    
+    // Update user in database
+    await pool.execute(
+      'UPDATE users SET first_name = ?, last_name = ?, email = ?, updated_at = NOW() WHERE id = ?',
+      [firstName, lastName, email, req.user!.id]
+    );
+    
+    // Update Cognito user (only in production, skip in development)
+    if (process.env.NODE_ENV !== 'development') {
+      try {
+        // Get current user details for Cognito update
+        const [userRows] = await pool.execute(
+          'SELECT cognito_username FROM users WHERE id = ?',
+          [req.user!.id]
+        );
+        
+        if (Array.isArray(userRows) && userRows.length > 0) {
+          const user = userRows[0] as any;
+          
+          // Update Cognito user attributes
+          await cognitoService.updateUser(user.cognito_username || email, {
+            firstName,
+            lastName,
+            email
+          });
+        }
+      } catch (cognitoError) {
+        console.error('Failed to update Cognito user:', cognitoError);
+        // Don't fail the whole request if Cognito update fails
+        // The database update already succeeded
+      }
+    } else {
+      console.log('Development mode: Skipping Cognito profile update for', email);
+    }
+    
+    // Get updated user data to return
+    const [updatedRows] = await pool.execute(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role,
+              u.school_id, s.name as school_name, u.subjects, u.grades,
+              u.created_at, u.last_login
+       FROM users u
+       LEFT JOIN schools s ON u.school_id = s.id
+       WHERE u.id = ? AND u.is_active = true`,
+      [req.user!.id]
+    );
+    
+    if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
+      res.status(500).json({ error: 'Failed to retrieve updated profile' });
+      return;
+    }
+    
+    const updatedUser = updatedRows[0] as any;
+    
+    console.log('Profile updated:', { 
+      userId: req.user!.id, 
+      email, 
+      firstName, 
+      lastName 
+    });
+    
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.first_name,
+        lastName: updatedUser.last_name,
+        role: updatedUser.role,
+        schoolId: updatedUser.school_id,
+        schoolName: updatedUser.school_name,
+        subjects: parseArrayField(updatedUser.subjects),
+        grades: parseArrayField(updatedUser.grades),
+        createdAt: updatedUser.created_at,
+        lastLogin: updatedUser.last_login,
+      }
+    });
+    
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+/**
  * Map Cognito school IDs to database school IDs
  */
 function mapSchoolId(cognitoSchoolId: string): number {
@@ -451,27 +565,26 @@ async function syncUserWithDatabase(cognitoUser: CognitoUser): Promise<void> {
     );
     
     if (Array.isArray(existing) && existing.length > 0) {
-      // Update existing user
+      // Update existing user (preserve database role, don't overwrite with Cognito role)
       const user = existing[0] as any;
-      const dbSchoolId = mapSchoolId(cognitoUser.schoolId);
       
       await pool.execute(
         `UPDATE users SET 
-         first_name = ?, last_name = ?, role = ?, school_id = ?,
+         first_name = ?, last_name = ?, 
          subjects = ?, grades = ?, cognito_username = ?, last_login = NOW(),
          updated_at = NOW()
          WHERE id = ?`,
         [
           cognitoUser.firstName,
           cognitoUser.lastName,
-          cognitoUser.role,
-          dbSchoolId,
           cognitoUser.subjects ? JSON.stringify(cognitoUser.subjects) : null,
           cognitoUser.grades ? JSON.stringify(cognitoUser.grades) : null,
           cognitoUser.username,
           user.id
         ]
       );
+      
+      console.log(`✅ User sync: Preserved existing role for ${cognitoUser.email} (database is source of truth for roles)`);
     } else {
       // Create new user
       await pool.execute(

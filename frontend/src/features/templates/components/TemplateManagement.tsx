@@ -43,6 +43,7 @@ import {
   IconSchool,
   IconChartBar,
   IconCategory,
+  IconAlertCircle,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
@@ -57,19 +58,32 @@ import {
   TemplateFilters 
 } from '../services/templates.service';
 import { schoolsService, School } from '@features/schools/services/schools.service';
+import { subjectsService, SchoolSubject } from '@features/schools/services/subjects.service';
+import { useSchoolContextStore } from '@store/school-context.store';
 
 export function TemplateManagement() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const { selectedSchool } = useSchoolContextStore();
   const isSuperAdmin = user.role === 'super_admin';
   const isSchoolManager = user.role === 'school_manager';
-  const currentUserSchoolId = user.schoolId;
+  
+  // Determine which school ID to use
+  const getEffectiveSchoolId = () => {
+    if (isSuperAdmin) {
+      return selectedSchool?.id || null;
+    }
+    return user.schoolId;
+  };
+  
+  const currentUserSchoolId = getEffectiveSchoolId();
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const [viewModalOpened, { open: openViewModal, close: closeViewModal }] = useDisclosure(false);
   const [applyModalOpened, { open: openApplyModal, close: closeApplyModal }] = useDisclosure(false);
   
   const [templates, setTemplates] = useState<Template[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
+  const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubject[]>([]);
   const [categories, setCategories] = useState<{
     id: number;
     category_name: string;
@@ -104,28 +118,37 @@ export function TemplateManagement() {
 
   const [applySchoolId, setApplySchoolId] = useState<string>('');
 
-  // Load data on component mount
+  // Load data on component mount and when school context changes
   useEffect(() => {
-    loadData();
-  }, []);
+    if (currentUserSchoolId) {
+      loadData();
+    }
+  }, [currentUserSchoolId, selectedSchool]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       
-      const schoolId = isSchoolManager ? currentUserSchoolId : user?.schoolId;
+      const schoolId = currentUserSchoolId;
       if (!schoolId) {
         throw new Error('School ID is required');
       }
 
       // Load real data from backend
-      const [templatesData, categoriesData] = await Promise.all([
-        templatesService.getTemplates(filters),
+      const schoolFilters = {
+        ...filters,
+        school_id: schoolId
+      };
+      
+      const [templatesData, categoriesData, schoolSubjectsData] = await Promise.all([
+        templatesService.getTemplates(schoolFilters),
         templatesService.getTemplateCategories(schoolId),
+        subjectsService.getSchoolSubjects(schoolId),
       ]);
       
       setTemplates(templatesData);
       setCategories(categoriesData);
+      setSchoolSubjects(schoolSubjectsData);
 
       // Load schools if super admin
       if (user?.role === 'super_admin') {
@@ -144,10 +167,12 @@ export function TemplateManagement() {
     }
   };
 
-  // Apply filters
+  // Apply filters and reload when school context changes
   useEffect(() => {
-    loadData();
-  }, [filters]);
+    if (currentUserSchoolId) {
+      loadData();
+    }
+  }, [filters, currentUserSchoolId, selectedSchool]);
 
   const handleCreateTemplate = () => {
     setEditingTemplate(null);
@@ -375,12 +400,28 @@ export function TemplateManagement() {
     return template.school_name || 'School Template';
   };
 
+  // Show message for super admin when no school is selected
+  if (isSuperAdmin && !currentUserSchoolId) {
+    return (
+      <Container size="md" py="xl">
+        <Alert icon={<IconAlertCircle size="1rem" />} title="No School Selected" color="blue">
+          Please select a school from the school switcher above to manage templates.
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container size="xl">
       <Group justify="space-between" mb="xl">
         <div>
           <Title order={1}>Template Management</Title>
-          <Text c="dimmed">Create and manage feedback evaluation templates</Text>
+          <Text c="dimmed">
+            {isSuperAdmin && selectedSchool 
+              ? `Managing templates for ${selectedSchool.name}`
+              : 'Create and manage feedback evaluation templates'
+            }
+          </Text>
         </div>
         <Group>
           <Button
@@ -671,7 +712,13 @@ export function TemplateManagement() {
               placeholder="Select subjects"
               value={formData.subjects}
               onChange={(subjects) => setFormData({...formData, subjects})}
-              data={templatesService.getCommonSubjects()}
+              data={schoolSubjects
+                .filter(subject => subject.is_active)
+                .map(subject => ({
+                  value: subject.subject_name,
+                  label: subject.subject_name
+                }))
+              }
               searchable
             />
             <MultiSelect

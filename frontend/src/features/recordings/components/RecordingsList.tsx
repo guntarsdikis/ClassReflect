@@ -34,18 +34,40 @@ import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useAuthStore } from '@store/auth.store';
 import { RecordingsService, type Recording, type RecordingsFilters } from '../services/recordings.service';
+import { schoolsService } from '@features/schools/services/schools.service';
+import { useSchoolContextStore } from '@store/school-context.store';
 
 const ITEMS_PER_PAGE = 20;
 
 export function RecordingsList() {
   const user = useAuthStore((state) => state.user);
+  const { selectedSchool } = useSchoolContextStore();
+  
+  // Determine which school ID to use for filtering
+  const getEffectiveSchoolId = () => {
+    if (user?.role === 'super_admin') {
+      return selectedSchool?.id || null;
+    }
+    return user?.schoolId || null;
+  };
+  
   const [filters, setFilters] = useState<RecordingsFilters>({
     limit: ITEMS_PER_PAGE,
     offset: 0,
+    schoolId: getEffectiveSchoolId(),
   });
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
   const [transcriptModalOpened, setTranscriptModalOpened] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Query for schools list (super admin only)
+  const {
+    data: schoolsData,
+  } = useQuery({
+    queryKey: ['schools'],
+    queryFn: () => schoolsService.getAllSchools(),
+    enabled: user?.role === 'super_admin',
+  });
 
   // Query for recordings list
   const {
@@ -58,6 +80,19 @@ export function RecordingsList() {
     queryFn: () => RecordingsService.getRecordings(filters),
     refetchInterval: 10000, // Refresh every 10 seconds to show processing updates
   });
+
+  // Update filters when school context changes for super admin
+  useEffect(() => {
+    if (user?.role === 'super_admin') {
+      const effectiveSchoolId = getEffectiveSchoolId();
+      setFilters(prev => ({
+        ...prev,
+        schoolId: effectiveSchoolId,
+        offset: 0,
+      }));
+      setCurrentPage(1);
+    }
+  }, [selectedSchool, user?.role]);
 
   // Handle filter changes
   const handleFilterChange = (key: keyof RecordingsFilters, value: any) => {
@@ -102,6 +137,17 @@ export function RecordingsList() {
     );
   }
 
+  // Show message for super admin when no school is selected
+  if (user?.role === 'super_admin' && !getEffectiveSchoolId()) {
+    return (
+      <Container size="md" py="xl">
+        <Alert icon={<IconAlertCircle size="1rem" />} title="No School Selected" color="blue">
+          Please select a school from the school switcher above to view recordings.
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container size="xl">
       {/* Header */}
@@ -111,7 +157,9 @@ export function RecordingsList() {
             {user?.role === 'super_admin' ? 'All Recordings' : 'School Recordings'}
           </Title>
           <Text c="dimmed">
-            {user?.role === 'super_admin' 
+            {user?.role === 'super_admin' && selectedSchool
+              ? `Managing recordings for ${selectedSchool.name}`
+              : user?.role === 'super_admin' 
               ? 'Manage all recordings across all schools'
               : 'View and manage recordings from your school'
             }
@@ -203,6 +251,7 @@ export function RecordingsList() {
             value={filters.search || ''}
             onChange={(e) => handleFilterChange('search', e.target.value || undefined)}
           />
+          
           <Select
             placeholder="Filter by status"
             data={[

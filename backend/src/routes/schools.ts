@@ -327,7 +327,7 @@ router.get('/:schoolId/subjects', async (req: Request, res: Response) => {
 router.post('/:schoolId/subjects', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId } = req.params;
-    const { subject_name, description, category = 'Custom' } = req.body;
+    const { subject_name, description } = req.body;
     const user = (req as any).user;
 
     // Check permissions
@@ -353,29 +353,16 @@ router.post('/:schoolId/subjects', authorize('school_manager', 'super_admin'), a
       });
     }
 
-    // Find the category ID if category is provided
-    let categoryId = null;
-    if (category) {
-      const [categoryRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ? AND is_active = TRUE',
-        [schoolId, category]
-      );
-      if (Array.isArray(categoryRows) && categoryRows.length > 0) {
-        categoryId = (categoryRows[0] as any).id;
-      }
-    }
-
     const [result] = await pool.execute<ResultSetHeader>(`
-      INSERT INTO school_subjects (school_id, subject_name, description, category, category_id, created_by) 
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [schoolId, subject_name, description, category, categoryId, user.id]);
+      INSERT INTO school_subjects (school_id, subject_name, description, created_by) 
+      VALUES (?, ?, ?, ?)
+    `, [schoolId, subject_name, description, user.id]);
 
     res.status(201).json({
       id: result.insertId,
       schoolId,
       subject_name,
       description,
-      category,
       message: 'School subject created successfully'
     });
   } catch (error) {
@@ -388,7 +375,7 @@ router.post('/:schoolId/subjects', authorize('school_manager', 'super_admin'), a
 router.put('/:schoolId/subjects/:subjectId', authorize('school_manager', 'super_admin'), async (req: Request, res: Response) => {
   try {
     const { schoolId, subjectId } = req.params;
-    const { subject_name, description, category, is_active } = req.body;
+    const { subject_name, description, is_active } = req.body;
     const user = (req as any).user;
 
     // Check permissions
@@ -418,24 +405,6 @@ router.put('/:schoolId/subjects/:subjectId', authorize('school_manager', 'super_
     if (description !== undefined) {
       updateFields.push('description = ?');
       values.push(description);
-    }
-
-    if (category !== undefined) {
-      // Find the category ID if category is provided
-      let categoryId = null;
-      if (category) {
-        const [categoryRows] = await pool.execute<RowDataPacket[]>(
-          'SELECT id FROM school_categories WHERE school_id = ? AND category_name = ? AND is_active = TRUE',
-          [schoolId, category]
-        );
-        if (Array.isArray(categoryRows) && categoryRows.length > 0) {
-          categoryId = (categoryRows[0] as any).id;
-        }
-      }
-      updateFields.push('category = ?');
-      updateFields.push('category_id = ?');
-      values.push(category);
-      values.push(categoryId);
     }
 
     if (is_active !== undefined) {

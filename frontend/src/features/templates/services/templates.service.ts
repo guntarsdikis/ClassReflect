@@ -50,6 +50,7 @@ export interface TemplateFilters {
   category?: string;
   subject?: string;
   grade?: string;
+  school_id?: number;
 }
 
 

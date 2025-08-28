@@ -12,7 +12,7 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { category, subject, grade } = req.query;
+    const { category, subject, grade, school_id } = req.query;
 
     let whereClause = '';
     const params: any[] = [];
@@ -34,6 +34,11 @@ router.get('/', async (req: Request, res: Response) => {
       conditions.push('JSON_CONTAINS(t.grade_levels, ?)');
       params.push(`"${grade}"`);
     }
+    
+    if (school_id) {
+      conditions.push('t.school_id = ?');
+      params.push(parseInt(school_id as string, 10));
+    }
 
     // Access control: SuperAdmin sees all, School Manager sees only own school templates
     console.log('🏫 Template Access Control Debug:');
@@ -44,14 +49,25 @@ router.get('/', async (req: Request, res: Response) => {
       schoolId: user.schoolId,
       schoolIdType: typeof user.schoolId
     });
+    console.log('   School filter:', school_id);
     
     if (user.role === 'super_admin') {
-      console.log('   Access: Super Admin - seeing all templates');
-      conditions.push('(t.is_global = TRUE OR t.school_id IS NOT NULL)');
+      if (!school_id) {
+        // Super admin without school filter - see all templates
+        console.log('   Access: Super Admin - seeing all templates');
+        conditions.push('(t.is_global = TRUE OR t.school_id IS NOT NULL)');
+      } else {
+        // Super admin with school filter - already added school_id condition above
+        console.log('   Access: Super Admin - filtering by school_id =', school_id);
+      }
     } else {
+      // School manager - always filter by their school
       console.log('   Access: School Manager - filtering by school_id =', user.schoolId);
-      conditions.push('t.school_id = ?');
-      params.push(user.schoolId);
+      if (!school_id) {
+        // Only add school filter if not already specified
+        conditions.push('t.school_id = ?');
+        params.push(user.schoolId);
+      }
     }
 
     if (conditions.length > 0) {
@@ -313,9 +329,21 @@ router.delete('/:templateId', authorize('school_manager', 'super_admin'), async 
 
     const template = templateRows[0];
 
-    // Check permissions - school managers can only modify their own school's templates
+    // Check permissions - school managers can only delete their own school's templates
     if (user.role !== 'super_admin' && template.school_id !== user.schoolId) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Check if template is in use (prevent deletion of active templates)
+    const [usageRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as usage_count FROM audio_jobs WHERE template_id = ? AND status != "failed"',
+      [templateId]
+    );
+
+    if (usageRows[0].usage_count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete template that is currently in use by audio jobs' 
+      });
     }
 
     // Soft delete - set is_active = false

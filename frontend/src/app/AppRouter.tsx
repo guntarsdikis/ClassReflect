@@ -14,6 +14,7 @@ import { TemplateManagement } from '@features/templates/components/TemplateManag
 import { TemplateCategoryManagement } from '@features/templates/components/TemplateCategoryManagement';
 import { UploadWizard } from '@features/uploads/components/UploadWizard';
 import { RecordingsList } from '@features/recordings/components/RecordingsList';
+import { ProfilePage } from '@features/profile';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
 // import { TemplateEditor } from '@features/templates/components/TemplateEditor';
 // import { SchoolAnalytics } from '@features/analytics/components/SchoolAnalytics';
@@ -72,7 +73,7 @@ export function AppRouter() {
           </Route>
           
           {/* Shared Routes - All roles */}
-          <Route path="/profile" element={<div>Profile - Coming Soon</div>} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<div>Settings - Coming Soon</div>} />
         </Route>
       </Route>

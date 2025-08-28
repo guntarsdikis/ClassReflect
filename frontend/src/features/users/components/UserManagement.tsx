@@ -50,6 +50,7 @@ import { usersService, User, CreateTeacherRequest, CreateSchoolManagerRequest, C
 import { schoolsService, School } from '@features/schools/services/schools.service';
 import { subjectsService, SchoolSubject } from '@features/schools/services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
+import { useSchoolContextStore } from '@store/school-context.store';
 
 interface TeacherFormData extends CreateTeacherRequest {
   schoolId: number;
@@ -73,6 +74,7 @@ interface BulkTeacher {
 export function UserManagement() {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
+  const { selectedSchool } = useSchoolContextStore();
   const [teacherModalOpened, { open: openTeacherModal, close: closeTeacherModal }] = useDisclosure(false);
   const [managerModalOpened, { open: openManagerModal, close: closeManagerModal }] = useDisclosure(false);
   const [bulkModalOpened, { open: openBulkModal, close: closeBulkModal }] = useDisclosure(false);
@@ -80,7 +82,16 @@ export function UserManagement() {
   // Role-based access control
   const isSuperAdmin = currentUser.role === 'super_admin';
   const isSchoolManager = currentUser.role === 'school_manager';
-  const currentUserSchoolId = currentUser.schoolId;
+  
+  // Determine which school ID to use
+  const getEffectiveSchoolId = () => {
+    if (isSuperAdmin) {
+      return selectedSchool?.id || null;
+    }
+    return currentUser.schoolId;
+  };
+  
+  const currentUserSchoolId = getEffectiveSchoolId();
   
   const [users, setUsers] = useState<User[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -115,10 +126,17 @@ export function UserManagement() {
   const [bulkCsvContent, setBulkCsvContent] = useState('');
   const [bulkFile, setBulkFile] = useState<File | null>(null);
 
-  // Load data on component mount
+  // Load data on component mount and when school context changes
   useEffect(() => {
-    loadData();
-  }, []);
+    if (isSuperAdmin && !currentUserSchoolId) {
+      // For super admin, wait for school selection
+      setLoading(false);
+      return;
+    }
+    if (currentUserSchoolId || isSchoolManager) {
+      loadData();
+    }
+  }, [currentUserSchoolId, selectedSchool]);
 
   const loadData = async () => {
     try {
@@ -130,24 +148,39 @@ export function UserManagement() {
       });
       
       if (isSuperAdmin) {
-        // Super admin can see all users and schools
-        const [usersData, schoolsData] = await Promise.all([
-          usersService.getAllUsers(),
-          schoolsService.getAllSchools(),
-        ]);
-        console.log('Super Admin - Loaded data:', { 
-          usersCount: usersData.length, 
-          schoolsCount: schoolsData.length 
-        });
-        console.log('Super Admin - User roles:', usersData.map(u => `${u.email}: ${u.role}`));
-        setUsers(usersData);
+        // Load schools data for super admin
+        const schoolsData = await schoolsService.getAllSchools();
         setSchools(schoolsData);
         
-        // Load subjects for current user's school (or first school)
         if (currentUserSchoolId) {
+          // Super admin with selected school - load users for that school only
+          console.log('Super Admin - Loading users for selected school:', currentUserSchoolId);
+          
+          // Get all users and filter by school on frontend for now
+          // TODO: Update backend to support school filtering in /users endpoint
+          const allUsersData = await usersService.getAllUsers();
+          const usersData = allUsersData.filter(user => user.schoolId === currentUserSchoolId);
+          
+          console.log('Super Admin - Loaded school users:', { 
+            usersCount: usersData.length, 
+            schoolId: currentUserSchoolId 
+          });
+          setUsers(usersData);
+          setFilterSchool(currentUserSchoolId.toString());
           await loadSchoolSubjects(currentUserSchoolId);
-        } else if (schoolsData.length > 0) {
-          await loadSchoolSubjects(schoolsData[0].id);
+        } else {
+          // Super admin without selected school - load all users
+          const usersData = await usersService.getAllUsers();
+          console.log('Super Admin - Loaded all users:', { 
+            usersCount: usersData.length 
+          });
+          setUsers(usersData);
+          setFilterSchool('all');
+          
+          // Load subjects for first school
+          if (schoolsData.length > 0) {
+            await loadSchoolSubjects(schoolsData[0].id);
+          }
         }
       } else if (isSchoolManager) {
         // School manager can only see teachers from their school
@@ -438,8 +471,23 @@ export function UserManagement() {
 
   const confirmResetPassword = async (userId: number) => {
     try {
-      console.log('🔐 Calling resetTeacherPassword for userId:', userId);
-      const result = await usersService.resetTeacherPassword(userId);
+      console.log('🔐 Calling password reset for userId:', userId);
+      
+      // Use appropriate reset method based on user role
+      let result;
+      if (isSuperAdmin) {
+        // Super admin can reset any user's password
+        const resetResult = await usersService.resetUserPassword(userId);
+        result = {
+          teacherName: resetResult.userName,
+          teacherEmail: resetResult.userEmail,
+          temporaryPassword: resetResult.temporaryPassword
+        };
+      } else {
+        // School managers can only reset teacher passwords
+        result = await usersService.resetTeacherPassword(userId);
+      }
+      
       console.log('🔐 Password reset API response:', result);
       
       // Show password in a modal with copy functionality
@@ -570,6 +618,17 @@ export function UserManagement() {
     }
   };
 
+  // Show message for super admin when no school is selected
+  if (isSuperAdmin && !currentUserSchoolId) {
+    return (
+      <Container size="md" py="xl">
+        <Alert icon={<IconAlertCircle size="1rem" />} title="No School Selected" color="blue">
+          Please select a school from the school switcher above to manage users, or use "All Schools" mode to see all users.
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container size="xl">
       <Group justify="space-between" mb="xl">
@@ -577,7 +636,9 @@ export function UserManagement() {
           <Title order={1}>{isSchoolManager ? 'Teacher Management' : 'User Management'}</Title>
           <Text c="dimmed">
             {isSchoolManager 
-              ? 'Manage teachers in your school' 
+              ? 'Manage teachers in your school'
+              : selectedSchool && isSuperAdmin
+              ? `Managing users for ${selectedSchool.name}`
               : 'Manage users, teachers, and school managers across the platform'
             }
           </Text>
@@ -669,21 +730,6 @@ export function UserManagement() {
                 { value: 'teacher', label: 'Teachers' },
                 { value: 'school_manager', label: 'School Managers' },
                 { value: 'super_admin', label: 'Super Admins' },
-              ]}
-              w={200}
-            />
-          )}
-          {isSuperAdmin && (
-            <Select
-              placeholder="Filter by school"
-              value={filterSchool}
-              onChange={(value) => setFilterSchool(value || 'all')}
-              data={[
-                { value: 'all', label: 'All Schools' },
-                ...schools.map(school => ({
-                  value: school.id.toString(),
-                  label: school.name,
-                })),
               ]}
               w={200}
             />

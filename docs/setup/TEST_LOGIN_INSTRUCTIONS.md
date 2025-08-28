@@ -12,6 +12,8 @@ All test users have been successfully created in AWS Cognito with permanent pass
 | **School Manager** | manager@test.local | ManagerPass2024!@ |
 | **Teacher** | teacher@test.local | TeacherPass2024!@ |
 
+guntars.dikis@icloud.com d%u3iefCnxnEsdYe#9YD
+
 ## 🚀 How to Test
 
 ### 1. Ensure Services Are Running

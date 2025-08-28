@@ -32,6 +32,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { useAuthStore } from '@store/auth.store';
+import { useSchoolContextStore } from '@store/school-context.store';
 
 export interface TemplateCategory {
   id: number;
@@ -132,6 +133,7 @@ const templateCategoryService = {
 
 export function TemplateCategoryManagement() {
   const currentUser = useAuthStore((state) => state.user);
+  const { selectedSchool } = useSchoolContextStore();
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   
   const [categories, setCategories] = useState<TemplateCategory[]>([]);
@@ -147,13 +149,22 @@ export function TemplateCategoryManagement() {
   // Role-based access control
   const isSchoolManager = currentUser.role === 'school_manager';
   const isSuperAdmin = currentUser.role === 'super_admin';
-  const currentSchoolId = currentUser.schoolId;
+  
+  // Determine which school ID to use
+  const getEffectiveSchoolId = () => {
+    if (isSuperAdmin) {
+      return selectedSchool?.id || null;
+    }
+    return currentUser.schoolId;
+  };
+  
+  const currentSchoolId = getEffectiveSchoolId();
 
   useEffect(() => {
     if (currentSchoolId) {
       loadCategories();
     }
-  }, [currentSchoolId]);
+  }, [currentSchoolId, selectedSchool]);
 
   const loadCategories = async () => {
     try {
@@ -298,6 +309,17 @@ export function TemplateCategoryManagement() {
     );
   }
 
+  // Show message for super admin when no school is selected
+  if (isSuperAdmin && !currentSchoolId) {
+    return (
+      <Container size="md" py="xl">
+        <Alert icon={<IconAlertCircle size="1rem" />} title="No School Selected" color="blue">
+          Please select a school from the school switcher above to manage categories.
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container size="lg" py="xl">
       <Stack>
@@ -305,7 +327,10 @@ export function TemplateCategoryManagement() {
           <div>
             <Title order={2}>Template Categories</Title>
             <Text c="dimmed" size="sm">
-              Manage template categories for your school
+              {isSuperAdmin && selectedSchool 
+                ? `Managing template categories for ${selectedSchool.name}`
+                : 'Manage template categories for your school'
+              }
             </Text>
           </div>
           <Group>

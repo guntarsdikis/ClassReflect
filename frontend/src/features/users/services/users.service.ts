@@ -164,6 +164,20 @@ export class UsersService {
   }
 
   /**
+   * Reset any user's password (Super Admin only)
+   */
+  async resetUserPassword(userId: number): Promise<{
+    message: string;
+    temporaryPassword: string;
+    userEmail: string;
+    userName: string;
+    userRole: string;
+    requiresPasswordChange: boolean;
+  }> {
+    return this.api.post(`/users/${userId}/reset-password`, {});
+  }
+
+  /**
    * Update user role (Super Admin only)
    */
   async updateUserRole(userId: number, data: UpdateUserRoleRequest): Promise<{ message: string }> {

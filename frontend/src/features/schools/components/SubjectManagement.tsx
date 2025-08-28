@@ -13,7 +13,6 @@ import {
   Modal,
   TextInput,
   Textarea,
-  Select,
   Space,
   Flex,
   Alert,
@@ -34,11 +33,13 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { subjectsService, SchoolSubject, CreateSubjectRequest } from '../services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
+import { useSchoolContextStore } from '@store/school-context.store';
 
 interface SubjectFormData extends CreateSubjectRequest {}
 
 export function SubjectManagement() {
   const currentUser = useAuthStore((state) => state.user);
+  const { selectedSchool } = useSchoolContextStore();
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   
   const [subjects, setSubjects] = useState<SchoolSubject[]>([]);
@@ -48,19 +49,27 @@ export function SubjectManagement() {
   const [formData, setFormData] = useState<SubjectFormData>({
     subject_name: '',
     description: '',
-    category: 'Custom',
   });
 
   // Role-based access control
   const isSchoolManager = currentUser.role === 'school_manager';
   const isSuperAdmin = currentUser.role === 'super_admin';
-  const currentSchoolId = currentUser.schoolId;
+  
+  // Determine which school ID to use
+  const getEffectiveSchoolId = () => {
+    if (isSuperAdmin) {
+      return selectedSchool?.id || null;
+    }
+    return currentUser.schoolId;
+  };
+  
+  const currentSchoolId = getEffectiveSchoolId();
 
   useEffect(() => {
     if (currentSchoolId) {
       loadSubjects();
     }
-  }, [currentSchoolId]);
+  }, [currentSchoolId, selectedSchool]);
 
   const loadSubjects = async () => {
     try {
@@ -87,7 +96,6 @@ export function SubjectManagement() {
     setFormData({
       subject_name: '',
       description: '',
-      category: 'Custom',
     });
     openModal();
   };
@@ -97,7 +105,6 @@ export function SubjectManagement() {
     setFormData({
       subject_name: subject.subject_name,
       description: subject.description || '',
-      category: subject.category || 'Custom',
     });
     openModal();
   };
@@ -211,7 +218,6 @@ export function SubjectManagement() {
           await subjectsService.createSubject(currentSchoolId, {
             subject_name: subjectName,
             description: `Default ${subjectName} subject for testing`,
-            category: 'Core'
           });
           successCount++;
         } catch (error) {
@@ -246,6 +252,17 @@ export function SubjectManagement() {
     );
   }
 
+  // Show message for super admin when no school is selected
+  if (isSuperAdmin && !currentSchoolId) {
+    return (
+      <Container size="md" py="xl">
+        <Alert icon={<IconAlertCircle size="1rem" />} title="No School Selected" color="blue">
+          Please select a school from the school switcher above to manage subjects.
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container size="lg" py="xl">
       <Stack>
@@ -253,7 +270,10 @@ export function SubjectManagement() {
           <div>
             <Title order={2}>Subject Management</Title>
             <Text c="dimmed" size="sm">
-              Manage the subjects available for teachers in your school
+              {isSuperAdmin && selectedSchool 
+                ? `Managing subjects for ${selectedSchool.name}`
+                : 'Manage the subjects available for teachers in your school'
+              }
             </Text>
           </div>
           <Group>
@@ -306,18 +326,7 @@ export function SubjectManagement() {
                 {subjects.map((subject) => (
                   <Table.Tr key={subject.id}>
                     <Table.Td>
-                      <Group gap="xs">
-                        <Text fw={500}>{subject.subject_name}</Text>
-                        {subject.category && (
-                          <Badge 
-                            color="blue" 
-                            size="xs" 
-                            variant="outline"
-                          >
-                            {subject.category}
-                          </Badge>
-                        )}
-                      </Group>
+                      <Text fw={500}>{subject.subject_name}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" c="dimmed" lineClamp={2}>
@@ -393,30 +402,6 @@ export function SubjectManagement() {
             value={formData.description}
             onChange={(e) => setFormData({...formData, description: e.target.value})}
             rows={3}
-          />
-
-          <Select
-            label="Category"
-            placeholder="Select or type a category"
-            value={formData.category}
-            onChange={(value) => setFormData({...formData, category: value || 'Custom'})}
-            data={[
-              'Core',
-              'Sciences',
-              'Social Sciences',
-              'Arts',
-              'Languages',
-              'Technology',
-              'Health',
-              'Custom'
-            ]}
-            searchable
-            creatable
-            getCreateLabel={(query) => `+ Create "${query}"`}
-            onCreate={(query) => {
-              setFormData({...formData, category: query});
-              return query;
-            }}
           />
 
           <Space h="md" />

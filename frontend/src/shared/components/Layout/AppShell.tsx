@@ -28,6 +28,7 @@ import {
 } from '@tabler/icons-react';
 import { useAuthStore, type UserRole } from '@store/auth.store';
 import { useLogout } from '@features/auth/services/auth.service';
+import { SchoolSwitcher } from '../SchoolSwitcher/SchoolSwitcher';
 
 // Define navigation items for each role
 const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: string }>> = {
@@ -91,7 +92,10 @@ export function AppShell() {
             </Text>
           </Group>
           
-          <Menu shadow="md" width={200}>
+          <Group gap="lg">
+            <SchoolSwitcher />
+            
+            <Menu shadow="md" width={200}>
             <Menu.Target>
               <UnstyledButton>
                 <Group gap={7}>
@@ -142,7 +146,8 @@ export function AppShell() {
                 Logout
               </Menu.Item>
             </Menu.Dropdown>
-          </Menu>
+            </Menu>
+          </Group>
         </Group>
       </MantineAppShell.Header>
       

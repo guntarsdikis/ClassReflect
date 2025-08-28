@@ -98,8 +98,15 @@ export const api = {
   
   // User management (School Manager only)
   users: {
-    getProfile: () =>
-      apiClient.get('/users/profile'),
+    getProfile: async () => {
+      const response = await apiClient.get('/auth/profile');
+      return response.data;
+    },
+    
+    updateProfile: async (data: { firstName: string; lastName: string; email: string }) => {
+      const response = await apiClient.put('/auth/profile', data);
+      return response.data;
+    },
     
     getTeachers: () =>
       apiClient.get('/users/teachers'),

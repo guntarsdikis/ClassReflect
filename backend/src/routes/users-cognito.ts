@@ -915,4 +915,75 @@ router.patch('/:userId/role',
   }
 );
 
+/**
+ * POST /api/users/:userId/reset-password
+ * Reset any user's password (Super Admin only)
+ */
+router.post('/:userId/reset-password',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+
+      if (isNaN(userId)) {
+        res.status(400).json({ error: 'Invalid user ID' });
+        return;
+      }
+
+      // Get user details
+      const [userRows] = await pool.execute(
+        'SELECT id, email, cognito_username, first_name, last_name, role FROM users WHERE id = ? AND is_active = true',
+        [userId]
+      );
+
+      if (!Array.isArray(userRows) || userRows.length === 0) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const user = userRows[0] as any;
+
+      // Reset password in Cognito 
+      let temporaryPassword = 'DevPass123!';
+      
+      try {
+        if (process.env.NODE_ENV !== 'development') {
+          // Production: Use Cognito password reset
+          const resetResult = await cognitoService.resetUserPassword(user.cognito_username || user.email);
+          temporaryPassword = resetResult.temporaryPassword;
+        } else {
+          // Development: Actually reset in Cognito too, but with a known password
+          console.log('Development mode: Performing Cognito password reset for', user.email);
+          const resetResult = await cognitoService.resetUserPassword(user.cognito_username || user.email);
+          temporaryPassword = resetResult.temporaryPassword;
+        }
+      } catch (cognitoError) {
+        console.error('Cognito password reset failed:', cognitoError);
+        // In development, if Cognito fails, use a fake password for UI testing
+        if (process.env.NODE_ENV === 'development') {
+          temporaryPassword = `DevTemp${Math.random().toString(36).substring(7)}!`;
+          console.log('Using fake password for development UI testing:', temporaryPassword);
+        } else {
+          throw cognitoError; // Re-throw in production
+        }
+      }
+
+      console.log('Password reset:', { userId, email: user.email, role: user.role, resetBy: req.user!.id });
+
+      res.json({
+        message: 'Password reset successfully',
+        temporaryPassword: temporaryPassword,
+        userEmail: user.email,
+        userName: `${user.first_name} ${user.last_name}`,
+        userRole: user.role,
+        requiresPasswordChange: true
+      });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
+    }
+  }
+);
+
 export default router;

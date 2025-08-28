@@ -120,7 +120,10 @@ export function TemplateManagement() {
 
   // Weight calculation and validation
   const calculateTotalWeight = (criteria: TemplateCriterion[]) => {
-    return criteria.reduce((total, criterion) => total + (criterion.weight || 0), 0);
+    return criteria.reduce((total, criterion) => {
+      const weight = typeof criterion.weight === 'number' ? criterion.weight : parseFloat(criterion.weight?.toString() || '0') || 0;
+      return total + weight;
+    }, 0);
   };
 
   const totalWeight = Number(calculateTotalWeight(formData.criteria || []));
@@ -134,6 +137,7 @@ export function TemplateManagement() {
   };
 
   const getWeightLabel = () => {
+    if (isNaN(totalWeight) || totalWeight === 0) return 'No criteria added';
     if (Math.abs(totalWeight - 100) < 0.01) return 'Perfect (100%)';
     if (totalWeight < 100) return `Need ${remainingWeight.toFixed(1)}% more`;
     return `${(totalWeight - 100).toFixed(1)}% over limit`;
@@ -795,7 +799,7 @@ export function TemplateManagement() {
                     color={getWeightColor()}
                     variant="filled"
                   >
-                    {getWeightLabel()} ({totalWeight.toFixed(1)}%)
+                    {getWeightLabel()} ({isNaN(totalWeight) ? '0.0' : totalWeight.toFixed(1)}%)
                   </Badge>
                 </Group>
               </Group>
@@ -832,7 +836,7 @@ export function TemplateManagement() {
                         size="sm"
                       />
                       <Text size="xs" c="dimmed" style={{ marginBottom: '8px' }}>
-                        {((criterion.weight / Math.max(totalWeight, 1)) * 100).toFixed(1)}% of total
+                        {totalWeight > 0 ? ((criterion.weight / totalWeight) * 100).toFixed(1) : '0.0'}% of total
                       </Text>
                     </Group>
                   </Stack>

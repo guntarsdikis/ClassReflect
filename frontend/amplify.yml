@@ -46,7 +46,20 @@ frontend:
     - source: '/schools/'
       target: '/index.html'
       status: '200'
-    # Handle all SPA routes (fallback for any path without file extension)
-    - source: '/<*>'
+    # Handle all other routes without file extensions
+    - source: '/dashboard'
+      target: '/index.html'
+      status: '200'
+    - source: '/upload'
+      target: '/index.html'
+      status: '200'
+    - source: '/login'
+      target: '/index.html'
+      status: '200'
+    - source: '/schools'
+      target: '/index.html'
+      status: '200'
+    # Catch-all fallback for SPA routes
+    - source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json)$)([^.]+$)/>'
       target: '/index.html'
       status: '200'

@@ -22,7 +22,6 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-ui': ['@mantine/core', '@mantine/hooks', '@mantine/form'],
           'vendor-utils': ['axios', 'date-fns', 'zod'],
-          'vendor-aws': ['aws-amplify'],
         },
       },
     },

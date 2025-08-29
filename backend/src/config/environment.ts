@@ -1,17 +1,12 @@
 /**
  * Environment Configuration for ClassReflect
- * Handles local development vs production environment detection and configuration
+ * Simplified configuration without S3 storage
  */
 
 export type Environment = 'local' | 'production';
 
 export interface EnvironmentConfig {
   env: Environment;
-  storage: {
-    type: 's3' | 'local';
-    s3Bucket?: string;
-    localPath?: string;
-  };
   processing: {
     type: 'assemblyai';
     assemblyaiApiKey?: string;
@@ -30,8 +25,8 @@ export interface EnvironmentConfig {
 export function detectEnvironment(): Environment {
   const nodeEnv = process.env.NODE_ENV?.toLowerCase();
   
-  // If we have AWS credentials and S3 bucket, assume production
-  if (process.env.AWS_ACCESS_KEY_ID && process.env.S3_BUCKET_NAME) {
+  // If we have production database host, assume production
+  if (process.env.DATABASE_HOST && process.env.DATABASE_HOST !== 'localhost') {
     return 'production';
   }
   
@@ -53,10 +48,6 @@ export function getEnvironmentConfig(): EnvironmentConfig {
   if (env === 'production') {
     return {
       env: 'production',
-      storage: {
-        type: 's3',
-        s3Bucket: process.env.S3_BUCKET_NAME || 'classreflect-audio-files-573524060586'
-      },
       processing: {
         type: 'assemblyai',
         assemblyaiApiKey: process.env.ASSEMBLYAI_API_KEY
@@ -71,10 +62,6 @@ export function getEnvironmentConfig(): EnvironmentConfig {
   } else {
     return {
       env: 'local',
-      storage: {
-        type: 'local',
-        localPath: process.env.LOCAL_AUDIO_PATH || '/tmp/classreflect-audio'
-      },
       processing: {
         type: 'assemblyai',
         assemblyaiApiKey: process.env.ASSEMBLYAI_API_KEY
@@ -92,5 +79,4 @@ export function getEnvironmentConfig(): EnvironmentConfig {
 export const config = getEnvironmentConfig();
 
 console.log(`🌍 Environment: ${config.env}`);
-console.log(`📁 Storage: ${config.storage.type}`);  
 console.log(`⚙️ Processing: ${config.processing.type}`);

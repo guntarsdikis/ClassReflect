@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { signIn, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
-import { Hub } from 'aws-amplify/utils';
 import { useNavigate } from 'react-router-dom';
 import './LoginPage.css';
 
@@ -56,38 +54,19 @@ const LoginPage: React.FC = () => {
   // Check authentication status on mount
   useEffect(() => {
     checkAuthStatus();
-    
-    // Listen for auth state changes
-    const unsubscribe = Hub.listen('auth', (data) => {
-      const { event } = data.payload;
-      
-      if (event === 'signedIn') {
-        checkAuthStatus();
-      } else if (event === 'signedOut') {
-        setAuthState({
-          isAuthenticated: false,
-          user: null,
-          isLoading: false,
-          error: null
-        });
-      }
-    });
-
-    return () => unsubscribe();
   }, []);
 
   const checkAuthStatus = async () => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       
-      const user = await getCurrentUser();
-      const session = await fetchAuthSession();
+      const token = localStorage.getItem('authToken');
       
-      if (user && session.tokens) {
+      if (token) {
         // Get user profile from backend
-        const response = await fetch('/api/auth/profile', {
+        const response = await fetch('/api/users/profile', {
           headers: {
-            'Authorization': `Bearer ${session.tokens.accessToken}`
+            'Authorization': `Bearer ${token}`
           }
         });
         
@@ -104,8 +83,18 @@ const LoginPage: React.FC = () => {
           // Redirect based on user role
           redirectAfterLogin(userProfile.role);
         } else {
+          // Token is invalid, clear it
+          localStorage.removeItem('authToken');
           throw new Error('Failed to get user profile');
         }
+      } else {
+        // No token found
+        setAuthState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: null
+        });
       }
     } catch (error) {
       setAuthState({
@@ -139,35 +128,44 @@ const LoginPage: React.FC = () => {
     setAuthState(prev => ({ ...prev, error: null }));
 
     try {
-      const signInResult = await signIn({
-        username: loginForm.email,
-        password: loginForm.password
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginForm.email,
+          password: loginForm.password
+        })
       });
 
-      if (signInResult.isSignedIn) {
-        await checkAuthStatus();
-      } else if (signInResult.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
-        // User needs to set a new password
-        setNewPasswordForm(prev => ({ 
-          ...prev, 
-          email: loginForm.email,
-          temporaryPassword: loginForm.password 
-        }));
-        setShowNewPasswordForm(true);
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Store the JWT token
+        localStorage.setItem('authToken', result.token);
+        
+        // Update auth state
+        setAuthState({
+          isAuthenticated: true,
+          user: result.user,
+          isLoading: false,
+          error: null
+        });
+
+        // Redirect based on user role
+        redirectAfterLogin(result.user.role);
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Login failed');
       }
     } catch (error: any) {
       console.error('Login error:', error);
       
       let errorMessage = 'Login failed. Please try again.';
       
-      if (error.name === 'NotAuthorizedException') {
-        errorMessage = 'Invalid email or password.';
-      } else if (error.name === 'UserNotFoundException') {
-        errorMessage = 'No account found with this email.';
-      } else if (error.name === 'UserNotConfirmedException') {
-        errorMessage = 'Please verify your email before logging in.';
-      } else if (error.name === 'TooManyRequestsException') {
-        errorMessage = 'Too many failed attempts. Please try again later.';
+      if (error.message) {
+        errorMessage = error.message;
       }
       
       setAuthState(prev => ({ ...prev, error: errorMessage }));
@@ -223,7 +221,9 @@ const LoginPage: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      // Remove JWT token from localStorage
+      localStorage.removeItem('authToken');
+      
       setAuthState({
         isAuthenticated: false,
         user: null,

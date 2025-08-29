@@ -51,6 +51,14 @@ router.post('/login', async (req: Request, res: Response) => {
     // Generate token
     const token = generateToken(userPayload);
     
+    console.log('🔐 Login Debug - Generated token for user:', {
+      userId: userPayload.userId,
+      email: userPayload.email,
+      role: userPayload.role,
+      schoolId: userPayload.schoolId
+    });
+    console.log('🔐 Login Debug - Token length:', token.length);
+    
     // Return user data and token
     res.json({
       token,

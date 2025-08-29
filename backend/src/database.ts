@@ -4,11 +4,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'classreflect',
+  host: process.env.DATABASE_HOST || process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DATABASE_PORT || process.env.DB_PORT || '3306'),
+  user: process.env.DATABASE_USER || process.env.DB_USER || 'root',
+  password: process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || '',
+  database: process.env.DATABASE_NAME || process.env.DB_NAME || 'classreflect',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -40,7 +40,7 @@ export async function initializeDatabase(): Promise<void> {
     // Check if tables exist
     const [tables] = await connection.query(
       "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = ? AND table_name = 'schools'",
-      [process.env.DB_NAME]
+      [process.env.DATABASE_NAME || process.env.DB_NAME || 'classreflect']
     );
     
     connection.release();

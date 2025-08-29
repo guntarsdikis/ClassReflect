@@ -38,15 +38,27 @@ export const authenticate = async (
   try {
     const authHeader = req.headers.authorization;
     
+    console.log('🔐 Auth Debug - Request URL:', req.method, req.url);
+    console.log('🔐 Auth Debug - Authorization header:', authHeader ? 'Present' : 'Missing');
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('🔐 Auth Debug - No valid Bearer token found');
       res.status(401).json({ error: 'No token provided' });
       return;
     }
     
     const token = authHeader.substring(7);
+    console.log('🔐 Auth Debug - Token extracted, length:', token.length);
+    console.log('🔐 Auth Debug - JWT_SECRET available:', !!JWT_SECRET);
     
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
+      console.log('🔐 Auth Debug - Token decoded successfully:', {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+        schoolId: decoded.schoolId
+      });
       
       req.user = {
         id: parseInt(decoded.userId),
@@ -57,13 +69,21 @@ export const authenticate = async (
         schoolId: parseInt(decoded.schoolId),
       };
       
+      console.log('🔐 Auth Debug - User attached to request:', {
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role,
+        schoolId: req.user.schoolId
+      });
+      
       next();
     } catch (error) {
+      console.log('🔐 Auth Debug - Token verification failed:', error);
       res.status(401).json({ error: 'Invalid token' });
       return;
     }
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('🔐 Auth Debug - Authentication error:', error);
     res.status(500).json({ error: 'Authentication failed' });
     return;
   }

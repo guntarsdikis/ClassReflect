@@ -125,11 +125,24 @@ export function UploadWizard() {
       formData.append('duration', duration.toString());
       formData.append('notes', notes);
 
-      // Upload file
-      const response = await fetch('/api/upload/direct', {
+      // Upload file - get token from auth store (consistent with other API calls)
+      const authStoreToken = useAuthStore.getState().token;
+      const localStorageToken = localStorage.getItem('authToken');
+      
+      console.log('🔍 Upload Debug - Auth store token:', authStoreToken ? `Length: ${authStoreToken.length}` : 'NULL');
+      console.log('🔍 Upload Debug - localStorage token:', localStorageToken ? `Length: ${localStorageToken.length}` : 'NULL');
+      
+      const token = authStoreToken || localStorageToken;
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/direct`;
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: formData
       });

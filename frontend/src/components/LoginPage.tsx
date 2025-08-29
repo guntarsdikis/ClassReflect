@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/auth.store';
 import './LoginPage.css';
 
 interface User {
@@ -21,6 +22,7 @@ interface AuthState {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { setAuth, logout } = useAuthStore();
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
     user: null,
@@ -73,6 +75,9 @@ const LoginPage: React.FC = () => {
         if (response.ok) {
           const userProfile = await response.json();
           
+          // Update auth store with existing token and user profile
+          setAuth(userProfile, token);
+          
           setAuthState({
             isAuthenticated: true,
             user: userProfile,
@@ -83,8 +88,9 @@ const LoginPage: React.FC = () => {
           // Redirect based on user role
           redirectAfterLogin(userProfile.role);
         } else {
-          // Token is invalid, clear it
+          // Token is invalid, clear it from both localStorage and auth store
           localStorage.removeItem('authToken');
+          logout();
           throw new Error('Failed to get user profile');
         }
       } else {
@@ -97,6 +103,8 @@ const LoginPage: React.FC = () => {
         });
       }
     } catch (error) {
+      // Clear auth store on any error
+      logout();
       setAuthState({
         isAuthenticated: false,
         user: null,
@@ -142,10 +150,11 @@ const LoginPage: React.FC = () => {
       if (response.ok) {
         const result = await response.json();
         
-        // Store the JWT token
+        // Store the JWT token in both localStorage and auth store
         localStorage.setItem('authToken', result.token);
+        setAuth(result.user, result.token);
         
-        // Update auth state
+        // Update local auth state
         setAuthState({
           isAuthenticated: true,
           user: result.user,
@@ -200,6 +209,10 @@ const LoginPage: React.FC = () => {
       if (response.ok) {
         const result = await response.json();
         
+        // Store the JWT token in both localStorage and auth store
+        localStorage.setItem('authToken', result.token);
+        setAuth(result.user, result.token);
+        
         setAuthState({
           isAuthenticated: true,
           user: result.user,
@@ -221,8 +234,9 @@ const LoginPage: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      // Remove JWT token from localStorage
+      // Remove JWT token from localStorage and auth store
       localStorage.removeItem('authToken');
+      logout();
       
       setAuthState({
         isAuthenticated: false,

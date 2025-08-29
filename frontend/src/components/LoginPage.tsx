@@ -61,9 +61,9 @@ const LoginPage: React.FC = () => {
     const unsubscribe = Hub.listen('auth', (data) => {
       const { event } = data.payload;
       
-      if (event === 'signIn') {
+      if (event === 'signedIn') {
         checkAuthStatus();
-      } else if (event === 'signOut') {
+      } else if (event === 'signedOut') {
         setAuthState({
           isAuthenticated: false,
           user: null,

@@ -127,6 +127,7 @@ export function UploadWizard() {
     console.log('✅ Frontend Upload Debug - Validation passed, proceeding with upload');
 
     setIsUploading(true);
+    setUploadProgress(0); // Reset progress for new upload
     
     try {
       // Prepare form data for upload
@@ -156,28 +157,59 @@ export function UploadWizard() {
       }
       
       const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/direct`;
-      console.log('🚀 Frontend Upload Debug - Making fetch request to:', apiUrl);
+      console.log('🚀 Frontend Upload Debug - Making XMLHttpRequest with progress tracking to:', apiUrl);
       console.log('🚀 Frontend Upload Debug - Token available:', token ? `Length: ${token.length}` : 'NULL');
+      console.log('🚀 Frontend Upload Debug - File size:', audioFile.size, 'bytes (', Math.round(audioFile.size / 1024 / 1024), 'MB)');
       
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData
+      // Use XMLHttpRequest for upload progress tracking
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            console.log('📊 Upload progress:', percentComplete, '% (', event.loaded, '/', event.total, 'bytes)');
+            setUploadProgress(percentComplete);
+          }
+        });
+        
+        // Handle upload completion
+        xhr.addEventListener('load', () => {
+          console.log('🚀 Frontend Upload Debug - Response received:', {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            ok: xhr.status >= 200 && xhr.status < 300
+          });
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve(response);
+            } catch (e) {
+              reject(new Error('Failed to parse response JSON'));
+            }
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+          }
+        });
+        
+        // Handle upload errors
+        xhr.addEventListener('error', () => {
+          reject(new Error('Upload failed: Network error'));
+        });
+        
+        // Handle upload timeout
+        xhr.addEventListener('timeout', () => {
+          reject(new Error('Upload failed: Request timeout'));
+        });
+        
+        // Configure and send request
+        xhr.open('POST', apiUrl);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.timeout = 10 * 60 * 1000; // 10 minutes timeout for large files
+        xhr.send(formData);
       });
-      
-      console.log('🚀 Frontend Upload Debug - Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       
       setIsUploading(false);
       notifications.show({
@@ -194,6 +226,7 @@ export function UploadWizard() {
       console.error('❌ Frontend Upload Debug - Error message:', error.message);
       console.error('❌ Frontend Upload Debug - Error stack:', error.stack);
       setIsUploading(false);
+      setUploadProgress(0); // Reset progress on error
       notifications.show({
         title: 'Upload Failed',
         message: error.message || 'Failed to upload recording',

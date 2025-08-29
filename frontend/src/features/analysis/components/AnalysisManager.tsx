@@ -29,7 +29,8 @@ import {
   IconTrash,
   IconMusic,
   IconInfoCircle,
-  IconX
+  IconX,
+  IconDownload
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
@@ -37,6 +38,8 @@ import { useSchoolContextStore } from '@store/school-context.store';
 import { analysisService, type RecordingForAnalysis, type AnalysisResult, type AnalysisJobStatus } from '../services/analysis.service';
 import { templatesService, type Template } from '@features/templates/services/templates.service';
 import { AnalysisResults } from './AnalysisResults';
+import { AnalysisReportPDF } from './AnalysisReportPDF';
+import { pdf } from '@react-pdf/renderer';
 
 export function AnalysisManager() {
   const user = useAuthStore((state) => state.user);
@@ -296,6 +299,47 @@ export function AnalysisManager() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleDownloadPDF = async (analysis: AnalysisResult) => {
+    try {
+      // Generate PDF blob
+      const doc = <AnalysisReportPDF analysis={analysis} />;
+      const asPdf = pdf(doc);
+      const blob = await asPdf.toBlob();
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename with class name and date
+      const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const className = analysis.class_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'analysis';
+      const templateName = analysis.template_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'template';
+      link.download = `ClassReflect_${className}_${templateName}_${date}.pdf`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: 'PDF Downloaded',
+        message: 'Analysis report has been downloaded successfully',
+        color: 'green',
+        icon: <IconDownload />,
+      });
+      
+    } catch (error: any) {
+      console.error('Failed to generate PDF:', error);
+      notifications.show({
+        title: 'Download Failed',
+        message: 'Failed to generate PDF report. Please try again.',
+        color: 'red',
+      });
+    }
   };
 
   if (user?.role === 'super_admin' && !selectedSchool) {
@@ -775,7 +819,21 @@ export function AnalysisManager() {
           setResultsModalOpen(false);
           setSelectedAnalysis(null);
         }}
-        title="Analysis Results"
+        title={
+          <Group justify="space-between" w="100%">
+            <Text fw={600} size="lg">Analysis Results</Text>
+            {selectedAnalysis && (
+              <Button
+                variant="light"
+                leftSection={<IconDownload size={16} />}
+                size="sm"
+                onClick={() => handleDownloadPDF(selectedAnalysis)}
+              >
+                Download PDF
+              </Button>
+            )}
+          </Group>
+        }
         size="xl"
       >
         {selectedAnalysis && (

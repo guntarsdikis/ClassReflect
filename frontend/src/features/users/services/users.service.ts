@@ -118,7 +118,6 @@ export class UsersService {
     teacherId: number;
     email: string;
     temporaryPassword?: string;
-    cognitoUsername: string;
   }> {
     return this.api.post('/users/teachers', data);
   }
@@ -131,7 +130,6 @@ export class UsersService {
     userId: number;
     email: string;
     temporaryPassword?: string;
-    cognitoUsername: string;
   }> {
     return this.api.post('/users', data);
   }
@@ -204,7 +202,6 @@ export class UsersService {
     managerId: number;
     managerEmail: string;
     temporaryPassword: string;
-    cognitoUsername: string;
   }> {
     return this.api.post('/users/admin/schools', data);
   }

@@ -1,4 +1,4 @@
-import { AuthenticatedUser } from '../middleware/auth-cognito';
+import { AuthenticatedUser } from '../middleware/auth';
 
 declare global {
   namespace Express {

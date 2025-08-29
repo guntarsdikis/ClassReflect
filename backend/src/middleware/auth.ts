@@ -1,7 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Pool } from 'mysql2/promise';
-import { AuthenticatedUser } from './auth-cognito';
+
+export interface AuthenticatedUser {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'teacher' | 'school_manager' | 'super_admin';
+  schoolId: number;
+}
 
 // Extend Express Request type
 declare module 'express-serve-static-core' {
@@ -137,6 +145,16 @@ export const authorizeTeacher = async (
 };
 
 /**
+ * Alias for authorizeSchool - for compatibility with Cognito routes
+ */
+export const requireSchoolAccess = authorizeSchool;
+
+/**
+ * Alias for authorizeTeacher - for compatibility with Cognito routes
+ */
+export const requireTeacherAccess = authorizeTeacher;
+
+/**
  * Generate JWT token
  */
 export const generateToken = (payload: TokenPayload): string => {
@@ -146,7 +164,7 @@ export const generateToken = (payload: TokenPayload): string => {
 };
 
 /**
- * Verify user credentials (mock implementation - replace with real auth)
+ * Verify user credentials with bcrypt password verification
  */
 export const verifyCredentials = async (
   email: string,
@@ -154,15 +172,10 @@ export const verifyCredentials = async (
   pool: Pool
 ): Promise<TokenPayload | null> => {
   try {
-    // This is a mock implementation
-    // In production, you should:
-    // 1. Query the database for the user
-    // 2. Verify password with bcrypt
-    // 3. Return user data
-    
+    // Query the database for the user including password_hash
     const [rows] = await pool.execute(
       `SELECT u.id, u.email, u.role, u.school_id, u.first_name, u.last_name, 
-              s.name as school_name
+              u.password_hash, s.name as school_name
        FROM users u
        LEFT JOIN schools s ON u.school_id = s.id
        WHERE u.email = ? AND u.is_active = true`,
@@ -175,21 +188,26 @@ export const verifyCredentials = async (
     
     const user = rows[0] as any;
     
-    // TODO: Verify password with bcrypt
-    // const validPassword = await bcrypt.compare(password, user.password_hash);
-    // if (!validPassword) return null;
-    
-    // For now, accept any password in development
-    if (process.env.NODE_ENV === 'development') {
-      return {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        schoolId: user.school_id,
-      };
+    // Verify password with bcrypt if hash exists
+    if (user.password_hash) {
+      const bcrypt = require('bcrypt');
+      const validPassword = await bcrypt.compare(password, user.password_hash);
+      if (!validPassword) {
+        return null;
+      }
+    } else {
+      // If no password hash exists, reject login for security
+      console.log(`⚠️ User ${email} has no password hash - rejecting login`);
+      return null;
     }
     
-    return null;
+    // Return user data for token generation
+    return {
+      userId: user.id.toString(),
+      email: user.email,
+      role: user.role,
+      schoolId: user.school_id?.toString() || 'platform',
+    };
   } catch (error) {
     console.error('Error verifying credentials:', error);
     return null;

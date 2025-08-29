@@ -15,7 +15,6 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@aws-amplify/ui-react": "^6.11.2",
     "@hookform/resolvers": "^3.3.0",
     "@mantine/charts": "^7.3.0",
     "@mantine/core": "^7.3.0",
@@ -27,7 +26,6 @@
     "@mantine/notifications": "^7.3.0",
     "@tabler/icons-react": "^2.44.0",
     "@tanstack/react-query": "^5.0.0",
-    "aws-amplify": "^6.15.5",
     "axios": "^1.6.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.0.0",

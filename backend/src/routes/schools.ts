@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import pool from '../database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { authenticate, authorize } from '../middleware/auth-cognito';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 

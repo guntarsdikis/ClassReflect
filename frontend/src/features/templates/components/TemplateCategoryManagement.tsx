@@ -59,10 +59,10 @@ interface CategoryFormData extends CreateTemplateCategoryRequest {
 
 // Template category service functions
 const templateCategoryService = {
-  async getTemplateCategories(schoolId: number): Promise<TemplateCategory[]> {
-    const response = await fetch(`/api/schools/${schoolId}/template-categories`, {
+  async getTemplateCategories(schoolId: number, token: string): Promise<TemplateCategory[]> {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
       },
     });
     if (!response.ok) {
@@ -71,7 +71,7 @@ const templateCategoryService = {
     return response.json();
   },
 
-  async createTemplateCategory(schoolId: number, data: CreateTemplateCategoryRequest): Promise<{
+  async createTemplateCategory(schoolId: number, data: CreateTemplateCategoryRequest, token: string): Promise<{
     id: number;
     schoolId: number;
     category_name: string;
@@ -79,11 +79,11 @@ const templateCategoryService = {
     color?: string;
     message: string;
   }> {
-    const response = await fetch(`/api/schools/${schoolId}/template-categories`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(data),
     });
@@ -94,15 +94,15 @@ const templateCategoryService = {
     return response.json();
   },
 
-  async updateTemplateCategory(schoolId: number, categoryId: number, data: Partial<CreateTemplateCategoryRequest & { is_active?: boolean }>): Promise<{
+  async updateTemplateCategory(schoolId: number, categoryId: number, data: Partial<CreateTemplateCategoryRequest & { is_active?: boolean }>, token: string): Promise<{
     id: number;
     message: string;
   }> {
-    const response = await fetch(`/api/schools/${schoolId}/template-categories/${categoryId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories/${categoryId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(data),
     });
@@ -113,14 +113,14 @@ const templateCategoryService = {
     return response.json();
   },
 
-  async deleteTemplateCategory(schoolId: number, categoryId: number): Promise<{
+  async deleteTemplateCategory(schoolId: number, categoryId: number, token: string): Promise<{
     id: number;
     message: string;
   }> {
-    const response = await fetch(`/api/schools/${schoolId}/template-categories/${categoryId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories/${categoryId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
       },
     });
     if (!response.ok) {
@@ -133,6 +133,7 @@ const templateCategoryService = {
 
 export function TemplateCategoryManagement() {
   const currentUser = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
   const { selectedSchool } = useSchoolContextStore();
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   
@@ -169,8 +170,8 @@ export function TemplateCategoryManagement() {
   const loadCategories = async () => {
     try {
       setLoading(true);
-      if (currentSchoolId) {
-        const data = await templateCategoryService.getTemplateCategories(currentSchoolId);
+      if (currentSchoolId && token) {
+        const data = await templateCategoryService.getTemplateCategories(currentSchoolId, token);
         setCategories(data);
       }
     } catch (error) {
@@ -226,14 +227,14 @@ export function TemplateCategoryManagement() {
       }
 
       if (editingCategory) {
-        await templateCategoryService.updateTemplateCategory(currentSchoolId, editingCategory.id, formData);
+        await templateCategoryService.updateTemplateCategory(currentSchoolId, editingCategory.id, formData, token!);
         notifications.show({
           title: 'Success',
           message: 'Template category updated successfully',
           color: 'green',
         });
       } else {
-        await templateCategoryService.createTemplateCategory(currentSchoolId, formData);
+        await templateCategoryService.createTemplateCategory(currentSchoolId, formData, token!);
         notifications.show({
           title: 'Success',
           message: 'Template category created successfully',
@@ -277,8 +278,8 @@ export function TemplateCategoryManagement() {
       },
       onConfirm: async () => {
         try {
-          if (currentSchoolId) {
-            await templateCategoryService.deleteTemplateCategory(currentSchoolId, category.id);
+          if (currentSchoolId && token) {
+            await templateCategoryService.deleteTemplateCategory(currentSchoolId, category.id, token);
             notifications.show({
               title: 'Success',
               message: 'Template category deleted successfully',

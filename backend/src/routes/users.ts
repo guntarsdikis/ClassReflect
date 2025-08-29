@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { Pool } from 'mysql2/promise';
-import { authenticate, authorize } from '../middleware/auth-cognito';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 let pool: Pool;
@@ -25,35 +25,161 @@ router.get('/teachers',
       
       const [rows] = await pool.execute(
         `SELECT u.id, u.email, u.first_name, u.last_name, u.created_at,
-                u.is_active, ut.subjects, ut.grades, 
-                COUNT(DISTINCT j.id) as total_evaluations,
-                AVG(j.score) as average_score
+                u.is_active, u.subjects, u.grades, 
+                COUNT(DISTINCT aj.id) as total_evaluations
          FROM users u
-         LEFT JOIN user_teachers ut ON u.id = ut.user_id
-         LEFT JOIN jobs j ON u.id = j.teacher_id AND j.status = 'completed'
+         LEFT JOIN audio_jobs aj ON u.id = aj.teacher_id AND aj.status = 'completed'
          WHERE u.role = 'teacher' AND u.school_id = ?
          GROUP BY u.id
          ORDER BY u.last_name, u.first_name`,
         [schoolId]
       );
       
-      const teachers = (rows as any[]).map(row => ({
-        id: row.id,
-        email: row.email,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        subjects: row.subjects ? JSON.parse(row.subjects) : [],
-        grades: row.grades ? JSON.parse(row.grades) : [],
-        totalEvaluations: row.total_evaluations,
-        averageScore: row.average_score,
-        isActive: row.is_active,
-        createdAt: row.created_at,
-      }));
+      const teachers = (rows as any[]).map(row => {
+        // Helper function to safely parse JSON or convert comma-separated string to array
+        const parseSubjectsOrGrades = (data: any): string[] => {
+          if (!data) return [];
+          
+          // If already an array, return it
+          if (Array.isArray(data)) return data;
+          
+          // If not a string, return empty array
+          if (typeof data !== 'string') return [];
+          
+          try {
+            // Try to parse as JSON first
+            const parsed = JSON.parse(data);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            // If JSON parsing fails, treat as comma-separated string
+            return data.split(',').map(item => item.trim()).filter(item => item.length > 0);
+          }
+        };
+
+        return {
+          id: row.id,
+          email: row.email,
+          firstName: row.first_name,
+          lastName: row.last_name,
+          subjects: parseSubjectsOrGrades(row.subjects),
+          grades: parseSubjectsOrGrades(row.grades),
+          totalEvaluations: row.total_evaluations,
+          averageScore: 0, // TODO: Calculate from analysis_results when implemented
+          isActive: row.is_active,
+          createdAt: row.created_at,
+        };
+      });
       
       res.json(teachers);
     } catch (error) {
       console.error('Get teachers error:', error);
       res.status(500).json({ error: 'Failed to get teachers' });
+    }
+  }
+);
+
+/**
+ * GET /api/users
+ * Get current user info OR all users (role-based access)
+ * - Super admins: Get all users
+ * - Other roles: Get current user info only
+ */
+router.get('/',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user!;
+      
+      if (user.role === 'super_admin') {
+        // Super admin: return all users
+        const [allUserRows] = await pool.execute(
+          `SELECT u.id, u.email, u.first_name, u.last_name, u.role,
+                  u.school_id, s.name as school_name, u.subjects, u.grades,
+                  u.is_active, u.last_login, u.created_at
+           FROM users u
+           LEFT JOIN schools s ON u.school_id = s.id
+           ORDER BY u.created_at DESC`
+        );
+        
+        const parseSubjectsOrGrades = (data: any): string[] => {
+          if (!data) return [];
+          if (Array.isArray(data)) return data;
+          if (typeof data !== 'string') return [];
+          
+          try {
+            const parsed = JSON.parse(data);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return data.split(',').map(item => item.trim()).filter(item => item.length > 0);
+          }
+        };
+
+        const allUsers = (allUserRows as any[]).map(row => ({
+          id: row.id,
+          email: row.email,
+          firstName: row.first_name,
+          lastName: row.last_name,
+          role: row.role,
+          schoolId: row.school_id,
+          schoolName: row.school_name,
+          subjects: parseSubjectsOrGrades(row.subjects),
+          grades: parseSubjectsOrGrades(row.grades),
+          isActive: row.is_active,
+          lastLogin: row.last_login,
+          createdAt: row.created_at,
+        }));
+        
+        res.json(allUsers);
+      } else {
+        // Other roles: return current user only
+        const [userRows] = await pool.execute(
+          `SELECT u.id, u.email, u.first_name, u.last_name, u.role,
+                  u.school_id, s.name as school_name, u.subjects, u.grades,
+                  u.is_active, u.created_at
+           FROM users u
+           LEFT JOIN schools s ON u.school_id = s.id
+           WHERE u.id = ?`,
+          [user.id]
+        );
+        
+        if (!Array.isArray(userRows) || userRows.length === 0) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const currentUser = userRows[0] as any;
+        
+        const parseSubjectsOrGrades = (data: any): string[] => {
+          if (!data) return [];
+          if (Array.isArray(data)) return data;
+          if (typeof data !== 'string') return [];
+          
+          try {
+            const parsed = JSON.parse(data);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return data.split(',').map(item => item.trim()).filter(item => item.length > 0);
+          }
+        };
+        
+        const response = {
+          id: currentUser.id,
+          email: currentUser.email,
+          firstName: currentUser.first_name,
+          lastName: currentUser.last_name,
+          role: currentUser.role,
+          schoolId: currentUser.school_id,
+          schoolName: currentUser.school_name,
+          subjects: parseSubjectsOrGrades(currentUser.subjects),
+          grades: parseSubjectsOrGrades(currentUser.grades),
+          isActive: currentUser.is_active,
+          createdAt: currentUser.created_at,
+        };
+        
+        res.json(response);
+      }
+    } catch (error) {
+      console.error('Get users error:', error);
+      res.status(500).json({ error: 'Failed to get users' });
     }
   }
 );
@@ -107,11 +233,10 @@ router.post('/teachers',
         
         const userId = (result as any).insertId;
         
-        // Add teacher-specific data
+        // Update teacher-specific data in users table
         await connection.execute(
-          `INSERT INTO user_teachers (user_id, subjects, grades)
-           VALUES (?, ?, ?)`,
-          [userId, JSON.stringify(subjects || []), JSON.stringify(grades || [])]
+          `UPDATE users SET subjects = ?, grades = ? WHERE id = ?`,
+          [JSON.stringify(subjects || []), JSON.stringify(grades || []), userId]
         );
         
         await connection.commit();
@@ -198,11 +323,10 @@ router.post('/teachers/bulk',
           
           const userId = (result as any).insertId;
           
-          // Add teacher-specific data
+          // Update teacher-specific data in users table
           await connection.execute(
-            `INSERT INTO user_teachers (user_id, subjects, grades)
-             VALUES (?, ?, ?)`,
-            [userId, JSON.stringify(subjects || []), JSON.stringify(grades || [])]
+            `UPDATE users SET subjects = ?, grades = ? WHERE id = ?`,
+            [JSON.stringify(subjects || []), JSON.stringify(grades || []), userId]
           );
           
           results.push({
@@ -273,19 +397,28 @@ router.put('/teachers/:id',
         );
       }
       
-      // Update teacher-specific data
+      // Update teacher-specific data in users table
       if (subjects || grades) {
-        await pool.execute(
-          `UPDATE user_teachers 
-           SET subjects = COALESCE(?, subjects), 
-               grades = COALESCE(?, grades)
-           WHERE user_id = ?`,
-          [
-            subjects ? JSON.stringify(subjects) : null,
-            grades ? JSON.stringify(grades) : null,
-            id
-          ]
-        );
+        const updateFields = [];
+        const updateValues = [];
+        
+        if (subjects) {
+          updateFields.push('subjects = ?');
+          updateValues.push(JSON.stringify(subjects));
+        }
+        
+        if (grades) {
+          updateFields.push('grades = ?');
+          updateValues.push(JSON.stringify(grades));
+        }
+        
+        if (updateFields.length > 0) {
+          updateValues.push(id);
+          await pool.execute(
+            `UPDATE users SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+            updateValues
+          );
+        }
       }
       
       res.json({ message: 'Teacher updated successfully' });
@@ -349,7 +482,7 @@ router.get('/profile',
     try {
       let query = `
         SELECT u.id, u.email, u.first_name, u.last_name, u.role,
-               u.school_id, s.name as school_name, u.created_at
+               u.school_id, s.name as school_name, u.subjects, u.grades, u.created_at
         FROM users u
         LEFT JOIN schools s ON u.school_id = s.id
         WHERE u.id = ?
@@ -362,34 +495,46 @@ router.get('/profile',
         return;
       }
       
-      const user = (rows as any[])[0];
+      const userRow = (rows as any[])[0];
       
-      // Get additional data for teachers
+      // Get additional data from users table (subjects and grades are already in main query)
       let additionalData = {};
-      if (user.role === 'teacher') {
-        const [teacherData] = await pool.execute(
-          'SELECT subjects, grades FROM user_teachers WHERE user_id = ?',
-          [user.id]
-        );
-        
-        if ((teacherData as any[]).length > 0) {
-          const data = (teacherData as any[])[0];
-          additionalData = {
-            subjects: data.subjects ? JSON.parse(data.subjects) : [],
-            grades: data.grades ? JSON.parse(data.grades) : [],
-          };
-        }
+      if (userRow.role === 'teacher') {
+        // Helper function to safely parse JSON or convert comma-separated string to array
+        const parseSubjectsOrGrades = (data: any): string[] => {
+          if (!data) return [];
+          
+          // If already an array, return it
+          if (Array.isArray(data)) return data;
+          
+          // If not a string, return empty array
+          if (typeof data !== 'string') return [];
+          
+          try {
+            // Try to parse as JSON first
+            const parsed = JSON.parse(data);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            // If JSON parsing fails, treat as comma-separated string
+            return data.split(',').map(item => item.trim()).filter(item => item.length > 0);
+          }
+        };
+
+        additionalData = {
+          subjects: parseSubjectsOrGrades(userRow.subjects),
+          grades: parseSubjectsOrGrades(userRow.grades),
+        };
       }
       
       res.json({
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        role: user.role,
-        schoolId: user.school_id,
-        schoolName: user.school_name,
-        createdAt: user.created_at,
+        id: userRow.id,
+        email: userRow.email,
+        firstName: userRow.first_name,
+        lastName: userRow.last_name,
+        role: userRow.role,
+        schoolId: userRow.school_id,
+        schoolName: userRow.school_name,
+        createdAt: userRow.created_at,
         ...additionalData,
       });
     } catch (error) {

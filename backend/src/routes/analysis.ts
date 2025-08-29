@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Pool } from 'mysql2/promise';
 import { randomUUID } from 'crypto';
-import { authenticate, authorize } from '../middleware/auth-cognito';
+import { authenticate, authorize } from '../middleware/auth';
 import { lemurService } from '../services/lemur';
 
 const router = Router();

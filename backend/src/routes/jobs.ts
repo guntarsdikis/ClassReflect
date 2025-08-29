@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import pool from '../database';
 import { RowDataPacket } from 'mysql2';
-import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } from '../middleware/auth-cognito';
+import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } from '../middleware/auth';
 import AWS from 'aws-sdk';
 
 const router = Router();

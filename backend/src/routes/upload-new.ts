@@ -7,7 +7,7 @@ import pool from '../database';
 // import { storageService } from '../services/storage'; // Removed - AssemblyAI-only system
 import { processingService } from '../services/processing';
 import { config } from '../config/environment';
-import { authenticate, authorize } from '../middleware/auth-cognito';
+import { authenticate, authorize } from '../middleware/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const router = Router();

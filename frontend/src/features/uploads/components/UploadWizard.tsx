@@ -53,6 +53,7 @@ export function UploadWizard() {
   const [active, setActive] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isFileLoading, setIsFileLoading] = useState(false);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   
@@ -96,6 +97,23 @@ export function UploadWizard() {
       });
     } finally {
       setLoadingTeachers(false);
+    }
+  };
+
+  const handleFileChange = async (file: File | null) => {
+    if (file) {
+      console.log('🚀 File Debug - Starting file selection:', file.name);
+      setIsFileLoading(true);
+      
+      // Small delay to ensure loading state is visible and file is processed
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('🚀 File Debug - File selection complete:', file.name);
+      setAudioFile(file);
+      setIsFileLoading(false);
+    } else {
+      setAudioFile(null);
+      setIsFileLoading(false);
     }
   };
   
@@ -250,7 +268,7 @@ export function UploadWizard() {
     let valid = false;
     switch (active) {
       case 0:
-        valid = !!audioFile;
+        valid = !!audioFile && !isFileLoading;
         break;
       case 1:
         valid = !!(selectedTeacher && className && subject && grade);
@@ -265,6 +283,7 @@ export function UploadWizard() {
       step: active, 
       valid, 
       audioFile: !!audioFile,
+      isFileLoading,
       selectedTeacher: !!selectedTeacher,
       className: !!className,
       subject: !!subject,
@@ -305,16 +324,24 @@ export function UploadWizard() {
             <Stack mt="xl">
               <FileInput
                 label="Audio Recording"
-                placeholder="Click to select audio file"
+                placeholder={isFileLoading ? "Processing file..." : "Click to select audio file"}
                 leftSection={<IconFileMusic size={16} />}
                 accept="audio/*"
                 value={audioFile}
-                onChange={setAudioFile}
+                onChange={handleFileChange}
                 required
+                disabled={isFileLoading}
                 description="Supported formats: MP3, WAV, M4A, OGG (max 500MB)"
               />
               
-              {audioFile && (
+              {isFileLoading && (
+                <Alert icon={<IconInfoCircle size={16} />} variant="light" color="blue">
+                  <Text size="sm">Processing file...</Text>
+                  <Text size="xs" c="dimmed">Please wait while we prepare your file</Text>
+                </Alert>
+              )}
+              
+              {audioFile && !isFileLoading && (
                 <Alert icon={<IconInfoCircle size={16} />} variant="light">
                   <Text size="sm">File: {audioFile.name}</Text>
                   <Text size="sm">Size: {(audioFile.size / 1024 / 1024).toFixed(2)} MB</Text>

@@ -22,7 +22,10 @@ const app: Application = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://classreflect.gdwd.co.uk',
+  origin: [
+    process.env.FRONTEND_URL || 'https://classreflect.gdwd.co.uk',
+    'https://main.djiffqj77jjfx.amplifyapp.com'
+  ],
   credentials: true
 }));
 

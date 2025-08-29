@@ -100,7 +100,22 @@ export function UploadWizard() {
   };
   
   const handleSubmit = async () => {
+    console.log('🚀 Frontend Upload Debug - handleSubmit called');
+    console.log('🚀 Upload Debug - Form validation check:', {
+      audioFile: audioFile ? `File: ${audioFile.name}` : 'NULL',
+      selectedTeacher,
+      currentSchoolId,
+      className,
+      subject,
+      grade
+    });
+    
     if (!audioFile || !selectedTeacher || !currentSchoolId) {
+      console.log('❌ Frontend Upload Debug - Validation failed:', {
+        audioFile: !!audioFile,
+        selectedTeacher: !!selectedTeacher,
+        currentSchoolId: !!currentSchoolId
+      });
       notifications.show({
         title: 'Error',
         message: 'Missing required information',
@@ -108,6 +123,8 @@ export function UploadWizard() {
       });
       return;
     }
+    
+    console.log('✅ Frontend Upload Debug - Validation passed, proceeding with upload');
 
     setIsUploading(true);
     
@@ -139,12 +156,21 @@ export function UploadWizard() {
       }
       
       const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/direct`;
+      console.log('🚀 Frontend Upload Debug - Making fetch request to:', apiUrl);
+      console.log('🚀 Frontend Upload Debug - Token available:', token ? `Length: ${token.length}` : 'NULL');
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
         body: formData
+      });
+      
+      console.log('🚀 Frontend Upload Debug - Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
       });
 
       if (!response.ok) {
@@ -164,7 +190,9 @@ export function UploadWizard() {
       navigate('/dashboard');
       
     } catch (error: any) {
-      console.error('Upload failed:', error);
+      console.error('❌ Frontend Upload Debug - Error occurred:', error);
+      console.error('❌ Frontend Upload Debug - Error message:', error.message);
+      console.error('❌ Frontend Upload Debug - Error stack:', error.stack);
       setIsUploading(false);
       notifications.show({
         title: 'Upload Failed',
@@ -174,20 +202,42 @@ export function UploadWizard() {
     }
   };
   
-  const nextStep = () => setActive((current) => (current < 2 ? current + 1 : current));
-  const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
+  const nextStep = () => {
+    console.log('🚀 Upload Debug - Next step clicked, current:', active);
+    const newStep = current => (current < 2 ? current + 1 : current);
+    setActive(newStep);
+    console.log('🚀 Upload Debug - New step will be:', newStep(active));
+  };
+  const prevStep = () => {
+    console.log('🚀 Upload Debug - Previous step clicked, current:', active);
+    setActive((current) => (current > 0 ? current - 1 : current));
+  };
   
   const isStepValid = () => {
+    let valid = false;
     switch (active) {
       case 0:
-        return !!audioFile;
+        valid = !!audioFile;
+        break;
       case 1:
-        return selectedTeacher && className && subject && grade;
+        valid = !!(selectedTeacher && className && subject && grade);
+        break;
       case 2:
-        return true; // Review step
+        valid = true; // Review step
+        break;
       default:
-        return true;
+        valid = true;
     }
+    console.log('🚀 Upload Debug - Step validation:', { 
+      step: active, 
+      valid, 
+      audioFile: !!audioFile,
+      selectedTeacher: !!selectedTeacher,
+      className: !!className,
+      subject: !!subject,
+      grade: !!grade
+    });
+    return valid;
   };
 
   // Show message for super admin when no school is selected

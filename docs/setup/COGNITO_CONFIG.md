@@ -10,7 +10,7 @@
 
 ### App Client Details
 - **Client ID**: `6s2hfgujbgt28ce4eh15b502d4`
-- **Client Secret**: `1ulqetjqcbp0dsuvrlsrkvp2gomovrithj5dntt8emegnfl1fs1p`
+- **Client Secret**: `[REDACTED - stored in AWS Secrets Manager]`
 - **Client Name**: classreflect-app-client
 
 ### Configuration Features

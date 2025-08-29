@@ -23,7 +23,7 @@ echo ""
 echo "Cleaning up database..."
 mysql -h gdwd.cluster-cjjl7f5jormj.eu-west-2.rds.amazonaws.com \
       -u gdwd \
-      -p'FullSMS2025DB' \
+      -p'YOUR_PASSWORD_HERE' \
       classreflect << EOF
 -- Delete transcripts first (foreign key constraint)
 DELETE FROM transcripts;
@@ -43,7 +43,7 @@ echo ""
 echo "Database records remaining:"
 mysql -h gdwd.cluster-cjjl7f5jormj.eu-west-2.rds.amazonaws.com \
       -u gdwd \
-      -p'FullSMS2025DB' \
+      -p'YOUR_PASSWORD_HERE' \
       classreflect \
       -e "SELECT 'audio_jobs' as table_name, COUNT(*) as count FROM audio_jobs 
           UNION ALL 

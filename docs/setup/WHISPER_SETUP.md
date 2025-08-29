@@ -186,7 +186,7 @@ aws secretsmanager get-secret-value \
 2. Test database connection:
 ```bash
 mysql -h gdwd.cluster-cjjl7f5jormj.eu-west-2.rds.amazonaws.com \
-  -u gdwd -p'FullSMS2025DB' classreflect -e "SELECT COUNT(*) FROM audio_jobs;"
+  -u gdwd -p'YOUR_PASSWORD_HERE' classreflect -e "SELECT COUNT(*) FROM audio_jobs;"
 ```
 
 ## Cost Optimization

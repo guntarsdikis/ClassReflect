@@ -33,11 +33,20 @@ frontend:
           value: 'public, max-age=31536000, immutable'
   # SPA routing redirects - handle client-side routes
   redirects:
-    # Handle trailing slash routes - redirect /path/ to /path
-    - source: '/*/index.html'
+    # Handle specific routes with trailing slashes
+    - source: '/dashboard/'
       target: '/index.html'
       status: '200'
-    # Handle all non-asset requests (including paths with and without trailing slashes)
-    - source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json)$)([^.]+$)/>'
+    - source: '/upload/'
+      target: '/index.html'
+      status: '200'
+    - source: '/login/'
+      target: '/index.html'
+      status: '200'
+    - source: '/schools/'
+      target: '/index.html'
+      status: '200'
+    # Handle all SPA routes (fallback for any path without file extension)
+    - source: '/<*>'
       target: '/index.html'
       status: '200'

@@ -18,18 +18,36 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
     
+    console.log('🔐 LOGIN ATTEMPT - Starting login process');
+    console.log('🔐 LOGIN ATTEMPT - Email:', email);
+    console.log('🔐 LOGIN ATTEMPT - Password provided:', password ? `YES (${password.length} chars)` : 'NO');
+    console.log('🔐 LOGIN ATTEMPT - Request body keys:', Object.keys(req.body));
+    console.log('🔐 LOGIN ATTEMPT - Request headers:', {
+      'content-type': req.headers['content-type'],
+      'user-agent': req.headers['user-agent'],
+      'origin': req.headers['origin']
+    });
+    
     if (!email || !password) {
+      console.log('🔐 LOGIN ATTEMPT - FAILED: Missing email or password');
       res.status(400).json({ error: 'Email and password are required' });
       return;
     }
     
+    console.log('🔐 LOGIN ATTEMPT - Calling verifyCredentials...');
+    
     // Verify credentials
     const userPayload = await verifyCredentials(email, password, pool);
     
+    console.log('🔐 LOGIN ATTEMPT - verifyCredentials result:', userPayload ? 'SUCCESS' : 'FAILED');
+    
     if (!userPayload) {
+      console.log('🔐 LOGIN ATTEMPT - AUTHENTICATION FAILED for email:', email);
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
+    
+    console.log('🔐 LOGIN ATTEMPT - Authentication successful, proceeding with user lookup');
     
     // Get full user details
     const [rows] = await pool.execute(
@@ -41,26 +59,40 @@ router.post('/login', async (req: Request, res: Response) => {
       [userPayload.userId]
     );
     
+    console.log('🔐 LOGIN ATTEMPT - User lookup query result:', {
+      rowCount: Array.isArray(rows) ? rows.length : 'Not array',
+      userId: userPayload.userId
+    });
+    
     if (!Array.isArray(rows) || rows.length === 0) {
+      console.log('🔐 LOGIN ATTEMPT - FAILED: User not found in lookup phase for userId:', userPayload.userId);
       res.status(404).json({ error: 'User not found' });
       return;
     }
     
     const user = rows[0] as any;
+    console.log('🔐 LOGIN ATTEMPT - User details retrieved:', {
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role,
+      schoolId: user.school_id,
+      schoolName: user.school_name
+    });
     
     // Generate token
     const token = generateToken(userPayload);
     
-    console.log('🔐 Login Debug - Generated token for user:', {
+    console.log('🔐 LOGIN ATTEMPT - Generated JWT token:', {
       userId: userPayload.userId,
       email: userPayload.email,
       role: userPayload.role,
-      schoolId: userPayload.schoolId
+      schoolId: userPayload.schoolId,
+      tokenLength: token.length
     });
-    console.log('🔐 Login Debug - Token length:', token.length);
     
-    // Return user data and token
-    res.json({
+    const responseData = {
       token,
       user: {
         id: user.id,
@@ -71,9 +103,23 @@ router.post('/login', async (req: Request, res: Response) => {
         schoolId: user.school_id,
         schoolName: user.school_name,
       },
+    };
+    
+    console.log('🔐 LOGIN ATTEMPT - SUCCESS! Returning response:', {
+      hasToken: !!responseData.token,
+      userEmail: responseData.user.email,
+      userRole: responseData.user.role
     });
+    
+    // Return user data and token
+    res.json(responseData);
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('🔐 LOGIN ATTEMPT - CRITICAL ERROR:', error);
+    console.error('🔐 LOGIN ATTEMPT - Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack',
+      name: error instanceof Error ? error.name : 'Unknown'
+    });
     res.status(500).json({ error: 'Login failed' });
   }
 });

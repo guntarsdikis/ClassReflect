@@ -473,6 +473,115 @@ router.delete('/teachers/:id',
 );
 
 /**
+ * POST /api/users/teachers/:id/reset-password
+ * Reset teacher password (School Manager and Super Admin only)
+ */
+router.post('/teachers/:id/reset-password',
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify teacher exists and belongs to the school
+      const [teacher] = await pool.execute(
+        'SELECT email, first_name, last_name, school_id FROM users WHERE id = ? AND role = ? AND is_active = true',
+        [id, 'teacher']
+      );
+      
+      if ((teacher as any[]).length === 0) {
+        res.status(404).json({ error: 'Teacher not found or inactive' });
+        return;
+      }
+      
+      const teacherData = (teacher as any[])[0];
+      
+      // Check authorization - school managers can only reset teachers in their school
+      if (req.user!.role !== 'super_admin' && teacherData.school_id !== req.user!.schoolId) {
+        res.status(403).json({ error: 'Cannot reset password for teacher from another school' });
+        return;
+      }
+      
+      // Generate new temporary password
+      const tempPassword = `Temp${Math.random().toString(36).substring(2, 10)}!`;
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      // Update password in database
+      await pool.execute(
+        'UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?',
+        [hashedPassword, id]
+      );
+      
+      // TODO: Send email notification to teacher
+      
+      res.json({
+        message: 'Teacher password reset successfully',
+        temporaryPassword: tempPassword,
+        teacherEmail: teacherData.email,
+        teacherName: `${teacherData.first_name} ${teacherData.last_name}`,
+        requiresPasswordChange: true
+      });
+      
+    } catch (error) {
+      console.error('Reset teacher password error:', error);
+      res.status(500).json({ error: 'Failed to reset teacher password' });
+    }
+  }
+);
+
+/**
+ * POST /api/users/:id/reset-password
+ * Reset any user's password (Super Admin only)
+ */
+router.post('/:id/reset-password',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Get user details
+      const [user] = await pool.execute(
+        'SELECT email, first_name, last_name, role FROM users WHERE id = ? AND is_active = true',
+        [id]
+      );
+      
+      if ((user as any[]).length === 0) {
+        res.status(404).json({ error: 'User not found or inactive' });
+        return;
+      }
+      
+      const userData = (user as any[])[0];
+      
+      // Generate new temporary password
+      const tempPassword = `Temp${Math.random().toString(36).substring(2, 10)}!`;
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      // Update password in database
+      await pool.execute(
+        'UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?',
+        [hashedPassword, id]
+      );
+      
+      // TODO: Send email notification to user
+      
+      res.json({
+        message: 'User password reset successfully',
+        temporaryPassword: tempPassword,
+        userEmail: userData.email,
+        userName: `${userData.first_name} ${userData.last_name}`,
+        userRole: userData.role,
+        requiresPasswordChange: true
+      });
+      
+    } catch (error) {
+      console.error('Reset user password error:', error);
+      res.status(500).json({ error: 'Failed to reset user password' });
+    }
+  }
+);
+
+/**
  * GET /api/users/profile
  * Get current user profile
  */

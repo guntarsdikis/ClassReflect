@@ -192,6 +192,9 @@ export const verifyCredentials = async (
   pool: Pool
 ): Promise<TokenPayload | null> => {
   try {
+    console.log('🔐 Login Debug - Starting credential verification for email:', email);
+    console.log('🔐 Login Debug - Password provided:', password ? `Yes (${password.length} chars)` : 'No');
+    
     // Query the database for the user including password_hash
     const [rows] = await pool.execute(
       `SELECT u.id, u.email, u.role, u.school_id, u.first_name, u.last_name, 
@@ -202,19 +205,43 @@ export const verifyCredentials = async (
       [email]
     );
     
+    console.log('🔐 Login Debug - Database query result:', {
+      rowCount: Array.isArray(rows) ? rows.length : 'Not array',
+      hasResults: Array.isArray(rows) && rows.length > 0
+    });
+    
     if (!Array.isArray(rows) || rows.length === 0) {
+      console.log('🔐 Login Debug - No user found with email:', email);
       return null;
     }
     
     const user = rows[0] as any;
+    console.log('🔐 Login Debug - User found:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      schoolId: user.school_id,
+      hasPasswordHash: !!user.password_hash,
+      passwordHashLength: user.password_hash ? user.password_hash.length : 0,
+      isActive: true // Query already filters for is_active = true
+    });
     
     // Verify password with bcrypt if hash exists
     if (user.password_hash) {
       const bcrypt = require('bcrypt');
+      console.log('🔐 Login Debug - Comparing password with bcrypt...');
+      console.log('🔐 Login Debug - Input password:', password);
+      console.log('🔐 Login Debug - Stored hash (first 20 chars):', user.password_hash.substring(0, 20) + '...');
+      
       const validPassword = await bcrypt.compare(password, user.password_hash);
+      console.log('🔐 Login Debug - Password comparison result:', validPassword);
+      
       if (!validPassword) {
+        console.log('🔐 Login Debug - Password verification failed for user:', email);
         return null;
       }
+      
+      console.log('🔐 Login Debug - Password verification successful!');
     } else {
       // If no password hash exists, reject login for security
       console.log(`⚠️ User ${email} has no password hash - rejecting login`);
@@ -222,14 +249,17 @@ export const verifyCredentials = async (
     }
     
     // Return user data for token generation
-    return {
+    const tokenPayload = {
       userId: user.id.toString(),
       email: user.email,
       role: user.role,
       schoolId: user.school_id?.toString() || 'platform',
     };
+    
+    console.log('🔐 Login Debug - Returning token payload:', tokenPayload);
+    return tokenPayload;
   } catch (error) {
-    console.error('Error verifying credentials:', error);
+    console.error('🔐 Login Debug - Error verifying credentials:', error);
     return null;
   }
 };

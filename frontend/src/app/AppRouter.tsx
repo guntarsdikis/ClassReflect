@@ -5,6 +5,8 @@ import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { RoleRoute } from '@features/auth/components/RoleRoute';
 import { AppShell } from '@shared/components/Layout/AppShell';
 import { DashboardRouter } from '@features/dashboard/components/DashboardRouter';
+import { MyProgress } from '@features/dashboard/teacher/MyProgress';
+import { TeacherReports } from '@features/dashboard/teacher/TeacherReports';
 import { SchoolManagement } from '@features/schools/components/SchoolManagement';
 import { SchoolDetail } from '@features/schools/components/SchoolDetail';
 import { SubjectManagement } from '@features/schools/components/SubjectManagement';
@@ -37,16 +39,24 @@ export function AppRouter() {
           
           {/* Teacher Routes */}
           <Route element={<RoleRoute roles={['teacher']} />}>
-            <Route path="/progress" element={<div style={{padding: '2rem', textAlign: 'center'}}><h2>My Progress - Coming Soon</h2><p>Track your teaching progress and performance metrics here.</p></div>} />
-            <Route path="/reports" element={<div style={{padding: '2rem', textAlign: 'center'}}><h2>Reports - Coming Soon</h2><p>View detailed reports and analytics about your lessons here.</p></div>} />
+            <Route path="/progress" element={<MyProgress />} />
+            <Route path="/reports" element={<TeacherReports />} />
             {/* <Route path="/feedback/:jobId" element={<FeedbackView />} /> */}
           </Route>
           
-          {/* School Manager and Super Admin Routes */}
+          {/* School Manager and Super Admin Only Routes */}
           <Route element={<RoleRoute roles={['school_manager', 'super_admin']} />}>
             <Route path="/upload" element={<UploadWizard />} />
-            <Route path="/recordings" element={<RecordingsList />} />
+          </Route>
+
+          {/* School Manager and Super Admin Only Routes */}
+          <Route element={<RoleRoute roles={['school_manager', 'super_admin']} />}>
             <Route path="/analysis" element={<AnalysisManager />} />
+          </Route>
+
+          {/* School Manager and Super Admin Routes */}
+          <Route element={<RoleRoute roles={['school_manager', 'super_admin']} />}>
+            <Route path="/recordings" element={<RecordingsList />} />
             <Route path="/templates" element={<TemplateManagement />} />
             <Route path="/categories" element={<TemplateCategoryManagement />} />
             <Route path="/subjects" element={<SubjectManagement />} />

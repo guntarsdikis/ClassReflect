@@ -120,7 +120,14 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs"
     ],
-    "deny": [],
+    "deny": [
+      "Bash(npm start)",
+      "Bash(npm start:*)",
+      "Bash(npm run dev)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run start)",
+      "Bash(npm run start:*)"
+    ],
     "ask": []
   }
 }

@@ -75,12 +75,18 @@ export function UploadWizard() {
   };
 
   const currentSchoolId = getEffectiveSchoolId();
+  const isTeacher = user?.role === 'teacher';
 
   useEffect(() => {
-    if (currentSchoolId) {
+    // If current user is a teacher, auto-select themselves
+    if (isTeacher && user?.id) {
+      setSelectedTeacher(user.id.toString());
+    }
+    // Only load teachers list for school managers/admins
+    else if (currentSchoolId && !isTeacher) {
       loadTeachers();
     }
-  }, [currentSchoolId, selectedSchool]);
+  }, [currentSchoolId, selectedSchool, isTeacher, user?.id]);
 
   const loadTeachers = async () => {
     try {
@@ -298,6 +304,9 @@ export function UploadWizard() {
       <Container size="md" py="xl">
         <Alert icon={<IconAlertCircle size="1rem" />} title="No School Selected" color="blue">
           Please select a school from the school switcher above to upload recordings.
+          <Text size="sm" mt="sm" c="dimmed">
+            Super admins can upload for any school, but you must select which school this recording belongs to.
+          </Text>
         </Alert>
       </Container>
     );
@@ -356,18 +365,29 @@ export function UploadWizard() {
             icon={<IconInfoCircle size={18} />}
           >
             <Stack mt="xl">
-              <Select
-                label="Teacher"
-                placeholder={loadingTeachers ? "Loading teachers..." : "Select a teacher"}
-                data={teachers.map(teacher => ({
-                  value: teacher.id.toString(),
-                  label: `${teacher.firstName} ${teacher.lastName}${teacher.subjects?.length ? ` - ${teacher.subjects.join(', ')}` : ''}${teacher.grades?.length ? ` (Grades ${teacher.grades.join(', ')})` : ''}`
-                }))}
-                value={selectedTeacher}
-                onChange={(value) => setSelectedTeacher(value || '')}
-                required
-                disabled={loadingTeachers}
-              />
+              {isTeacher ? (
+                // For teachers - show their info as read-only
+                <TextInput
+                  label="Teacher"
+                  value={`${user?.firstName} ${user?.lastName}`}
+                  disabled
+                  description="Recording will be associated with your account"
+                />
+              ) : (
+                // For managers/admins - show teacher selection dropdown
+                <Select
+                  label="Teacher"
+                  placeholder={loadingTeachers ? "Loading teachers..." : "Select a teacher"}
+                  data={teachers.map(teacher => ({
+                    value: teacher.id.toString(),
+                    label: `${teacher.firstName} ${teacher.lastName}${teacher.subjects?.length ? ` - ${teacher.subjects.join(', ')}` : ''}${teacher.grades?.length ? ` (Grades ${teacher.grades.join(', ')})` : ''}`
+                  }))}
+                  value={selectedTeacher}
+                  onChange={(value) => setSelectedTeacher(value || '')}
+                  required
+                  disabled={loadingTeachers}
+                />
+              )}
               
               <TextInput
                 label="Class Name"

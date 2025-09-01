@@ -12,6 +12,9 @@ import {
   Paper,
   SimpleGrid,
   ThemeIcon,
+  Loader,
+  Alert,
+  ActionIcon,
 } from '@mantine/core';
 import {
   IconFileText,
@@ -21,63 +24,166 @@ import {
   IconEye,
   IconDownload,
   IconChartBar,
+  IconUpload,
+  IconBell,
+  IconRefresh,
+  IconCheck,
 } from '@tabler/icons-react';
-// import { useQuery } from '@tanstack/react-query';
-// import { api } from '@shared/services/api.client';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@shared/services/api.client';
 import { useAuthStore } from '@store/auth.store';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
-// TODO: Replace with real API calls when backend endpoints are ready
-// const { data: evaluations, isLoading: evaluationsLoading } = useQuery(['teacher-evaluations']);
-// const { data: progress, isLoading: progressLoading } = useQuery(['teacher-progress']);
+// Types for teacher job data - matching backend response
+interface TeacherJob {
+  id: string;
+  class_name: string;
+  subject: string;
+  grade: string;
+  file_name: string;
+  created_at: string;
+  status: 'pending' | 'uploading' | 'queued' | 'processing' | 'completed' | 'failed';
+  progress_percentage?: number;
+  has_analysis?: number;
+  analysis_count?: number;
+  latest_score?: number;
+  transcript_content?: string;
+  word_count?: number;
+  confidence_score?: number;
+  teacher_name: string;
+  first_name: string;
+  last_name: string;
+  school_name: string;
+}
 
-// Placeholder data - will be replaced with real data
-const recentEvaluations: any[] = [];
-const progress = {};
+const getStatusInfo = (job: TeacherJob) => {
+  switch (job.status) {
+    case 'pending':
+    case 'uploading':
+      return { label: 'Uploading', color: 'blue', progress: 25 };
+    case 'queued':
+    case 'processing':
+      return { label: 'Processing', color: 'orange', progress: job.progress_percentage || 50 };
+    case 'completed':
+      return { label: 'Completed', color: 'green', progress: 100 };
+    case 'failed':
+      return { label: 'Failed', color: 'red', progress: 0 };
+    default:
+      return { label: 'Unknown', color: 'gray', progress: 0 };
+  }
+};
 
 export function TeacherDashboard() {
   const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
   
-  // In real app, fetch data with React Query
-  // const { data: evaluations, isLoading } = useQuery({
-  //   queryKey: ['teacher-evaluations', user?.id],
-  //   queryFn: () => api.jobs.getTeacherJobs(user!.id),
-  // });
+  // Fetch teacher's jobs/recordings
+  const { data: jobs, isLoading: jobsLoading, error: jobsError, refetch: refetchJobs } = useQuery({
+    queryKey: ['teacher-jobs', user?.id],
+    queryFn: () => api.jobs.getTeacherJobs(user!.id.toString()),
+    enabled: !!user?.id,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds as per plan
+  });
+
+  // Ensure jobs data is always an array - backend returns { jobs: [...], count: N }
+  const jobsData = Array.isArray(jobs?.data?.jobs) ? jobs.data.jobs : (Array.isArray(jobs?.jobs) ? jobs.jobs : []);
   
+  const recentJobs = jobsData.slice(0, 5); // Last 5-7 recordings as per plan
+  
+  // Calculate stats from real data
+  const totalRecordings = jobsData.length;
+  const thisMonthRecordings = jobsData.filter((job: TeacherJob) => {
+    const uploadDate = new Date(job.created_at);
+    const now = new Date();
+    return uploadDate.getMonth() === now.getMonth() && uploadDate.getFullYear() === now.getFullYear();
+  }).length;
+  
+  const analyzedJobs = jobsData.filter((job: TeacherJob) => job.has_analysis > 0);
+  const averageScore = analyzedJobs.length > 0 
+    ? Math.round(analyzedJobs.reduce((sum: number, job: TeacherJob) => sum + (job.latest_score || 0), 0) / analyzedJobs.length)
+    : null;
+
   const stats = [
     {
-      title: 'Total Evaluations',
-      value: '0',
+      title: 'Total Recordings',
+      value: totalRecordings.toString(),
       icon: IconFileText,
       color: 'blue',
     },
     {
       title: 'Average Score',
-      value: 'N/A',
+      value: averageScore ? `${averageScore}%` : 'N/A',
       icon: IconStar,
       color: 'yellow',
     },
     {
       title: 'This Month',
-      value: '0',
+      value: thisMonthRecordings.toString(),
       icon: IconClock,
       color: 'green',
     },
     {
-      title: 'Improvement',
-      value: 'N/A',
+      title: 'Analyzed',
+      value: analyzedJobs.length.toString(),
       icon: IconTrendingUp,
       color: 'teal',
     },
   ];
+
+  // Count pending actions
+  const pendingTranscriptions = jobsData.filter((job: TeacherJob) => 
+    job.status === 'pending' || job.status === 'uploading' || job.status === 'queued' || job.status === 'processing'
+  ).length;
   
+  const readyForAnalysis = jobsData.filter((job: TeacherJob) => 
+    job.status === 'completed' && (!job.has_analysis || job.has_analysis === 0)
+  ).length;
+  
+  const newAnalysisResults = jobsData.filter((job: TeacherJob) => 
+    job.status === 'completed' && job.has_analysis && job.has_analysis > 0
+  ).length;
+  
+  if (jobsError) {
+    return (
+      <Container size="xl">
+        <Alert color="red" title="Error loading dashboard">
+          <Text mb="md">Unable to load your recordings and analytics.</Text>
+          <Text size="sm" c="dimmed" mb="md">
+            {jobsError.message}
+          </Text>
+          <Button onClick={() => refetchJobs()} mt="md">
+            Try Again
+          </Button>
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container size="xl">
-      <Title order={1} mb="xl">
-        Welcome back, {user?.firstName}!
-      </Title>
+      {/* Welcome Header with personalized greeting */}
+      <Group justify="space-between" mb="xl">
+        <div>
+          <Title order={1}>
+            Welcome back, {user?.firstName}!
+          </Title>
+          <Text c="dimmed" size="sm">
+            {format(new Date(), 'EEEE, MMMM d, yyyy')} • {totalRecordings} total recordings
+          </Text>
+        </div>
+        <Group>
+          <ActionIcon 
+            variant="subtle" 
+            onClick={() => refetchJobs()}
+            loading={jobsLoading}
+          >
+            <IconRefresh size={18} />
+          </ActionIcon>
+        </Group>
+      </Group>
       
-      {/* Stats Cards */}
+      {/* Quick Stats Overview */}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg" mb="xl">
         {stats.map((stat) => (
           <Card key={stat.title} shadow="sm" p="lg" radius="md" withBorder>
@@ -99,139 +205,211 @@ export function TeacherDashboard() {
       </SimpleGrid>
       
       <Grid gutter="lg">
-        {/* Recent Evaluations */}
+        {/* Recent Recordings Widget (TOP PRIORITY) */}
         <Grid.Col span={{ base: 12, lg: 8 }}>
           <Card shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
-              <Title order={3}>Recent Evaluations</Title>
-              <Button variant="subtle" size="sm" rightSection={<IconChartBar size={16} />}>
-                View All
-              </Button>
+              <Title order={3}>Recent Recordings</Title>
+              <Group>
+                <Button 
+                  variant="subtle" 
+                  size="sm" 
+                  rightSection={<IconChartBar size={16} />}
+                  onClick={() => navigate('/reports')}
+                >
+                  View All
+                </Button>
+              </Group>
             </Group>
             
-            {recentEvaluations.length > 0 ? (
+            {jobsLoading ? (
+              <Group justify="center" p="xl">
+                <Loader size="lg" />
+                <Text c="dimmed">Loading your recordings...</Text>
+              </Group>
+            ) : recentJobs.length > 0 ? (
               <Stack gap="md">
-                {recentEvaluations.map((evaluation) => (
-                  <Paper key={evaluation.id} p="md" withBorder>
-                    <Group justify="space-between" mb="xs">
-                      <div>
-                        <Text fw={600}>{evaluation.className}</Text>
-                        <Text size="sm" c="dimmed">
-                          {format(evaluation.date, 'MMM dd, yyyy')} • Uploaded by {evaluation.uploadedBy}
-                        </Text>
-                      </div>
-                      {evaluation.status === 'completed' ? (
-                        <Badge color="green" variant="light">
-                          Score: {evaluation.score}%
-                        </Badge>
-                      ) : (
-                        <Badge color="blue" variant="light">
-                          Processing: {evaluation.progress}%
-                        </Badge>
-                      )}
-                    </Group>
-                    
-                    {evaluation.status === 'completed' && (
-                      <>
-                        <Text size="sm" mt="xs" c="dimmed">
-                          {evaluation.feedback}
-                        </Text>
+                {recentJobs.map((job: TeacherJob) => {
+                  const statusInfo = getStatusInfo(job);
+                  return (
+                    <Paper key={job.id} p="md" withBorder>
+                      <Group justify="space-between" mb="xs">
+                        <div style={{ flex: 1 }}>
+                          <Text fw={600} size="md">
+                            {job.file_name || 'Untitled Recording'}
+                          </Text>
+                          <Group gap="xs" mt={4}>
+                            {job.class_name && (
+                              <Text size="sm" fw={500} c="blue">
+                                {job.class_name}
+                              </Text>
+                            )}
+                            {job.subject && (
+                              <Badge variant="outline" size="sm">
+                                {job.subject}
+                              </Badge>
+                            )}
+                            {job.grade && (
+                              <Badge variant="light" size="sm" color="gray">
+                                Grade {job.grade}
+                              </Badge>
+                            )}
+                          </Group>
+                          <Text size="xs" c="dimmed" mt={2}>
+                            {formatDistanceToNow(new Date(job.created_at), { addSuffix: true })}
+                            {job.word_count && ` • ${job.word_count.toLocaleString()} words`}
+                          </Text>
+                        </div>
+                        <Group gap="xs">
+                          {job.has_analysis > 0 ? (
+                            <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>
+                              {job.has_analysis === 1 ? '1 Analysis' : `${job.has_analysis} Analyses`}
+                            </Badge>
+                          ) : (
+                            <Badge color="gray" variant="light">
+                              Not Analyzed
+                            </Badge>
+                          )}
+                          <Badge color={statusInfo.color} variant="light">
+                            {statusInfo.label}
+                          </Badge>
+                        </Group>
+                      </Group>
+                      
+                      {job.status === 'completed' && job.has_analysis > 0 && (
                         <Group gap="xs" mt="md">
                           <Button
                             size="xs"
                             variant="light"
                             leftSection={<IconEye size={14} />}
+                            onClick={() => navigate(`/reports?recording=${job.id}`)}
                           >
-                            View Feedback
+                            View Results
                           </Button>
                           <Button
                             size="xs"
                             variant="subtle"
                             leftSection={<IconDownload size={14} />}
+                            onClick={() => {
+                              // TODO: Implement PDF download for specific recording
+                              console.log('Download PDF for recording:', job.id);
+                            }}
                           >
-                            Export Report
+                            Download PDF
                           </Button>
                         </Group>
-                      </>
-                    )}
-                    
-                    {evaluation.status === 'processing' && (
-                      <Progress value={evaluation.progress!} mt="xs" />
-                    )}
-                  </Paper>
-                ))}
+                      )}
+                      
+                      {job.status === 'completed' && (!job.has_analysis || job.has_analysis === 0) && (
+                        <Group gap="xs" mt="md">
+                          <Text size="xs" c="dimmed">
+                            Analysis pending - your school manager will apply analysis templates
+                          </Text>
+                        </Group>
+                      )}
+                      
+                      {(job.status === 'processing' || job.status === 'queued' || job.status === 'uploading') && (
+                        <Progress value={statusInfo.progress} mt="xs" />
+                      )}
+                    </Paper>
+                  );
+                })}
               </Stack>
             ) : (
               <Paper p="xl" ta="center">
                 <Text c="dimmed" size="sm" mb="md">
-                  No evaluations yet. Your class evaluations will appear here once uploaded and processed.
-                </Text>
-                <Text c="dimmed" size="xs">
-                  Coming soon: View your teaching performance feedback and improvement suggestions.
+                  No recordings yet. Your recordings will appear here once uploaded by your school manager.
                 </Text>
               </Paper>
             )}
           </Card>
         </Grid.Col>
         
-        {/* Progress Overview */}
+        {/* Sidebar: Pending Actions Panel and Quick Upload */}
         <Grid.Col span={{ base: 12, lg: 4 }}>
-          <Card shadow="sm" p="lg" radius="md" withBorder>
-            <Title order={3} mb="md">Your Progress This Month</Title>
+          {/* Pending Actions Panel */}
+          <Card shadow="sm" p="lg" radius="md" withBorder mb="lg">
+            <Group justify="space-between" mb="md">
+              <Title order={3}>Pending Actions</Title>
+              {(pendingTranscriptions + readyForAnalysis + newAnalysisResults) > 0 && (
+                <ThemeIcon color="orange" variant="light" size="sm">
+                  <IconBell size={16} />
+                </ThemeIcon>
+              )}
+            </Group>
             
-            {Object.keys(progress).length > 0 ? (
-              <Stack gap="lg">
-                {Object.entries(progress).map(([key, data]: [string, any]) => (
-                  <div key={key}>
-                    <Group justify="space-between" mb={5}>
-                      <Text size="sm" fw={500} tt="capitalize">
-                        {key}
-                      </Text>
-                      <Group gap={5}>
-                        <Text size="sm" fw={600}>
-                          {data.current}%
-                        </Text>
-                        <Badge
-                          size="sm"
-                          color={data.change >= 0 ? 'green' : 'red'}
-                          variant="light"
-                        >
-                          {data.change >= 0 ? '+' : ''}{data.change}%
-                        </Badge>
-                      </Group>
-                    </Group>
-                    <Progress value={data.current} size="lg" />
-                  </div>
-                ))}
-              </Stack>
-            ) : (
-              <Paper p="xl" ta="center">
-                <Text c="dimmed" size="sm" mb="md">
-                  Your teaching progress analytics will appear here.
-                </Text>
-                <Text c="dimmed" size="xs">
-                  Coming soon: Track your improvement in engagement, clarity, classroom management, and assessment techniques.
-                </Text>
-              </Paper>
+            <Stack gap="md">
+              {pendingTranscriptions > 0 && (
+                <Paper p="sm" bg="blue.0" radius="sm">
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>Transcribing</Text>
+                    <Badge size="sm" color="blue">{pendingTranscriptions}</Badge>
+                  </Group>
+                  <Text size="xs" c="dimmed">Recordings being transcribed</Text>
+                </Paper>
+              )}
+              
+              {readyForAnalysis > 0 && (
+                <Paper p="sm" bg="green.0" radius="sm">
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>Ready for Analysis</Text>
+                    <Badge size="sm" color="green">{readyForAnalysis}</Badge>
+                  </Group>
+                  <Text size="xs" c="dimmed">Recordings ready to analyze</Text>
+                </Paper>
+              )}
+              
+              {newAnalysisResults > 0 && (
+                <Paper p="sm" bg="teal.0" radius="sm">
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>New Analysis Results</Text>
+                    <Badge size="sm" color="teal">{newAnalysisResults}</Badge>
+                  </Group>
+                  <Text size="xs" c="dimmed">New feedback available</Text>
+                </Paper>
+              )}
+              
+              {(pendingTranscriptions + readyForAnalysis + newAnalysisResults) === 0 && (
+                <Paper p="sm" ta="center">
+                  <Text size="sm" c="dimmed">All caught up! No pending actions.</Text>
+                </Paper>
+              )}
+            </Stack>
+            
+            {newAnalysisResults > 0 && (
+              <Text size="sm" ta="center" mt="md" c="dimmed">
+                New analysis results available - check your recordings below
+              </Text>
             )}
-            
-            <Button fullWidth mt="xl" variant="light">
-              View Detailed Analytics
-            </Button>
           </Card>
+
           
           {/* Quick Actions */}
-          <Card shadow="sm" p="lg" radius="md" withBorder mt="lg">
+          <Card shadow="sm" p="lg" radius="md" withBorder>
             <Title order={3} mb="md">Quick Actions</Title>
             
             <Stack>
-              <Button variant="subtle" justify="space-between" rightSection={<IconChartBar size={16} />}>
+              <Button 
+                variant="subtle" 
+                justify="space-between" 
+                rightSection={<IconChartBar size={16} />}
+                onClick={() => navigate('/progress')}
+              >
                 View Progress Report
               </Button>
-              <Button variant="subtle" justify="space-between" rightSection={<IconDownload size={16} />}>
+              <Button 
+                variant="subtle" 
+                justify="space-between" 
+                rightSection={<IconDownload size={16} />}
+                onClick={() => navigate('/reports')}
+              >
                 Export Monthly Summary
               </Button>
-              <Button variant="subtle" justify="space-between" rightSection={<IconFileText size={16} />}>
+              <Button 
+                variant="subtle" 
+                justify="space-between" 
+                rightSection={<IconFileText size={16} />}
+              >
                 Learning Resources
               </Button>
             </Stack>

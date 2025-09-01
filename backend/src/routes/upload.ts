@@ -87,9 +87,23 @@ router.post('/direct',
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    // Enhanced debugging - log all req.body contents first
+    console.log('📤 Upload Debug - Full req.body:', req.body);
+    console.log('📤 Upload Debug - req.body keys:', Object.keys(req.body));
+    console.log('📤 Upload Debug - req.body values:', Object.values(req.body));
+    
     const { teacherId, schoolId, className, subject, grade, duration, notes } = req.body;
-    console.log('📤 Upload Debug - Form data:', {
+    console.log('📤 Upload Debug - Extracted form data:', {
       teacherId, schoolId, className, subject, grade, duration, notes
+    });
+    console.log('📤 Upload Debug - Form data types:', {
+      teacherId: typeof teacherId, 
+      schoolId: typeof schoolId, 
+      className: typeof className, 
+      subject: typeof subject, 
+      grade: typeof grade, 
+      duration: typeof duration, 
+      notes: typeof notes
     });
 
     if (!teacherId || !schoolId) {
@@ -137,12 +151,23 @@ router.post('/direct',
     const jobId = uuidv4();
     console.log('📤 Upload Debug - Generated job ID:', jobId);
 
+    // Process form data - convert empty strings to null, handle undefined
+    const processedClassName = className && className.trim() !== '' ? className.trim() : null;
+    const processedSubject = subject && subject.trim() !== '' ? subject.trim() : null;
+    const processedGrade = grade && grade.trim() !== '' ? grade.trim() : null;
+    const processedDuration = duration && !isNaN(parseInt(duration)) ? parseInt(duration) : null;
+    const processedNotes = notes && notes.trim() !== '' ? notes.trim() : null;
+    
+    console.log('📤 Upload Debug - Processed form data for DB:', {
+      processedClassName, processedSubject, processedGrade, processedDuration, processedNotes
+    });
+
     // Create job record in database (no S3 involved)
     console.log('📤 Upload Debug - Creating database record...');
     await pool.execute<ResultSetHeader>(
       `INSERT INTO audio_jobs (id, teacher_id, school_id, class_name, subject, grade, class_duration_minutes, notes, file_name, file_size, status) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
-      [jobId, teacherId, schoolId, className || null, subject || null, grade || null, duration || null, notes || null, req.file.originalname, req.file.size]
+      [jobId, teacherId, schoolId, processedClassName, processedSubject, processedGrade, processedDuration, processedNotes, req.file.originalname, req.file.size]
     );
     console.log('✅ Upload Debug - Database record created');
 

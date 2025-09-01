@@ -127,8 +127,12 @@ export class UsersService {
    */
   async createUser(data: CreateUserRequest): Promise<{
     message: string;
-    userId: number;
+    id: number;
     email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    schoolId: number;
     temporaryPassword?: string;
   }> {
     return this.api.post('/users', data);

@@ -1,0 +1,1 @@
+how difficult would be to create mobile applications for iphone and the android for whole app? and how much you think this could cost additionally? think   

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClassReflect Development Proposal</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+        }
+        
+        h1 {
+            color: #1a252f;
+            border-bottom: 3px solid #4a6741;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        h2 {
+            color: #34495e;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-left: 4px solid #4a6741;
+            padding-left: 15px;
+        }
+        
+        h3 {
+            color: #2c3e50;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .header-subtitle {
+            font-size: 1.2em;
+            color: #6c757d;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        
+        .investment-summary {
+            background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+        
+        .investment-summary h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            border: none;
+            padding: 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        
+        th, td {
+            border: 1px solid #e9ecef;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #495057;
+            color: white;
+            font-weight: bold;
+        }
+        
+        td {
+            background-color: white;
+            color: #2c3e50;
+        }
+        
+        tr:nth-child(even) td {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+        }
+        
+        tr:hover td {
+            background-color: #e9ecef;
+            color: #2c3e50;
+        }
+        
+        .feature-list {
+            background-color: #f8f9fa;
+            border-left: 4px solid #4a6741;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .feature-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .feature-list li {
+            margin: 8px 0;
+            font-size: 1.05em;
+        }
+        
+        .highlight {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1.2em;
+            color: #2c3e50;
+        }
+        
+        .phase-box {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .phase-box h4 {
+            margin: 0 0 10px 0;
+            font-size: 1.3em;
+        }
+        
+        .phase-box ul {
+            margin: 10px 0 0 0;
+            padding-left: 20px;
+        }
+        
+        .checkmark {
+            color: #4a6741;
+            font-weight: bold;
+        }
+        
+        .cost-emphasis {
+            background: linear-gradient(135deg, #495057 0%, #6c757d 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 30px 0;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+        
+        .footer {
+            background-color: #343a40;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 40px;
+            text-align: center;
+        }
+        
+        .small-text {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 20px;
+            text-align: center;
+            font-style: italic;
+        }
+        
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(to right, transparent, #dee2e6, transparent);
+            margin: 40px 0;
+        }
+        
+        @media print {
+            body {
+                max-width: none;
+                margin: 0;
+                padding: 15px;
+            }
+            
+            .phase-box, .investment-summary, .cost-emphasis {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>ClassReflect Development Proposal</h1>
+    <div class="header-subtitle"><strong>Professional Educational Audio Analysis Platform</strong></div>
+
+    <div class="investment-summary">
+        <h2>🎯 Project Overview</h2>
+        <p>ClassReflect is a cutting-edge educational technology platform designed to revolutionize how teachers analyze and improve their classroom interactions through intelligent audio processing and AI-powered insights.</p>
+        
+        <h3>Key Benefits</h3>
+        <ul>
+            <li><strong>Transform Teaching Quality:</strong> Automated analysis of classroom audio sessions</li>
+            <li><strong>Save Time:</strong> Instant transcription and insights instead of manual review</li>
+            <li><strong>Data-Driven Improvement:</strong> Objective metrics for teaching effectiveness</li>
+            <li><strong>Cost-Effective Solution:</strong> 95% cost savings compared to traditional analysis methods</li>
+            <li><strong>Scalable Platform:</strong> Grows with your organization's needs</li>
+        </ul>
+    </div>
+
+    <div class="cost-emphasis">
+        <h2>💰 Investment Summary</h2>
+        <table>
+            <tr>
+                <th>Component</th>
+                <th>Cost (excl. VAT)</th>
+                <th>Timeline</th>
+            </tr>
+            <tr>
+                <td><strong>Complete Platform Development</strong></td>
+                <td><strong>€15,000</strong></td>
+                <td>8-10 weeks</td>
+            </tr>
+            <tr>
+                <td><strong>Monthly Operations (Standard Support)</strong></td>
+                <td><strong>€506.91</strong></td>
+                <td>Ongoing</td>
+            </tr>
+            <tr>
+                <td><strong>Cost per Teaching Session</strong></td>
+                <td><strong>€101.69</strong></td>
+                <td>Usage-based</td>
+            </tr>
+        </table>
+        
+        <div class="highlight">
+            Total Development Investment: €15,000 (excl. VAT)
+        </div>
+    </div>
+
+    <hr>
+
+    <h2>🚀 Platform Features</h2>
+
+    <div class="feature-list">
+        <h3><span class="checkmark">✅</span> Core Functionality</h3>
+        <ul>
+            <li><strong>Secure Audio Upload System</strong> with drag-and-drop interface</li>
+            <li><strong>Professional Transcription Service</strong> powered by AssemblyAI</li>
+            <li><strong>Multi-Role Access Control</strong> (Teachers, Managers, Administrators)</li>
+            <li><strong>Interactive Dashboards</strong> with real-time status tracking</li>
+            <li><strong>School Management System</strong> for multi-tenant organizations</li>
+            <li><strong>Modern Web Interface</strong> built with latest React technology</li>
+        </ul>
+    </div>
+
+    <div class="feature-list">
+        <h3><span class="checkmark">✅</span> Advanced Features Included</h3>
+        <ul>
+            <li><strong>Progressive File Upload</strong> with real-time progress tracking</li>
+            <li><strong>Template-Based Analysis</strong> system for standardized evaluations</li>
+            <li><strong>User Management Portal</strong> with role-based permissions</li>
+            <li><strong>Responsive Design</strong> optimized for desktop and mobile</li>
+            <li><strong>Professional UI Components</strong> with polished user experience</li>
+            <li><strong>Comprehensive Error Handling</strong> and user feedback systems</li>
+        </ul>
+    </div>
+
+    <div class="feature-list">
+        <h3><span class="checkmark">✅</span> Enterprise Infrastructure</h3>
+        <ul>
+            <li><strong>Cloud-Native Architecture</strong> on Amazon Web Services</li>
+            <li><strong>Automatic Scaling</strong> to handle varying loads</li>
+            <li><strong>Professional Security</strong> with JWT authentication</li>
+            <li><strong>Reliable File Storage</strong> with backup and redundancy</li>
+            <li><strong>Production Monitoring</strong> and alerting systems</li>
+            <li><strong>SSL Encryption</strong> for all data transmission</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>🏗️ Development Breakdown</h2>
+
+    <div class="phase-box">
+        <h4>Phase 1: Foundation & Architecture (€2,280)</h4>
+        <strong>Duration: 2 weeks</strong>
+        <ul>
+            <li>Requirements analysis and technical specifications</li>
+            <li>System architecture design and AWS infrastructure planning</li>
+            <li>Database schema design with scalability considerations</li>
+            <li>Security framework and authentication strategy</li>
+            <li>Project setup and development environment configuration</li>
+        </ul>
+    </div>
+
+    <div class="phase-box">
+        <h4>Phase 2: Core Backend Development (€5,775)</h4>
+        <strong>Duration: 3 weeks</strong>
+        <ul>
+            <li><strong>Authentication System:</strong> JWT-based secure login with password reset</li>
+            <li><strong>API Development:</strong> RESTful endpoints for all platform functions</li>
+            <li><strong>Database Implementation:</strong> MySQL with optimized queries and indexing</li>
+            <li><strong>File Processing Pipeline:</strong> Upload handling and AssemblyAI integration</li>
+            <li><strong>Multi-Tenant Architecture:</strong> School-based data isolation</li>
+            <li><strong>Role-Based Access Control:</strong> Fine-grained permission system</li>
+        </ul>
+    </div>
+
+    <div class="phase-box">
+        <h4>Phase 3: User Interface Development (€5,600)</h4>
+        <strong>Duration: 3 weeks</strong>
+        <ul>
+            <li><strong>Modern React Application:</strong> Built with TypeScript and Vite</li>
+            <li><strong>Authentication Interface:</strong> Professional login/register forms</li>
+            <li><strong>Upload Wizard:</strong> Intuitive file upload with progress tracking</li>
+            <li><strong>Teacher Dashboard:</strong> Comprehensive job management interface</li>
+            <li><strong>Manager Dashboard:</strong> School-wide overview and analytics</li>
+            <li><strong>Admin Interface:</strong> User and school management tools</li>
+        </ul>
+    </div>
+
+    <div class="phase-box">
+        <h4>Phase 4: Infrastructure & Deployment (€2,295)</h4>
+        <strong>Duration: 1 week</strong>
+        <ul>
+            <li><strong>AWS Infrastructure Setup:</strong> ECS, Load Balancer, and networking</li>
+            <li><strong>Docker Containerization:</strong> Professional deployment architecture</li>
+            <li><strong>CI/CD Pipeline:</strong> Automated testing and deployment</li>
+            <li><strong>Production Monitoring:</strong> CloudWatch logging and alerting</li>
+            <li><strong>Security Configuration:</strong> SSL certificates and VPC setup</li>
+        </ul>
+    </div>
+
+    <div class="phase-box">
+        <h4>Phase 5: Testing & Launch (€1,300)</h4>
+        <strong>Duration: 1 week</strong>
+        <ul>
+            <li><strong>End-to-End Testing:</strong> Complete workflow validation</li>
+            <li><strong>Security Testing:</strong> Authentication and authorization verification</li>
+            <li><strong>Performance Testing:</strong> Load testing and optimization</li>
+            <li><strong>User Acceptance Testing:</strong> Client feedback and refinement</li>
+            <li><strong>Go-Live Support:</strong> Production deployment and monitoring</li>
+        </ul>
+    </div>
+
+    <div class="cost-emphasis">
+        Total Development Cost: €15,000 (excl. VAT)
+    </div>
+
+    <hr>
+
+    <h2>📈 Operational Costs</h2>
+
+    <h3>Monthly Infrastructure (€56.91)</h3>
+    <table>
+        <tr>
+            <th>Service</th>
+            <th>Specification</th>
+            <th>Monthly Cost</th>
+            <th>Notes</th>
+        </tr>
+        <tr>
+            <td><strong>ECS Fargate</strong></td>
+            <td>0.5 vCPU, 1GB RAM</td>
+            <td>€16.02</td>
+            <td>24/7 uptime</td>
+        </tr>
+        <tr>
+            <td><strong>Load Balancer</strong></td>
+            <td>Application Load Balancer</td>
+            <td>€19.36</td>
+            <td>High availability</td>
+        </tr>
+        <tr>
+            <td><strong>Database</strong></td>
+            <td>Aurora MySQL</td>
+            <td>€15.00</td>
+            <td>Shared cluster</td>
+        </tr>
+        <tr>
+            <td><strong>File Storage</strong></td>
+            <td>Amazon EFS</td>
+            <td>€3.00</td>
+            <td>Audio files</td>
+        </tr>
+        <tr>
+            <td><strong>Monitoring & DNS</strong></td>
+            <td>CloudWatch, Route53</td>
+            <td>€2.00</td>
+            <td>System monitoring</td>
+        </tr>
+    </table>
+
+    <h3>Support Services</h3>
+    <table>
+        <tr>
+            <th>Level</th>
+            <th>Monthly Cost</th>
+            <th>Response Time</th>
+            <th>Coverage</th>
+        </tr>
+        <tr>
+            <td><strong>Basic</strong></td>
+            <td>€300</td>
+            <td>4 hours</td>
+            <td>Business hours, critical fixes</td>
+        </tr>
+        <tr>
+            <td><strong>Standard ⭐</strong></td>
+            <td>€450</td>
+            <td>2 hours</td>
+            <td>Extended hours, updates included</td>
+        </tr>
+        <tr>
+            <td><strong>Premium</strong></td>
+            <td>€600</td>
+            <td>1 hour</td>
+            <td>24/7 support, proactive monitoring</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        Recommended: Standard Support (€450/month)
+    </div>
+
+    <hr>
+
+    <h2>🎯 Usage-Based Economics</h2>
+
+    <h3>Scaling Economics</h3>
+    <table>
+        <tr>
+            <th>Teachers</th>
+            <th>Monthly Sessions</th>
+            <th>Monthly Cost</th>
+            <th>Cost per Session</th>
+        </tr>
+        <tr>
+            <td>30</td>
+            <td>5</td>
+            <td>€506.91</td>
+            <td>€101.69</td>
+        </tr>
+        <tr>
+            <td>60</td>
+            <td>10</td>
+            <td>€508.16</td>
+            <td>€50.82</td>
+        </tr>
+        <tr>
+            <td>150</td>
+            <td>25</td>
+            <td>€513.16</td>
+            <td>€20.53</td>
+        </tr>
+        <tr>
+            <td>300</td>
+            <td>50</td>
+            <td>€669.16*</td>
+            <td>€13.38</td>
+        </tr>
+    </table>
+    <p><small>*Includes Premium support for larger scale</small></p>
+
+    <div class="highlight">
+        <strong>ROI Comparison:</strong><br>
+        Traditional Analysis: €200-€500 per session<br>
+        ClassReflect: €101.69 per session<br>
+        <strong>Savings: 50-80% cost reduction</strong>
+    </div>
+
+    <hr>
+
+    <h2>⏱️ Project Timeline</h2>
+
+    <table>
+        <tr>
+            <th>Phase</th>
+            <th>Duration</th>
+            <th>Key Deliverables</th>
+        </tr>
+        <tr>
+            <td><strong>Week 1-2: Foundation</strong></td>
+            <td>2 weeks</td>
+            <td>Architecture design, Database design</td>
+        </tr>
+        <tr>
+            <td><strong>Week 3-5: Backend</strong></td>
+            <td>3 weeks</td>
+            <td>API development, Authentication system</td>
+        </tr>
+        <tr>
+            <td><strong>Week 6-8: Frontend</strong></td>
+            <td>3 weeks</td>
+            <td>User interfaces, Dashboards</td>
+        </tr>
+        <tr>
+            <td><strong>Week 9: Infrastructure</strong></td>
+            <td>1 week</td>
+            <td>AWS deployment, Security setup</td>
+        </tr>
+        <tr>
+            <td><strong>Week 10: Testing & Launch</strong></td>
+            <td>1 week</td>
+            <td>System testing, Go-live support</td>
+        </tr>
+    </table>
+
+    <div class="highlight">
+        Total Timeline: 10 weeks
+    </div>
+
+    <hr>
+
+    <h2>🚀 Next Steps</h2>
+
+    <div class="feature-list">
+        <h3>To Begin Development:</h3>
+        <ol>
+            <li><strong>Contract Signature</strong> and initial payment (50%)</li>
+            <li><strong>Requirements Workshop</strong> (1-2 sessions)</li>
+            <li><strong>Development Kickoff</strong> meeting</li>
+            <li><strong>Weekly Progress Reviews</strong> throughout development</li>
+            <li><strong>Final Delivery</strong> and go-live support</li>
+        </ol>
+    </div>
+
+    <div class="cost-emphasis">
+        <h3>Payment Schedule:</h3>
+        <p><strong>€7,500</strong> upon contract signing (excl. VAT)<br>
+        <strong>€7,500</strong> upon successful delivery and client acceptance (excl. VAT)</p>
+    </div>
+
+    <div class="footer">
+        <h3>Ready to Transform Your Teaching Analysis?</h3>
+        <p>Contact us to schedule a detailed requirements workshop and begin your ClassReflect implementation.</p>
+        
+        <p><strong>Professional Development Team</strong><br>
+        <strong>Estimated Delivery:</strong> 10 weeks from project start<br>
+        <strong>Total Investment:</strong> €15,000 development + €506.91/month operations (all excl. VAT)</p>
+    </div>
+
+    <div class="small-text">
+        <p>This proposal is valid for 30 days from the date of delivery. All costs are in EUR excluding VAT. VAT will be added as applicable according to local tax regulations.</p>
+    </div>
+</body>
+</html>

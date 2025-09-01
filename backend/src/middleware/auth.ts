@@ -60,6 +60,13 @@ export const authenticate = async (
         schoolId: decoded.schoolId
       });
       
+      console.log('🔐 Auth Debug - Raw decoded token schoolId:', {
+        schoolIdString: decoded.schoolId,
+        schoolIdType: typeof decoded.schoolId,
+        parsedSchoolId: parseInt(decoded.schoolId),
+        isNaN: isNaN(parseInt(decoded.schoolId))
+      });
+
       req.user = {
         id: parseInt(decoded.userId),
         email: decoded.email,
@@ -73,7 +80,8 @@ export const authenticate = async (
         id: req.user.id,
         email: req.user.email,
         role: req.user.role,
-        schoolId: req.user.schoolId
+        schoolId: req.user.schoolId,
+        schoolIdIsNaN: isNaN(req.user.schoolId)
       });
       
       next();

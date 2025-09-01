@@ -19,12 +19,18 @@ router.get('/teachers',
   authorize('school_manager', 'super_admin'),
   async (req: Request, res: Response) => {
     try {
+      console.log('🔍 Teachers Debug - req.user:', JSON.stringify(req.user, null, 2));
+      console.log('🔍 Teachers Debug - req.query.schoolId:', req.query.schoolId);
+      
       const schoolId = req.user!.role === 'super_admin' 
         ? req.query.schoolId 
         : req.user!.schoolId;
+        
+      console.log('🔍 Teachers Debug - Final schoolId for query:', schoolId);
+      console.log('🔍 Teachers Debug - schoolId type:', typeof schoolId);
       
       const [rows] = await pool.execute(
-        `SELECT u.id, u.email, u.first_name, u.last_name, u.created_at,
+        `SELECT u.id, u.email, u.first_name, u.last_name, u.school_id, u.created_at,
                 u.is_active, u.subjects, u.grades, 
                 COUNT(DISTINCT aj.id) as total_evaluations
          FROM users u
@@ -34,6 +40,11 @@ router.get('/teachers',
          ORDER BY u.last_name, u.first_name`,
         [schoolId]
       );
+      
+      console.log('🔍 Teachers Debug - Raw query results:', {
+        rowCount: Array.isArray(rows) ? rows.length : 'Not array',
+        rows: Array.isArray(rows) ? rows : 'Not array'
+      });
       
       const teachers = (rows as any[]).map(row => {
         // Helper function to safely parse JSON or convert comma-separated string to array
@@ -61,6 +72,8 @@ router.get('/teachers',
           email: row.email,
           firstName: row.first_name,
           lastName: row.last_name,
+          role: 'teacher', // Add role field for filtering
+          schoolId: row.school_id, // Add missing schoolId field
           subjects: parseSubjectsOrGrades(row.subjects),
           grades: parseSubjectsOrGrades(row.grades),
           totalEvaluations: row.total_evaluations,
@@ -70,10 +83,104 @@ router.get('/teachers',
         };
       });
       
+      console.log('🔍 Teachers Debug - Final response:', {
+        teacherCount: teachers.length,
+        teachers: teachers.map(t => ({ id: t.id, email: t.email, schoolId: schoolId }))
+      });
+      
       res.json(teachers);
     } catch (error) {
       console.error('Get teachers error:', error);
       res.status(500).json({ error: 'Failed to get teachers' });
+    }
+  }
+);
+
+/**
+ * POST /api/users
+ * Create a new user with role selection (Super Admin only)
+ */
+router.post('/',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { email, firstName, lastName, role, schoolId, subjects, grades, sendInviteEmail } = req.body;
+      
+      console.log('📤 Create User Debug - Request body:', req.body);
+      
+      if (!email || !firstName || !lastName || !role || !schoolId) {
+        res.status(400).json({ error: 'Email, first name, last name, role, and school ID are required' });
+        return;
+      }
+      
+      if (!['teacher', 'school_manager'].includes(role)) {
+        res.status(400).json({ error: 'Role must be either teacher or school_manager' });
+        return;
+      }
+      
+      // Check if email already exists
+      const [existing] = await pool.execute(
+        'SELECT id FROM users WHERE email = ?',
+        [email]
+      );
+      
+      if ((existing as any[]).length > 0) {
+        res.status(409).json({ error: 'Email already exists' });
+        return;
+      }
+      
+      // Generate temporary password
+      const tempPassword = `Temp${Math.random().toString(36).substring(2, 10)}!`;
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      // Start transaction
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
+      
+      try {
+        // Create user with specified role
+        const [result] = await connection.execute(
+          `INSERT INTO users (email, password_hash, first_name, last_name, role, school_id, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, true)`,
+          [email, hashedPassword, firstName, lastName, role, schoolId]
+        );
+        
+        const userId = (result as any).insertId;
+        
+        // Only add subjects and grades for teachers
+        if (role === 'teacher' && (subjects || grades)) {
+          await connection.execute(
+            `UPDATE users SET subjects = ?, grades = ? WHERE id = ?`,
+            [JSON.stringify(subjects || []), JSON.stringify(grades || []), userId]
+          );
+        }
+        
+        await connection.commit();
+        
+        // TODO: Send email with temporary password if sendInviteEmail is true
+        
+        console.log('✅ Create User Debug - User created successfully:', { userId, email, role });
+        
+        res.status(201).json({
+          id: userId,
+          email,
+          firstName,
+          lastName,
+          role,
+          schoolId,
+          temporaryPassword: process.env.NODE_ENV === 'development' ? tempPassword : undefined,
+          message: `${role === 'school_manager' ? 'School Manager' : 'Teacher'} account created successfully`,
+        });
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      console.error('Create user error:', error);
+      res.status(500).json({ error: 'Failed to create user' });
     }
   }
 );

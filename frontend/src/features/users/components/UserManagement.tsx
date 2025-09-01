@@ -192,6 +192,7 @@ export function UserManagement() {
         ]);
         
         console.log('School Manager - Teachers data:', teachersData);
+        console.log('School Manager - First teacher object:', teachersData[0]);
         console.log('School Manager - School data:', schoolData);
         
         setUsers(teachersData);
@@ -347,12 +348,33 @@ export function UserManagement() {
           color: 'green',
         });
       } else {
-        const result = await usersService.createTeacher(teacherFormData);
-        notifications.show({
-          title: 'Success',
-          message: `Teacher created successfully. ${!teacherFormData.sendInviteEmail ? 'Temporary password: ' + result.temporaryPassword : ''}`,
-          color: 'green',
-        });
+        // Choose the correct service method based on role
+        let result;
+        if (teacherFormData.role === 'school_manager') {
+          // Use the general createUser endpoint for school managers
+          const userData: CreateUserRequest = {
+            email: teacherFormData.email,
+            firstName: teacherFormData.firstName,
+            lastName: teacherFormData.lastName,
+            role: 'school_manager',
+            schoolId: teacherFormData.schoolId,
+            sendInviteEmail: teacherFormData.sendInviteEmail,
+          };
+          result = await usersService.createUser(userData);
+          notifications.show({
+            title: 'Success',
+            message: `School Manager created successfully. ${!teacherFormData.sendInviteEmail ? 'Temporary password: ' + result.temporaryPassword : ''}`,
+            color: 'green',
+          });
+        } else {
+          // Use the specific createTeacher endpoint for teachers
+          result = await usersService.createTeacher(teacherFormData);
+          notifications.show({
+            title: 'Success',
+            message: `Teacher created successfully. ${!teacherFormData.sendInviteEmail ? 'Temporary password: ' + result.temporaryPassword : ''}`,
+            color: 'green',
+          });
+        }
       }
       
       await loadData();
@@ -597,8 +619,22 @@ export function UserManagement() {
     const matchesRole = filterRole === 'all' || user.role === filterRole;
     const matchesSchool = filterSchool === 'all' || user.schoolId?.toString() === filterSchool;
     
+    console.log('🔍 Filter Debug - User:', user.firstName, user.lastName, {
+      matchesSearch,
+      matchesRole,
+      matchesSchool,
+      searchQuery,
+      filterRole,
+      filterSchool,
+      userRole: user.role,
+      userSchoolId: user.schoolId?.toString(),
+      finalResult: matchesSearch && matchesRole && matchesSchool
+    });
+    
     return matchesSearch && matchesRole && matchesSchool;
   });
+  
+  console.log('🔍 Filter Debug - Total users:', users.length, 'Filtered users:', filteredUsers.length);
 
   const getRoleColor = (role: string) => {
     switch (role) {

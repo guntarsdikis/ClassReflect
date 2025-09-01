@@ -8,11 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Start both frontend and backend simultaneously
 scripts/setup/start-local.sh
-# Frontend runs on http://localhost:3000 (Vite dev server)
+# Frontend runs on http://localhost:3002 (Vite dev server)
 # Backend API runs on http://localhost:3001
 
 # Or start separately:
-cd frontend && npm run dev    # Frontend on port 3000 (Vite)
+cd frontend && npm run dev    # Frontend on port 3002 (Vite)
 cd backend && npm run dev     # Backend on port 3001 (with hot reload)
 ```
 
@@ -295,7 +295,7 @@ DB_USER=root
 DB_PASSWORD=root
 S3_BUCKET=classreflect-audio-files-573524060586
 SQS_QUEUE_URL=https://sqs.eu-west-2.amazonaws.com/573524060586/classreflect-processing-queue
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3002
 ```
 
 **Backend Production (ECS task definition):**

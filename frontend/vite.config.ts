@@ -28,7 +28,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
   server: {
-    port: 3000,
+    port: 3002, // Changed from 3000 to avoid conflicts
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:3001',

@@ -82,8 +82,9 @@ P2 — Dev UX + Docs
 - Default to relative API base in dev (avoid CORS)
   - If `import.meta.env.DEV`, set baseURL to `/api`
   - Keep `VITE_API_URL` for preview/prod
-- Clean JWT‑only docs
-  - Remove/annotate Cognito instructions from dev guides and scripts
+- Clean JWT‑only docs ✅ Completed
+  - Annotated Cognito instructions in dev guides as production-only
+  - Updated setup scripts to reflect JWT-only local development
 - Consolidate on a single client layer
   - Choose `ApiClient` services and phase out the top‑level `api` object (or vice versa)
 
@@ -116,7 +117,7 @@ P3 — Quality & Enhancements (Optional)
 - [ ] No dead client endpoints (e.g., `/users/admin/schools`)
 - [ ] System subjects: mounted or removed
 - [ ] Dev API base is relative (`/api`) in dev; CORS issues gone
-- [ ] Docs reflect JWT‑only local development; no misleading Cognito steps
+- [x] Docs reflect JWT‑only local development; no misleading Cognito steps
 - [ ] Single client layer in use across the app
 
 ## References

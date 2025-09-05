@@ -1,4 +1,10 @@
-# AWS Cognito Configuration - ClassReflect
+# AWS Cognito Configuration - ClassReflect (Production)
+
+> **⚠️ PRODUCTION ONLY**: This document describes Cognito configuration for **production environments**. 
+> 
+> **For local development**, ClassReflect uses JWT-only authentication. No Cognito setup required.
+> 
+> Use `npm run dev` in both backend and frontend directories for local development.
 
 ## ✅ Successfully Created!
 

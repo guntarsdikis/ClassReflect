@@ -64,7 +64,7 @@ Should run on: http://localhost:3002
 
 1. **Check Backend Console**
    - Should show: `🔐 Using JWT authentication`
-   - If showing Cognito, you're likely reading production docs; for local dev, JWT is expected
+   - This confirms JWT-only authentication is active for local development
 
 2. **Check Browser Console (F12)**
    - Look for errors in red
@@ -87,8 +87,8 @@ Should run on: http://localhost:3002
 ### Common Issues:
 
 **"Invalid credentials" error:**
-- User might not exist in Cognito
-- Run: `node test-all-roles.js` to recreate users
+- User might not exist in local database
+- Check that test users are properly seeded in local MySQL
 
 **"fetch failed" error:**
 - Backend not running or crashed
@@ -101,30 +101,15 @@ Should run on: http://localhost:3002
 
 ## 🗑️ Clean Up Test Users
 
-When done testing, remove test users:
-```bash
-aws cognito-idp admin-delete-user \
-  --user-pool-id eu-west-2_E3SFkCKPU \
-  --username superadmin-test \
-  --region eu-west-2
-
-aws cognito-idp admin-delete-user \
-  --user-pool-id eu-west-2_E3SFkCKPU \
-  --username manager-test \
-  --region eu-west-2
-
-aws cognito-idp admin-delete-user \
-  --user-pool-id eu-west-2_E3SFkCKPU \
-  --username teacher-test \
-  --region eu-west-2
-```
+Test users are stored in your local MySQL database and persist across sessions. 
+To remove them, you can delete from the `users` table directly or recreate the database.
 
 ## ✨ Summary
 
-- ✅ Cognito User Pool configured
-- ✅ 3 test users with different roles created
-- ✅ Backend configured for Cognito auth
-- ✅ Frontend updated to use real API
+- ✅ JWT authentication configured for local development
+- ✅ 3 test users with different roles available
+- ✅ Backend configured for JWT auth
+- ✅ Frontend connected to local API
 
 **Ready to test!** Use the credentials above at http://localhost:3002/login
 

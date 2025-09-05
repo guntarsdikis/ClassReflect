@@ -152,13 +152,13 @@ LOCAL_AUDIO_PATH=/tmp/classreflect-audio
 # Whisper service
 WHISPER_DOCKER_URL=http://localhost:8000
 
-# Cognito configuration (update with your values)
-COGNITO_USER_POOL_ID=eu-west-2_E3SFkCKPU
-COGNITO_CLIENT_ID=your-client-id
-COGNITO_CLIENT_SECRET=your-client-secret
-AWS_REGION=eu-west-2
+# JWT Authentication for local development
+JWT_SECRET=local-dev-secret-key-change-in-production
+
+# Note: Cognito is only used in production environments
+# Local development uses JWT-only authentication
 EOF
-    print_warning "Please update backend/.env with your Cognito credentials"
+    print_success "Backend .env configured for JWT authentication"
 fi
 
 # Install frontend dependencies if needed

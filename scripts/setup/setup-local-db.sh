@@ -45,15 +45,15 @@ else
     exit 1
 fi
 
-# Insert test data for Cognito users
-echo -n "Creating test users for Cognito sync... "
+# Insert test data for JWT authentication
+echo -n "Creating test users for local development... "
 mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASSWORD $DB_NAME << 'EOF' 2>/dev/null
 -- Insert test schools
 INSERT IGNORE INTO schools (id, name) VALUES 
 ('test-school-001', 'Test Elementary School'),
 ('platform', 'ClassReflect Platform');
 
--- Insert test users that match Cognito users
+-- Insert test users for JWT authentication (local development)
 INSERT INTO users (email, first_name, last_name, role, school_id, subjects, grades, cognito_username, is_active) VALUES
 ('superadmin@test.local', 'Super', 'Admin', 'super_admin', 'platform', NULL, NULL, 'superadmin-test', true),
 ('manager@test.local', 'School', 'Manager', 'school_manager', 'test-school-001', NULL, NULL, 'manager-test', true),

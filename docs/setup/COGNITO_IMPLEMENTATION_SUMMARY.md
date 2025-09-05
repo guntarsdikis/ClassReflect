@@ -1,7 +1,13 @@
 # AWS Cognito Integration Implementation Summary
 
+> **⚠️ PRODUCTION ONLY**: This document describes Cognito integration for **production environments**. 
+> 
+> **For local development**, ClassReflect uses JWT-only authentication (no Cognito required).
+> 
+> See `docs/setup/TEST_LOGIN_INSTRUCTIONS.md` for local development login credentials.
+
 ## Overview
-Successfully implemented AWS Cognito authentication integration for ClassReflect, replacing the previous JWT-based system with enterprise-grade authentication that supports the controlled access model.
+Successfully implemented AWS Cognito authentication integration for ClassReflect **production environment**, providing enterprise-grade authentication that supports the controlled access model.
 
 ## 🎯 Completed Tasks
 

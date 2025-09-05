@@ -5,12 +5,14 @@ This guide explains how to run ClassReflect in different environments with autom
 ## 🏗️ Architecture Overview
 
 ### Local Development Environment
+- **Authentication**: JWT-only (no Cognito required)
 - **File Storage**: Local filesystem (`/tmp/classreflect-audio/`)
 - **Audio Processing**: Local Docker container with Whisper
 - **Database**: Local MySQL (localhost:3306)
 - **Queue System**: Direct HTTP API calls (no SQS)
 
 ### Production Environment  
+- **Authentication**: AWS Cognito with JWT tokens
 - **File Storage**: AWS S3 (`classreflect-audio-files`)
 - **Audio Processing**: Auto-scaling EC2 instance with Whisper
 - **Database**: AWS Aurora MySQL cluster
@@ -76,11 +78,14 @@ LOCAL_AUDIO_PATH=/tmp/classreflect-audio
 # Whisper service
 WHISPER_DOCKER_URL=http://localhost:8000
 
-# Cognito (same for both environments)
-COGNITO_USER_POOL_ID=eu-west-2_E3SFkCKPU
-COGNITO_CLIENT_ID=your-client-id
-COGNITO_CLIENT_SECRET=your-client-secret
-AWS_REGION=eu-west-2
+# Authentication - JWT only for local dev
+JWT_SECRET=your-local-jwt-secret
+
+# Cognito (PRODUCTION ONLY - not needed for local dev)
+# COGNITO_USER_POOL_ID=eu-west-2_E3SFkCKPU
+# COGNITO_CLIENT_ID=your-client-id
+# COGNITO_CLIENT_SECRET=your-client-secret
+# AWS_REGION=eu-west-2
 ```
 
 ### Step 4: Test Local Setup

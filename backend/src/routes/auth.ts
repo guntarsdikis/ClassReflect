@@ -173,6 +173,96 @@ router.get('/profile', authenticate, async (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /api/auth/profile
+ * Update current user's profile (first name, last name, email)
+ */
+router.put('/profile', authenticate, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { firstName, lastName, email } = req.body as {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    };
+
+    // Basic validation
+    if (!firstName || !lastName || !email) {
+      res.status(400).json({ error: 'First name, last name, and email are required' });
+      return;
+    }
+
+    // Email format validation (simple)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ error: 'Invalid email format' });
+      return;
+    }
+
+    // Check for existing email on a different user
+    const [existing] = await pool.execute(
+      'SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1',
+      [email, userId]
+    );
+    if (Array.isArray(existing) && existing.length > 0) {
+      res.status(409).json({ error: 'Email already in use' });
+      return;
+    }
+
+    // Update user
+    await pool.execute(
+      'UPDATE users SET email = ?, first_name = ?, last_name = ?, updated_at = NOW() WHERE id = ?',
+      [email, firstName, lastName, userId]
+    );
+
+    // Fetch updated profile
+    const [rows] = await pool.execute(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role,
+              u.school_id, s.name as school_name, u.subjects, u.grades,
+              u.is_active, u.created_at, u.last_login
+       FROM users u
+       LEFT JOIN schools s ON u.school_id = s.id
+       WHERE u.id = ?`,
+      [userId]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const updated = rows[0] as any;
+
+    // Safely parse JSON fields
+    const parseArray = (data: any): string[] => {
+      if (!data) return [];
+      if (Array.isArray(data)) return data;
+      if (typeof data !== 'string') return [];
+      try { return JSON.parse(data); } catch { return data.split(',').map((x: string) => x.trim()).filter(Boolean); }
+    };
+
+    const userResponse = {
+      id: updated.id,
+      email: updated.email,
+      firstName: updated.first_name,
+      lastName: updated.last_name,
+      role: updated.role,
+      schoolId: updated.school_id,
+      schoolName: updated.school_name,
+      subjects: parseArray(updated.subjects),
+      grades: parseArray(updated.grades),
+      isActive: updated.is_active,
+      createdAt: updated.created_at,
+      lastLogin: updated.last_login || null,
+    };
+
+    res.json({ user: userResponse });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+/**
  * POST /api/auth/change-password
  * Change password for authenticated user
  */

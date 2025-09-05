@@ -2,7 +2,9 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+const API_BASE_URL = import.meta.env.DEV
+  ? '/api'
+  : `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({

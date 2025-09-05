@@ -29,7 +29,6 @@ import {
   IconEdit,
   IconTrash,
   IconUsers,
-  IconSchool,
   IconUserPlus,
   IconUpload,
   IconDownload,
@@ -46,7 +45,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
-import { usersService, User, CreateTeacherRequest, CreateSchoolManagerRequest, CreateUserRequest, UpdateUserRoleRequest } from '../services/users.service';
+import { usersService, User, CreateTeacherRequest, CreateUserRequest, UpdateUserRoleRequest } from '../services/users.service';
 import { schoolsService, School } from '@features/schools/services/schools.service';
 import { subjectsService, SchoolSubject } from '@features/schools/services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
@@ -76,7 +75,6 @@ export function UserManagement() {
   const currentUser = useAuthStore((state) => state.user);
   const { selectedSchool } = useSchoolContextStore();
   const [teacherModalOpened, { open: openTeacherModal, close: closeTeacherModal }] = useDisclosure(false);
-  const [managerModalOpened, { open: openManagerModal, close: closeManagerModal }] = useDisclosure(false);
   const [bulkModalOpened, { open: openBulkModal, close: closeBulkModal }] = useDisclosure(false);
   
   // Role-based access control
@@ -114,14 +112,8 @@ export function UserManagement() {
     role: 'teacher', // Default to teacher
   });
 
-  const [managerFormData, setManagerFormData] = useState<ManagerFormData>({
-    schoolName: '',
-    domain: '',
-    subscriptionTier: 'basic',
-    managerEmail: '',
-    managerFirstName: '',
-    managerLastName: '',
-  });
+  // Composite create school + manager flow removed. Use Admin > Schools to create a school,
+  // then use "Create User" with role "School Manager".
 
   const [bulkCsvContent, setBulkCsvContent] = useState('');
   const [bulkFile, setBulkFile] = useState<File | null>(null);
@@ -689,14 +681,6 @@ export function UserManagement() {
               Bulk Import
             </Button>
           )}
-          {isSuperAdmin && (
-            <Button
-              leftSection={<IconSchool size={16} />}
-              onClick={openManagerModal}
-            >
-              Create School & Manager
-            </Button>
-          )}
           <Button
             leftSection={<IconUserPlus size={16} />}
             onClick={handleCreateTeacher}
@@ -705,6 +689,12 @@ export function UserManagement() {
           </Button>
         </Group>
       </Group>
+
+      {isSuperAdmin && (
+        <Alert variant="light" color="blue" icon={<IconAlertCircle /> } mb="md">
+          To add a new school with a manager: first create the school in <strong>Admin &gt; Schools</strong>, then return here and click <strong>Create User</strong> and choose <strong>School Manager</strong>.
+        </Alert>
+      )}
 
       {/* User Statistics */}
       <Group mb="xl" grow>
@@ -1075,78 +1065,7 @@ export function UserManagement() {
         </Stack>
       </Modal>
 
-      {/* Create School & Manager Modal */}
-      <Modal 
-        opened={managerModalOpened} 
-        onClose={closeManagerModal} 
-        title={
-          <Group>
-            <IconSchool size={20} />
-            <Text fw={600}>Create New School & Manager</Text>
-          </Group>
-        }
-        size="lg"
-      >
-        <Stack>
-          <TextInput
-            label="School Name"
-            placeholder="Lincoln Elementary School"
-            value={managerFormData.schoolName}
-            onChange={(e) => setManagerFormData({...managerFormData, schoolName: e.target.value})}
-            required
-          />
-
-          <Group grow>
-            <TextInput
-              label="Domain (Optional)"
-              placeholder="lincoln-elem.edu"
-              value={managerFormData.domain}
-              onChange={(e) => setManagerFormData({...managerFormData, domain: e.target.value})}
-            />
-          </Group>
-
-          <Title order={5} mt="md">Manager Details</Title>
-
-          <Group grow>
-            <TextInput
-              label="Manager First Name"
-              placeholder="Jane"
-              value={managerFormData.managerFirstName}
-              onChange={(e) => setManagerFormData({...managerFormData, managerFirstName: e.target.value})}
-              required
-            />
-            <TextInput
-              label="Manager Last Name"
-              placeholder="Doe"
-              value={managerFormData.managerLastName}
-              onChange={(e) => setManagerFormData({...managerFormData, managerLastName: e.target.value})}
-              required
-            />
-          </Group>
-
-          <TextInput
-            label="Manager Email"
-            placeholder="jane.doe@lincoln-elem.edu"
-            value={managerFormData.managerEmail}
-            onChange={(e) => setManagerFormData({...managerFormData, managerEmail: e.target.value})}
-            required
-          />
-
-          <Space h="md" />
-
-          <Flex justify="flex-end" gap="sm">
-            <Button variant="light" onClick={closeManagerModal}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveManager}
-              leftSection={<IconSchool size={16} />}
-            >
-              Create School & Manager
-            </Button>
-          </Flex>
-        </Stack>
-      </Modal>
+      {/* Composite Create School & Manager flow removed. */}
 
       {/* Bulk Import Modal */}
       <Modal 

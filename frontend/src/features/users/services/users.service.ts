@@ -36,14 +36,6 @@ export interface CreateUserRequest {
   sendInviteEmail?: boolean;
 }
 
-export interface CreateSchoolManagerRequest {
-  schoolName: string;
-  domain?: string;
-  subscriptionTier?: 'basic' | 'professional' | 'enterprise';
-  managerEmail: string;
-  managerFirstName: string;
-  managerLastName: string;
-}
 
 export interface UpdateTeacherRequest {
   subjects?: string[];
@@ -197,18 +189,7 @@ export class UsersService {
     return this.api.delete(`/users/teachers/${teacherId}`);
   }
 
-  /**
-   * Create school with manager (Super Admin only)
-   */
-  async createSchoolWithManager(data: CreateSchoolManagerRequest): Promise<{
-    message: string;
-    schoolId: number;
-    managerId: number;
-    managerEmail: string;
-    temporaryPassword: string;
-  }> {
-    return this.api.post('/users/admin/schools', data);
-  }
+  // Note: Composite "create school + manager" flow removed.
 
 
   /**

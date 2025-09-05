@@ -26,6 +26,11 @@ Configuration and setup guides for various components.
 - [**GITHUB_TOKEN_SETUP.md**](setup/GITHUB_TOKEN_SETUP.md) - GitHub authentication and CI/CD setup
 - [**WHISPER_SETUP.md**](setup/WHISPER_SETUP.md) - OpenAI Whisper configuration for audio processing
 
+### 📖 Features
+Functional overview and what’s implemented today.
+
+- [**FEATURES.md**](../docs/FEATURES.md) - Current feature set and capabilities
+
 ## 🎯 Quick Links
 
 ### For Developers
@@ -42,6 +47,7 @@ Configuration and setup guides for various components.
 1. Track progress in [IMPLEMENTATION_ROADMAP.md](development/IMPLEMENTATION_ROADMAP.md)
 2. Review system design in [USER_ACCESS_DESIGN.md](architecture/USER_ACCESS_DESIGN.md)
 3. Check deployment status in [DEPLOYMENT_STATUS.md](deployment/DEPLOYMENT_STATUS.md)
+4. Review current app capabilities in [FEATURES.md](../docs/FEATURES.md)
 
 ## 📊 Project Status
 

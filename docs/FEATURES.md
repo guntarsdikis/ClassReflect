@@ -134,6 +134,7 @@ References:
 - Users & Schools
   - User management (create, edit, deactivate, reset passwords)
   - School management (create/edit/suspend; subject management)
+  - Creating a new school with a manager: First create the school under Admin > Schools, then use User Management "Create User" with role "School Manager" to add the manager.
 - Profile
   - View profile (name/email/role/school). Edit UI is present but server-side update endpoint is not implemented yet (see gaps below).
 

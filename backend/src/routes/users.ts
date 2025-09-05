@@ -580,6 +580,79 @@ router.delete('/teachers/:id',
 );
 
 /**
+ * PATCH /api/users/:id/role
+ * Update a user's role (Super Admin only)
+ * - Allowed roles: teacher, school_manager
+ * - If setting role to school_manager, schoolId is required
+ */
+router.patch('/:id/role',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { role, schoolId } = req.body as { role?: string; schoolId?: number };
+
+      const userId = parseInt(id, 10);
+      if (isNaN(userId)) {
+        res.status(400).json({ error: 'Invalid user ID' });
+        return;
+      }
+
+      // Validate role
+      if (!role || !['teacher', 'school_manager'].includes(role)) {
+        res.status(400).json({ error: 'Role must be either teacher or school_manager' });
+        return;
+      }
+
+      // Require schoolId when promoting to school_manager
+      if (role === 'school_manager' && (!schoolId || isNaN(Number(schoolId)))) {
+        res.status(400).json({ error: 'schoolId is required when assigning school_manager role' });
+        return;
+      }
+
+      // Ensure user exists and is not a super_admin target (prevent demotion/escalation here)
+      const [existingRows] = await pool.execute(
+        'SELECT id, role, school_id FROM users WHERE id = ? LIMIT 1',
+        [userId]
+      );
+
+      if (!Array.isArray(existingRows) || existingRows.length === 0) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const existing = existingRows[0] as any;
+      if (existing.role === 'super_admin') {
+        res.status(403).json({ error: 'Cannot change role for super_admin users' });
+        return;
+      }
+
+      // Perform update
+      const updates: string[] = ['role = ?'];
+      const values: any[] = [role];
+      
+      if (role === 'school_manager') {
+        updates.push('school_id = ?');
+        values.push(parseInt(String(schoolId), 10));
+      }
+
+      values.push(userId);
+
+      await pool.execute(
+        `UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = ?`,
+        values
+      );
+
+      res.json({ message: 'User role updated successfully' });
+    } catch (error) {
+      console.error('Update user role error:', error);
+      res.status(500).json({ error: 'Failed to update user role' });
+    }
+  }
+);
+
+/**
  * POST /api/users/teachers/:id/reset-password
  * Reset teacher password (School Manager and Super Admin only)
  */

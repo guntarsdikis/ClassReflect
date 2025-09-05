@@ -69,9 +69,8 @@ P0 — Unblock Core UX
   - Acceptance: No calls to non‑existent `/criteria` routes
 
 P1 — Admin & Consistency
-- Add `PATCH /api/users/:id/role`
-  - Validate transitions; require `schoolId` when promoting to `school_manager`
-  - Restrict to `super_admin`
+- Add `PATCH /api/users/:id/role` ✅ Implemented
+  - Validates role; requires `schoolId` for `school_manager`; restricted to `super_admin`
 - Remove or implement `POST /api/users/admin/schools`
   - Prefer existing `/schools` + `/users` flows; remove unused endpoint from client
 - Mount or remove System Subjects routes

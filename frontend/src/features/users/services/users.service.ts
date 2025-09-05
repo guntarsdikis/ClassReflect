@@ -90,8 +90,9 @@ export class UsersService {
   /**
    * Get all users (Super Admin only)
    */
-  async getAllUsers(): Promise<User[]> {
-    return this.api.get<User[]>('/users');
+  async getAllUsers(schoolId?: number): Promise<User[]> {
+    const params = schoolId ? { schoolId } : undefined;
+    return this.api.get<User[]>('/users', params);
   }
 
   /**

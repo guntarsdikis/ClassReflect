@@ -29,6 +29,7 @@ import {
   IconEdit,
   IconTrash,
   IconUsers,
+  IconSchool,
   IconUserPlus,
   IconUpload,
   IconDownload,
@@ -60,7 +61,6 @@ interface UserFormData extends CreateUserRequest {
   // All fields from CreateUserRequest
 }
 
-interface ManagerFormData extends CreateSchoolManagerRequest {}
 
 interface BulkTeacher {
   email: string;
@@ -145,18 +145,10 @@ export function UserManagement() {
         setSchools(schoolsData);
         
         if (currentUserSchoolId) {
-          // Super admin with selected school - load users for that school only
+          // Super admin with selected school - load users for that school (server-side filter)
           console.log('Super Admin - Loading users for selected school:', currentUserSchoolId);
-          
-          // Get all users and filter by school on frontend for now
-          // TODO: Update backend to support school filtering in /users endpoint
-          const allUsersData = await usersService.getAllUsers();
-          const usersData = allUsersData.filter(user => user.schoolId === currentUserSchoolId);
-          
-          console.log('Super Admin - Loaded school users:', { 
-            usersCount: usersData.length, 
-            schoolId: currentUserSchoolId 
-          });
+          const usersData = await usersService.getAllUsers(currentUserSchoolId);
+          console.log('Super Admin - Loaded school users:', { usersCount: usersData.length, schoolId: currentUserSchoolId });
           setUsers(usersData);
           setFilterSchool(currentUserSchoolId.toString());
           await loadSchoolSubjects(currentUserSchoolId);
@@ -381,35 +373,7 @@ export function UserManagement() {
     }
   };
 
-  const handleSaveManager = async () => {
-    try {
-      if (!managerFormData.schoolName || !managerFormData.managerEmail || !managerFormData.managerFirstName || !managerFormData.managerLastName) {
-        notifications.show({
-          title: 'Error',
-          message: 'Please fill in all required fields',
-          color: 'red',
-        });
-        return;
-      }
-
-      const result = await usersService.createSchoolWithManager(managerFormData);
-      notifications.show({
-        title: 'Success',
-        message: `School and manager created successfully. Temporary password: ${result.temporaryPassword}`,
-        color: 'green',
-      });
-      
-      await loadData();
-      closeManagerModal();
-    } catch (error) {
-      console.error('Failed to create school manager:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to create school and manager',
-        color: 'red',
-      });
-    }
-  };
+  // Removed: handleSaveManager (composite flow removed)
 
   const handleBulkImport = async () => {
     try {

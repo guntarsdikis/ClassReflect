@@ -198,15 +198,26 @@ router.get('/',
       const user = req.user!;
       
       if (user.role === 'super_admin') {
-        // Super admin: return all users
-        const [allUserRows] = await pool.execute(
-          `SELECT u.id, u.email, u.first_name, u.last_name, u.role,
-                  u.school_id, s.name as school_name, u.subjects, u.grades,
-                  u.is_active, u.last_login, u.created_at
-           FROM users u
-           LEFT JOIN schools s ON u.school_id = s.id
-           ORDER BY u.created_at DESC`
-        );
+        // Super admin: return all users or filter by schoolId
+        const schoolIdParam = req.query.schoolId ? parseInt(String(req.query.schoolId), 10) : undefined;
+        
+        let sql = `
+          SELECT u.id, u.email, u.first_name, u.last_name, u.role,
+                 u.school_id, s.name as school_name, u.subjects, u.grades,
+                 u.is_active, u.last_login, u.created_at
+          FROM users u
+          LEFT JOIN schools s ON u.school_id = s.id
+        `;
+        const params: any[] = [];
+        
+        if (!isNaN(Number(schoolIdParam))) {
+          sql += ' WHERE u.school_id = ?';
+          params.push(schoolIdParam);
+        }
+        
+        sql += ' ORDER BY u.created_at DESC';
+        
+        const [allUserRows] = await pool.execute(sql, params);
         
         const parseSubjectsOrGrades = (data: any): string[] => {
           if (!data) return [];

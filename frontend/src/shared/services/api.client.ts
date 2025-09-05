@@ -98,7 +98,7 @@ export const api = {
       apiClient.post('/auth/reset-password', { token, password }),
   },
   
-  // User management (School Manager only)
+  // User management
   users: {
     getProfile: async () => {
       const response = await apiClient.get('/auth/profile');
@@ -109,121 +109,14 @@ export const api = {
       const response = await apiClient.put('/auth/profile', data);
       return response.data;
     },
-    
-    getTeachers: () =>
-      apiClient.get('/users/teachers'),
-    
-    createTeacher: (data: {
-      email: string;
-      firstName: string;
-      lastName: string;
-      subjects: string[];
-      grades: string[];
-    }) =>
-      apiClient.post('/users/teachers', data),
-    
-    updateTeacher: (id: string, data: Partial<{
-      subjects: string[];
-      grades: string[];
-      isActive: boolean;
-    }>) =>
-      apiClient.put(`/users/teachers/${id}`, data),
-    
-    bulkCreateTeachers: (teachers: Array<{
-      email: string;
-      firstName: string;
-      lastName: string;
-      subjects: string[];
-      grades: string[];
-    }>) =>
-      apiClient.post('/users/teachers/bulk', { teachers }),
-  },
-  
-  // School management (Super Admin only)
-  admin: {
-    createSchool: (data: {
-      schoolName: string;
-      domain: string;
-      subscriptionTier: 'basic' | 'professional' | 'enterprise';
-      managerEmail: string;
-      managerFirstName: string;
-      managerLastName: string;
-    }) =>
-      apiClient.post('/admin/schools', data),
-    
-    getSchools: () =>
-      apiClient.get('/admin/schools'),
-    
-    updateSchool: (id: string, data: Partial<{
-      subscriptionTier: string;
-      isActive: boolean;
-      maxTeachers: number;
-      maxMonthlyUploads: number;
-    }>) =>
-      apiClient.put(`/admin/schools/${id}`, data),
-  },
-  
-  // Upload endpoints (School Manager only)
-  upload: {
-    uploadRecording: (formData: FormData, onProgress?: (progress: number) => void) =>
-      apiClient.post('/upload/recording', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total && onProgress) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            onProgress(progress);
-          }
-        },
-      }),
-    
-    getTemplates: (params?: { grade?: string; subject?: string; curriculum?: string }) =>
-      apiClient.get('/upload/templates', { params }),
+    // Keep profile-only methods here; prefer typed services for user CRUD.
   },
   
   // Jobs and results
   jobs: {
     getTeacherJobs: (teacherId: string) =>
       apiClient.get(`/jobs/teacher/${teacherId}`),
-    
-    getJobStatus: (jobId: string) =>
-      apiClient.get(`/jobs/${jobId}`),
-    
-    getJobResult: (jobId: string) =>
-      apiClient.get(`/jobs/${jobId}/result`),
-  },
-  
-  // Analytics
-  analytics: {
-    getTeacherAnalytics: (teacherId: string, params?: { startDate?: string; endDate?: string }) =>
-      apiClient.get(`/analytics/teacher/${teacherId}`, { params }),
-    
-    getSchoolAnalytics: (params?: { startDate?: string; endDate?: string }) =>
-      apiClient.get('/analytics/school', { params }),
-  },
-  
-  // Templates (School Manager)
-  templates: {
-    getTemplates: (params?: { category?: string; subject?: string; grade?: string }) =>
-      apiClient.get('/templates', { params }),
-    
-    getTemplate: (id: string) =>
-      apiClient.get(`/templates/${id}`),
-    
-    createTemplate: (data: {
-      templateName: string;
-      category: string;
-      gradeLevels: string[];
-      subjectAreas: string[];
-      criteria: any;
-      baseTemplateId?: string;
-    }) =>
-      apiClient.post('/templates', data),
-    
-    updateTemplate: (id: string, data: Partial<{
-      criteria: any;
-      isActive: boolean;
-    }>) =>
-      apiClient.put(`/templates/${id}`, data),
+    // other job helpers are provided via feature services
   },
 };
 

@@ -71,6 +71,8 @@ P0 — Unblock Core UX
 P1 — Admin & Consistency
 - Add `PATCH /api/users/:id/role` ✅ Implemented
   - Validates role; requires `schoolId` for `school_manager`; restricted to `super_admin`
+ - Add server-side users filtering for super_admin via `GET /api/users?schoolId=` ✅ Implemented
+   - Frontend updated to pass `schoolId` when a school is selected
 - Remove or implement `POST /api/users/admin/schools`
   - Prefer existing `/schools` + `/users` flows; remove unused endpoint from client
 - Mount or remove System Subjects routes

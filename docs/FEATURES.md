@@ -135,7 +135,7 @@ References:
   - User management (create, edit, deactivate, reset passwords)
   - School management (create/edit/suspend; subject management)
 - Profile
-  - View/update profile (name/email), basic account settings
+  - View profile (name/email/role/school). Edit UI is present but server-side update endpoint is not implemented yet (see gaps below).
 
 References:
 - `frontend/src/shared/services/api.client.ts`
@@ -160,6 +160,9 @@ References:
 - Email flows (invites, notifications) are placeholders
 - WebSocket references exist but not required for current flows
 - Some manager dashboard analytics are scaffolded but not fully implemented
+- Profile update endpoint `PUT /api/auth/profile` is missing; UI calls this route but backend doesn’t implement it yet
+- CategoriesManagement UI points to `/api/schools/:id/criteria` which isn’t implemented; backend provides `/api/schools/:id/template-categories` instead
+- System subjects routes exist (`backend/src/routes/system-subjects.ts`) but are not mounted in `backend/src/index.ts`, so they are not reachable
 
 ## Quick Start (Local)
 
@@ -173,4 +176,3 @@ References:
 
 3) Login
 - Use test users from the docs and go to `http://localhost:3002/login`
-

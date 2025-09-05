@@ -2,7 +2,7 @@
 
 ## ✅ Test Users Created
 
-All test users have been successfully created in AWS Cognito with permanent passwords.
+Note: Local development uses JWT authentication (no Cognito). The credentials below are for local testing.
 
 ### 📝 Login Credentials
 
@@ -11,8 +11,6 @@ All test users have been successfully created in AWS Cognito with permanent pass
 | **Super Admin** | superadmin@test.local | AdminPass2024!@ |
 | **School Manager** | manager@test.local | ManagerPass2024!@ |
 | **Teacher** | teacher@test.local | TeacherPass2024!@ |
-
-guntars@gdwd.co.uk d%u3iefCnxnEsdYe#9YD
 
 ## 🚀 How to Test
 
@@ -23,18 +21,18 @@ guntars@gdwd.co.uk d%u3iefCnxnEsdYe#9YD
 cd backend
 npm run dev
 ```
-Look for: `🔐 Using AWS Cognito authentication` in the console
+Look for: `🔐 Using JWT authentication` in the console
 
 **Frontend (Terminal 2):**
 ```bash
 cd frontend
 npm run dev
 ```
-Should run on: http://localhost:3000
+Should run on: http://localhost:3002
 
 ### 2. Test Each Role
 
-1. **Open browser:** http://localhost:3000/login
+1. **Open browser:** http://localhost:3002/login
 2. **Enter credentials** from the table above
 3. **Click "Sign In"**
 4. **Verify redirect:**
@@ -65,8 +63,8 @@ Should run on: http://localhost:3000
 ### If Login Fails:
 
 1. **Check Backend Console**
-   - Should show: `🔐 Using AWS Cognito authentication`
-   - If showing JWT auth, restart backend
+   - Should show: `🔐 Using JWT authentication`
+   - If showing Cognito, you're likely reading production docs; for local dev, JWT is expected
 
 2. **Check Browser Console (F12)**
    - Look for errors in red
@@ -75,12 +73,12 @@ Should run on: http://localhost:3000
 3. **Verify Environment Variables**
    ```bash
    # Backend should have:
-   cat backend/.env | grep COGNITO
+   cat backend/.env | grep -E "PORT|FRONTEND_URL|JWT_SECRET"
    ```
-   Should show:
-   - COGNITO_USER_POOL_ID=eu-west-2_E3SFkCKPU
-   - COGNITO_CLIENT_ID=6s2hfgujbgt28ce4eh15b502d4
-   - COGNITO_CLIENT_SECRET=(secret value)
+   Should include:
+   - PORT=3001
+   - FRONTEND_URL=http://localhost:3002
+   - JWT_SECRET=<your local dev secret>
 
 4. **Frontend Auth Service**
    - File: `frontend/src/features/auth/services/auth.service.ts`
@@ -98,9 +96,8 @@ Should run on: http://localhost:3000
 - Restart: `cd backend && npm run dev`
 
 **Still on login page after submit:**
-- Mock auth might be enabled
-- Check `auth.service.ts` line 19
-- Should be: `const USE_MOCK_AUTH = false;`
+- Ensure backend is running and CORS allows http://localhost:3002
+- Verify `frontend/.env.local` has `VITE_API_URL=http://localhost:3001` and `VITE_APP_URL=http://localhost:3002`
 
 ## 🗑️ Clean Up Test Users
 
@@ -129,7 +126,7 @@ aws cognito-idp admin-delete-user \
 - ✅ Backend configured for Cognito auth
 - ✅ Frontend updated to use real API
 
-**Ready to test!** Use the credentials above at http://localhost:3000/login
+**Ready to test!** Use the credentials above at http://localhost:3002/login
 
 ---
 

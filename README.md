@@ -93,7 +93,7 @@ aws s3api create-bucket \
 ```bash
 cd frontend
 npm run dev
-# Runs on http://localhost:3000
+# Runs on http://localhost:3002
 ```
 
 ### Backend
@@ -106,8 +106,8 @@ npm run dev
 ### Start Both Services
 ```bash
 # From project root
-./start-local.sh
-# Frontend: http://localhost:3000
+scripts/setup/start-local.sh
+# Frontend: http://localhost:3002
 # Backend API: http://localhost:3001
 ```
 

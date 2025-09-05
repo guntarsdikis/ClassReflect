@@ -12,12 +12,12 @@ BACKEND_PID=$!
 # Start frontend
 echo "Starting frontend..."
 cd ../frontend
-npm start &
+npm run dev &
 FRONTEND_PID=$!
 
 echo ""
 echo "Services running:"
-echo "Frontend: http://localhost:3000"
+echo "Frontend: http://localhost:3002"
 echo "Backend API: http://localhost:3001"
 echo ""
 echo "Press Ctrl+C to stop all services"

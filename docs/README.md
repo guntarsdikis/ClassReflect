@@ -19,6 +19,7 @@ Deployment status, procedures, and production information.
 Development roadmaps, implementation guides, and task tracking.
 
 - [**IMPLEMENTATION_ROADMAP.md**](development/IMPLEMENTATION_ROADMAP.md) - Complete implementation task list and project roadmap
+- [**NEXT_TASKS_PLAN.md**](NEXT_TASKS_PLAN.md) - Current missing features and prioritized action plan
 
 ### ⚙️ Setup
 Configuration and setup guides for various components.

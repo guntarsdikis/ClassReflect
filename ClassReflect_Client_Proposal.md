@@ -3,6 +3,21 @@
 
 ---
 
+## 📊 About GDWD
+
+**GDWD SIA** is a specialized software development company focused on educational technology solutions and AI-powered platforms.
+
+**Company Details:**
+- **Registration Number:** 40103981811
+- **VAT Number:** LV40103981811
+- **Address:** Liepdārzi 15, Baldones pag, Ķekavas nov, LV-2125, Latvia
+- **Website:** [gdwd.co.uk](https://gdwd.co.uk)
+- **Phone:** +371 29438427
+
+**Expertise:** Custom web applications, AI integration, cloud infrastructure, and educational technology platforms.
+
+---
+
 ## 🎯 Project Overview
 
 ClassReflect is a cutting-edge educational technology platform designed to revolutionize how teachers analyze and improve their classroom interactions through intelligent audio processing and AI-powered insights.
@@ -22,7 +37,6 @@ ClassReflect is a cutting-edge educational technology platform designed to revol
 |-----------|------------------|----------|
 | **Complete Platform Development** | **€15,000** | 8-10 weeks |
 | **Monthly Operations (Standard Support)** | **€506.91** | Ongoing |
-| **Cost per Teaching Session** | **€101.69** | Usage-based |
 
 ### **Total Development Investment: €15,000 (excl. VAT)**
 
@@ -274,6 +288,15 @@ ClassReflect is a cutting-edge educational technology platform designed to revol
 Contact us to schedule a detailed requirements workshop and begin your ClassReflect implementation.
 
 ---
+
+## 📞 Contact Information
+
+**GDWD SIA**  
+Reģ. Nr. 40103981811  
+PVN LV40103981811  
+Liepdārzi 15, Baldones pag, Ķekavas nov, LV-2125  
+Website: [gdwd.co.uk](https://gdwd.co.uk)  
+Phone: +371 29438427  
 
 **Professional Development Team**  
 **Estimated Delivery: 10 weeks from project start**  

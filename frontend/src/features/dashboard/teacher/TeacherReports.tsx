@@ -19,6 +19,7 @@ import {
   RangeSlider,
   Tooltip,
   Menu,
+  Divider,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import {
@@ -35,6 +36,8 @@ import {
   IconHistory,
   IconDotsVertical,
   IconCheck,
+  IconAlertCircle,
+  IconClock,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { jobsService } from '@features/jobs/services/jobs.service';
@@ -44,6 +47,10 @@ import { useState, useMemo, useEffect } from 'react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useSearchParams } from 'react-router-dom';
+import { analysisService, type AnalysisResult } from '@features/analysis/services/analysis.service';
+import { AnalysisResults } from '@features/analysis/components/AnalysisResults';
+import { AnalysisReportPDF } from '@features/analysis/components/AnalysisReportPDF';
+import { pdf } from '@react-pdf/renderer';
 
 // Types for teacher recordings data
 interface TeacherRecording {
@@ -62,6 +69,7 @@ interface TeacherRecording {
   word_count?: number;
   template_name?: string;
   latest_analysis_date?: string;
+  transcript_id?: number; // Add this to get transcript ID from backend
 }
 
 interface FilterState {
@@ -80,6 +88,12 @@ export function TeacherReports() {
   const [selectedRecordings, setSelectedRecordings] = useState<Set<string>>(new Set());
   const [detailsModalOpened, { open: openDetailsModal, close: closeDetailsModal }] = useDisclosure(false);
   const [selectedRecording, setSelectedRecording] = useState<TeacherRecording | null>(null);
+  
+  // Analysis-related state
+  const [analysisResultsModalOpened, { open: openAnalysisModal, close: closeAnalysisModal }] = useDisclosure(false);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
   
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -116,6 +130,106 @@ export function TeacherReports() {
       }
     }
   }, [recordingsData, searchParams, setSearchParams, openDetailsModal]);
+
+  // Load analysis results for a recording
+  const loadAnalysisResults = async (recording: TeacherRecording) => {
+    try {
+      setLoadingAnalysis(true);
+      
+      // Try to get transcript_id from recording data
+      let transcriptId = recording.transcript_id;
+      
+      if (!transcriptId) {
+        // Fallback: find transcript by job_id (this might need backend support)
+        // For now, just show an error message
+        notifications.show({
+          title: 'Analysis Error',
+          message: 'Unable to find transcript for this recording. Please try refreshing the page.',
+          color: 'orange',
+        });
+        return;
+      }
+      
+      const results = await analysisService.getAnalysisResults(transcriptId);
+      setAnalysisResults(results);
+      setSelectedRecording(recording);
+      openAnalysisModal();
+    } catch (error: any) {
+      console.error('Failed to load analysis results:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load analysis results',
+        color: 'red',
+      });
+    } finally {
+      setLoadingAnalysis(false);
+    }
+  };
+
+  // Handle PDF export
+  const handleExportPDF = async (recording: TeacherRecording, analysisResult?: AnalysisResult) => {
+    try {
+      // If no analysis result provided, get the first one
+      let analysis = analysisResult;
+      if (!analysis) {
+        if (!recording.transcript_id) {
+          notifications.show({
+            title: 'Export Error',
+            message: 'Unable to find transcript for this recording. Please try refreshing the page.',
+            color: 'orange',
+          });
+          return;
+        }
+        
+        const results = await analysisService.getAnalysisResults(recording.transcript_id);
+        if (results.length === 0) {
+          notifications.show({
+            title: 'No Analysis Found',
+            message: 'This recording has no analysis to export',
+            color: 'orange',
+          });
+          return;
+        }
+        analysis = results[0]; // Export the first/latest analysis
+      }
+
+      // Generate PDF blob
+      const doc = <AnalysisReportPDF analysis={analysis} />;
+      const asPdf = pdf(doc);
+      const blob = await asPdf.toBlob();
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename
+      const date = new Date().toISOString().split('T')[0];
+      const className = recording.class_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'recording';
+      const templateName = analysis.template_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'analysis';
+      link.download = `ClassReflect_${className}_${templateName}_${date}.pdf`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: 'PDF Downloaded',
+        message: 'Analysis report has been downloaded successfully',
+        color: 'green',
+        icon: <IconDownload />,
+      });
+    } catch (error: any) {
+      console.error('Failed to export PDF:', error);
+      notifications.show({
+        title: 'Export Failed',
+        message: 'Failed to generate PDF report. Please try again.',
+        color: 'red',
+      });
+    }
+  };
 
   // Filter and search recordings
   const filteredRecordings = useMemo(() => {
@@ -481,10 +595,18 @@ export function TeacherReports() {
                               </ActionIcon>
                             </Menu.Target>
                             <Menu.Dropdown>
-                              <Menu.Item leftSection={<IconEye size={14} />}>
+                              <Menu.Item 
+                                leftSection={<IconEye size={14} />}
+                                onClick={() => loadAnalysisResults(recording)}
+                                disabled={recording.has_analysis === 0}
+                              >
                                 View Analysis
                               </Menu.Item>
-                              <Menu.Item leftSection={<IconDownload size={14} />}>
+                              <Menu.Item 
+                                leftSection={<IconDownload size={14} />}
+                                onClick={() => handleExportPDF(recording)}
+                                disabled={recording.has_analysis === 0}
+                              >
                                 Export PDF
                               </Menu.Item>
                               <Menu.Item leftSection={<IconGitCompare size={14} />} disabled>
@@ -567,11 +689,23 @@ export function TeacherReports() {
 
             <Group mt="lg">
               {selectedRecording.has_analysis > 0 && (
-                <Button leftSection={<IconEye size={16} />}>
+                <Button 
+                  leftSection={<IconEye size={16} />}
+                  onClick={() => {
+                    closeDetailsModal();
+                    loadAnalysisResults(selectedRecording);
+                  }}
+                  loading={loadingAnalysis}
+                >
                   View Full Analysis
                 </Button>
               )}
-              <Button variant="light" leftSection={<IconDownload size={16} />}>
+              <Button 
+                variant="light" 
+                leftSection={<IconDownload size={16} />}
+                onClick={() => handleExportPDF(selectedRecording)}
+                disabled={selectedRecording.has_analysis === 0}
+              >
                 Export PDF
               </Button>
               <Button variant="subtle" onClick={closeDetailsModal}>
@@ -579,6 +713,53 @@ export function TeacherReports() {
               </Button>
             </Group>
           </Stack>
+        )}
+      </Modal>
+
+      {/* Analysis Results Modal */}
+      <Modal
+        opened={analysisResultsModalOpened}
+        onClose={closeAnalysisModal}
+        title="Analysis Results"
+        size="xl"
+        overflow="inside"
+      >
+        {loadingAnalysis ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <IconClock size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <Text>Loading analysis results...</Text>
+          </div>
+        ) : analysisResults.length > 0 ? (
+          <Stack>
+            {analysisResults.map((result, index) => (
+              <div key={result.id}>
+                {index > 0 && <Divider my="md" />}
+                <Group justify="space-between" mb="md">
+                  <div>
+                    <Text size="lg" fw={600}>{result.template_name}</Text>
+                    <Text size="sm" c="dimmed">
+                      Applied by {result.applied_by_first_name} {result.applied_by_last_name} • {' '}
+                      {format(new Date(result.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                    </Text>
+                  </div>
+                  <Button
+                    leftSection={<IconDownload size={16} />}
+                    variant="light"
+                    size="sm"
+                    onClick={() => handleExportPDF(selectedRecording!, result)}
+                  >
+                    Export PDF
+                  </Button>
+                </Group>
+                <AnalysisResults analysis={result} />
+              </div>
+            ))}
+          </Stack>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <IconAlertCircle size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+            <Text>No analysis results found for this recording.</Text>
+          </div>
         )}
       </Modal>
     </Container>

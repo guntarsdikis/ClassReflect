@@ -30,6 +30,32 @@ export interface CreateSchoolRequest {
 
 export interface UpdateSchoolRequest extends Partial<CreateSchoolRequest> {}
 
+export interface TemplateCategory {
+  id: number;
+  category_name: string;
+  description?: string;
+  color?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by_first_name?: string;
+  created_by_last_name?: string;
+  template_count: number;
+}
+
+export interface CreateTemplateCategoryRequest {
+  category_name: string;
+  description?: string;
+  color?: string;
+}
+
+export interface UpdateTemplateCategoryRequest {
+  category_name?: string;
+  description?: string;
+  color?: string;
+  is_active?: boolean;
+}
+
 export interface PlatformStats {
   total_schools: number;
   total_users: number;
@@ -113,21 +139,44 @@ export class SchoolsService {
   }
 
   /**
-   * Get school's analysis criteria
+   * Get school's template categories
    */
-  async getSchoolCriteria(schoolId: number): Promise<any[]> {
-    return this.api.get<any[]>(`/schools/${schoolId}/criteria`);
+  async getSchoolTemplateCategories(schoolId: number): Promise<TemplateCategory[]> {
+    return this.api.get<TemplateCategory[]>(`/schools/${schoolId}/template-categories`);
   }
 
   /**
-   * Add analysis criterion to school
+   * Create template category for school
    */
-  async addSchoolCriterion(schoolId: number, data: {
-    criteria_name: string;
-    criteria_description?: string;
-    weight?: number;
-  }): Promise<any> {
-    return this.api.post(`/schools/${schoolId}/criteria`, data);
+  async createSchoolTemplateCategory(schoolId: number, data: CreateTemplateCategoryRequest): Promise<{
+    id: number;
+    schoolId: number;
+    category_name: string;
+    description?: string;
+    color?: string;
+    message: string;
+  }> {
+    return this.api.post(`/schools/${schoolId}/template-categories`, data);
+  }
+
+  /**
+   * Update template category for school
+   */
+  async updateSchoolTemplateCategory(schoolId: number, categoryId: number, data: UpdateTemplateCategoryRequest): Promise<{
+    id: number;
+    message: string;
+  }> {
+    return this.api.put(`/schools/${schoolId}/template-categories/${categoryId}`, data);
+  }
+
+  /**
+   * Delete template category for school
+   */
+  async deleteSchoolTemplateCategory(schoolId: number, categoryId: number): Promise<{
+    id: number;
+    message: string;
+  }> {
+    return this.api.delete(`/schools/${schoolId}/template-categories/${categoryId}`);
   }
 
   /**

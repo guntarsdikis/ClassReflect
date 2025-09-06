@@ -24,7 +24,6 @@ import {
   IconEye,
   IconDownload,
   IconChartBar,
-  IconUpload,
   IconBell,
   IconRefresh,
   IconCheck,
@@ -206,7 +205,7 @@ export function TeacherDashboard() {
       
       <Grid gutter="lg">
         {/* Recent Recordings Widget (TOP PRIORITY) */}
-        <Grid.Col span={{ base: 12, lg: 8 }}>
+        <Grid.Col span={{ base: 12, lg: 9 }}>
           <Card shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
               <Title order={3}>Recent Recordings</Title>
@@ -217,7 +216,7 @@ export function TeacherDashboard() {
                   rightSection={<IconChartBar size={16} />}
                   onClick={() => navigate('/reports')}
                 >
-                  View All
+                  View All Records
                 </Button>
               </Group>
             </Group>
@@ -325,10 +324,10 @@ export function TeacherDashboard() {
           </Card>
         </Grid.Col>
         
-        {/* Sidebar: Pending Actions Panel and Quick Upload */}
-        <Grid.Col span={{ base: 12, lg: 4 }}>
+        {/* Sidebar: Pending Actions Panel */}
+        <Grid.Col span={{ base: 12, lg: 3 }}>
           {/* Pending Actions Panel */}
-          <Card shadow="sm" p="lg" radius="md" withBorder mb="lg">
+          <Card shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
               <Title order={3}>Pending Actions</Title>
               {(pendingTranscriptions + readyForAnalysis + newAnalysisResults) > 0 && (
@@ -383,37 +382,6 @@ export function TeacherDashboard() {
             )}
           </Card>
 
-          
-          {/* Quick Actions */}
-          <Card shadow="sm" p="lg" radius="md" withBorder>
-            <Title order={3} mb="md">Quick Actions</Title>
-            
-            <Stack>
-              <Button 
-                variant="subtle" 
-                justify="space-between" 
-                rightSection={<IconChartBar size={16} />}
-                onClick={() => navigate('/progress')}
-              >
-                View Progress Report
-              </Button>
-              <Button 
-                variant="subtle" 
-                justify="space-between" 
-                rightSection={<IconDownload size={16} />}
-                onClick={() => navigate('/reports')}
-              >
-                Export Monthly Summary
-              </Button>
-              <Button 
-                variant="subtle" 
-                justify="space-between" 
-                rightSection={<IconFileText size={16} />}
-              >
-                Learning Resources
-              </Button>
-            </Stack>
-          </Card>
         </Grid.Col>
       </Grid>
     </Container>

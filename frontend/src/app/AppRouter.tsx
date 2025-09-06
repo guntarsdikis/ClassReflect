@@ -5,7 +5,6 @@ import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { RoleRoute } from '@features/auth/components/RoleRoute';
 import { AppShell } from '@shared/components/Layout/AppShell';
 import { DashboardRouter } from '@features/dashboard/components/DashboardRouter';
-import { MyProgress } from '@features/dashboard/teacher/MyProgress';
 import { TeacherReports } from '@features/dashboard/teacher/TeacherReports';
 import { SchoolManagement } from '@features/schools/components/SchoolManagement';
 import { SchoolDetail } from '@features/schools/components/SchoolDetail';
@@ -39,7 +38,6 @@ export function AppRouter() {
           
           {/* Teacher Routes */}
           <Route element={<RoleRoute roles={['teacher']} />}>
-            <Route path="/progress" element={<MyProgress />} />
             <Route path="/reports" element={<TeacherReports />} />
             {/* <Route path="/feedback/:jobId" element={<FeedbackView />} /> */}
           </Route>

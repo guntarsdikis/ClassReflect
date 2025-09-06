@@ -71,12 +71,15 @@ This plan documents remaining gaps and a prioritized action plan for the current
 - ✅ CategoriesManagement API mismatch (component doesn't exist - no issue)
 - ✅ Admin endpoints review (unused `/users/admin/schools` verified not needed)
 
-**REMAINING TASKS (Lower Priority):**
+**ALL CORE TASKS COMPLETED! ✅**
 
-P1 — Code Quality & Consistency
-- Consolidate API client layers (choose between `api` object and `ApiClient` services)
-  - Current: Both patterns exist in codebase
-  - Recommendation: Standardize on typed service classes, keep minimal auth helpers in api object
+**COMPLETED (September 6, 2025):**
+- ✅ API client layer consolidation (standardized on typed services, auth helpers kept in api object)
+  - Created jobs.service.ts for job-related API calls
+  - Updated TeacherDashboard and TeacherReports to use jobsService
+  - Updated TemplateCategoryManagement to use schoolsService  
+  - Removed redundant api.jobs methods
+  - Achieved single client layer pattern with proper TypeScript typing
 
 P2 — Quality & Enhancements (Optional)
 - Implement token‑based forgot/reset password with email stubs for dev
@@ -114,7 +117,7 @@ The application is **production-ready** for core use cases. Remaining tasks are 
 - [x] System subjects: removed (unused feature)
 - [x] Dev API base is relative (`/api`) in dev; CORS issues resolved
 - [x] Docs reflect JWT‑only local development; no misleading Cognito steps
-- [ ] Single client layer in use across the app (code quality - not blocking)
+- [x] Single client layer in use across the app (consolidated to typed services)
 - [x] TLC Template Import System fully functional in Templates page
 - [x] Server-side users filtering by schoolId implemented
 

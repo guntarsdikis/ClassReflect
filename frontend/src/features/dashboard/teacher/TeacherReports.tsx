@@ -18,7 +18,6 @@ import {
   Textarea,
   RangeSlider,
   Tooltip,
-  Menu,
   Divider,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
@@ -32,9 +31,7 @@ import {
   IconCalendar,
   IconFileText,
   IconChartBar,
-  IconGitCompare,
   IconHistory,
-  IconDotsVertical,
   IconCheck,
   IconAlertCircle,
   IconClock,
@@ -621,32 +618,6 @@ export function TeacherReports() {
                               </ActionIcon>
                             </Tooltip>
                           )}
-                          <Menu withinPortal>
-                            <Menu.Target>
-                              <ActionIcon variant="subtle">
-                                <IconDotsVertical size={16} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item 
-                                leftSection={<IconEye size={14} />}
-                                onClick={() => loadAnalysisResults(recording)}
-                                disabled={recording.has_analysis === 0}
-                              >
-                                View Analysis
-                              </Menu.Item>
-                              <Menu.Item 
-                                leftSection={<IconDownload size={14} />}
-                                onClick={() => handleExportPDF(recording)}
-                                disabled={recording.has_analysis === 0}
-                              >
-                                Export PDF
-                              </Menu.Item>
-                              <Menu.Item leftSection={<IconGitCompare size={14} />} disabled>
-                                Compare (Coming Soon)
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
                         </Group>
                       </Table.Td>
                     </Table.Tr>

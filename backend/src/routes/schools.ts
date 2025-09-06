@@ -687,4 +687,160 @@ router.delete('/:schoolId/template-categories/:categoryId', authorize('school_ma
   }
 });
 
+/**
+ * POST /api/schools/:schoolId/import-tlc-templates
+ * Import Teach Like a Champion templates to a school (Super Admin only)
+ */
+router.post('/:schoolId/import-tlc-templates', authorize('super_admin'), async (req: Request, res: Response) => {
+  try {
+    const { schoolId } = req.params;
+    const user = (req as any).user;
+
+    // Verify school exists
+    const [schoolRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id, name FROM schools WHERE id = ?',
+      [schoolId]
+    );
+
+    if (!Array.isArray(schoolRows) || schoolRows.length === 0) {
+      return res.status(404).json({ error: 'School not found' });
+    }
+
+    const school = schoolRows[0] as any;
+
+    // Check if Teaching Methods category exists for this school
+    let teachingMethodsCategoryId;
+    const [categoryRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM template_categories WHERE school_id = ? AND category_name = "Teaching Methods"',
+      [schoolId]
+    );
+
+    if (Array.isArray(categoryRows) && categoryRows.length > 0) {
+      teachingMethodsCategoryId = (categoryRows[0] as any).id;
+    } else {
+      // Create Teaching Methods category for this school
+      const [categoryResult] = await pool.execute<ResultSetHeader>(
+        'INSERT INTO template_categories (school_id, category_name, description, color, created_by) VALUES (?, ?, ?, ?, ?)',
+        [schoolId, 'Teaching Methods', 'Templates for evaluating teaching methodologies including Teach Like a Champion frameworks', '#e03131', user.id]
+      );
+      teachingMethodsCategoryId = categoryResult.insertId;
+    }
+
+    // TLC Template definitions
+    const tlcTemplates = [
+      {
+        template_name: 'Teach Like a Champion - Foundation Techniques',
+        description: 'Core foundation techniques from Teach Like a Champion focusing on essential classroom management and instruction methods. Ideal for new teachers or schools starting with the framework.',
+        criteria: [
+          { name: 'Cold Call - Frequency', description: 'Total cold calls per lesson. Target: 8-12 cold calls per 45-minute lesson. Measures teacher ability to maintain universal engagement through unpredictable questioning.', weight: 5.26, order: 1 },
+          { name: 'Cold Call - Distribution', description: 'Percentage of students called upon. Target: 60%+ of students called at least once. Ensures equitable participation across all learners.', weight: 5.26, order: 2 },
+          { name: 'Cold Call - Timing', description: 'Cold calls distributed throughout lesson vs clustered. Measures consistency of engagement expectations across entire lesson.', weight: 5.26, order: 3 },
+          { name: 'Cold Call - Effectiveness', description: 'Student response rate to cold calls. Target: 90%+ receive substantive answers. Indicates successful culture of preparedness.', weight: 5.26, order: 4 },
+          { name: 'Wait Time - Average Duration', description: 'Mean pause length after questions. Target: 3-5 seconds average. Allows sufficient processing time for thoughtful responses.', weight: 5.26, order: 5 },
+          { name: 'Wait Time - Consistency', description: 'Percentage of questions with 3+ second wait time. Target: 80%+ meet minimum threshold. Demonstrates sustained commitment to thinking time.', weight: 5.26, order: 6 },
+          { name: 'Wait Time - Question Complexity Matching', description: 'Wait time adjusted for question difficulty. Complex questions receive longer wait times (up to 8 seconds). Shows strategic thinking about questioning.', weight: 5.26, order: 7 },
+          { name: 'No Opt Out - Resolution Rate', description: 'Percentage of "I don\'t know" responses successfully resolved. Target: 95%+ resolution rate. Maintains high expectations for all students.', weight: 5.26, order: 8 },
+          { name: 'No Opt Out - Method Variety', description: 'Different support strategies used (hint, simpler question, peer help). Target: 3+ different approaches. Shows adaptive teaching skills.', weight: 5.26, order: 9 },
+          { name: 'No Opt Out - Follow Through', description: 'Returning to original student with correct answer. Ensures student achieves success rather than avoidance.', weight: 5.26, order: 10 },
+          { name: 'No Opt Out - Time Investment', description: 'Average time spent resolving opt-outs. Target: 45-90 seconds per resolution. Balances support with lesson pacing.', weight: 5.26, order: 11 },
+          { name: 'Right is Right - Precision Requests', description: 'Frequency of demanding more accurate answers. Target: 70%+ of imprecise answers receive precision requests. Maintains high academic standards.', weight: 5.26, order: 12 },
+          { name: 'Right is Right - Standard Consistency', description: 'Standards maintained throughout entire lesson. Measures sustained commitment to accuracy without fatigue or compromise.', weight: 5.26, order: 13 },
+          { name: 'Right is Right - Student Growth Evidence', description: 'Students increasingly self-correct by lesson end. Indicates internalization of high expectations.', weight: 5.26, order: 14 },
+          { name: 'Right is Right - Missed Opportunities', description: 'Partially correct answers accepted without pushback. Identifies areas for improvement in standard maintenance.', weight: 5.26, order: 15 },
+          { name: 'Format Matters - Complete Sentences', description: 'Percentage of student responses in complete sentences. Target: 80%+ proper format. Builds academic language habits.', weight: 5.26, order: 16 },
+          { name: 'Format Matters - Academic Vocabulary', description: 'Usage of subject-specific terms. Target: 5+ academic terms per 10-minute segment. Develops scholarly discourse.', weight: 5.26, order: 17 },
+          { name: 'Format Matters - Format Interventions', description: 'Teacher requests for proper language format. Shows commitment to elevating student communication.', weight: 5.26, order: 18 },
+          { name: 'Format Matters - Language Progression', description: 'Improvement in format quality from start to end of lesson. Target: 15% improvement. Evidence of responsive teaching.', weight: 5.32, order: 19 }
+        ]
+      },
+      {
+        template_name: 'Teach Like a Champion - Complete Framework',
+        description: 'Complete framework covering all 62 techniques from Doug Lemov\'s research-proven teaching methods including High Academic Expectations, Planning for Success, Structuring and Delivering Lessons, and Building Character and Trust.',
+        criteria: [
+          { name: 'Cold Call - Frequency', description: 'Total cold calls per lesson. Target: 8-12 cold calls per 45-minute lesson. Measures teacher ability to maintain universal engagement through unpredictable questioning.', weight: 6.25, order: 1 },
+          { name: 'Cold Call - Distribution', description: 'Percentage of students called upon. Target: 60%+ of students called at least once. Ensures equitable participation across all learners.', weight: 6.25, order: 2 },
+          { name: 'Wait Time - Average Duration', description: 'Mean pause length after questions. Target: 3-5 seconds average. Allows sufficient processing time for thoughtful responses.', weight: 6.25, order: 3 },
+          { name: 'No Opt Out - Resolution Rate', description: 'Percentage of "I don\'t know" responses successfully resolved. Target: 95%+ resolution rate. Maintains high expectations for all students.', weight: 6.25, order: 4 },
+          { name: 'Right is Right - Precision Requests', description: 'Frequency of demanding more accurate answers. Target: 70%+ of imprecise answers receive precision requests. Maintains high academic standards.', weight: 6.25, order: 5 },
+          { name: 'Format Matters - Complete Sentences', description: 'Percentage of student responses in complete sentences. Target: 80%+ proper format. Builds academic language habits.', weight: 6.25, order: 6 },
+          { name: 'Begin With the End', description: 'Evidence that lesson objectives are clear from the start. Learning goals stated and referenced throughout lesson.', weight: 6.25, order: 7 },
+          { name: 'Post It - Objective Visibility', description: 'Learning objective visibly posted and referenced. Students can articulate what they are learning and why.', weight: 6.25, order: 8 },
+          { name: '100% - Universal Participation', description: 'Evidence that all students are engaged 100% of the time. No opt-outs or passive participation allowed.', weight: 6.25, order: 9 },
+          { name: 'What to Do - Clear Directions', description: 'Instructions are specific, concrete, and actionable. Students know exactly what to do without confusion.', weight: 6.25, order: 10 },
+          { name: 'Exit Ticket - Learning Check', description: 'Formal assessment of student understanding at lesson end. Data collected on objective mastery.', weight: 6.25, order: 11 },
+          { name: 'Targeted Questioning', description: 'Questions strategically designed to assess specific learning objectives and reveal student thinking.', weight: 6.25, order: 12 },
+          { name: 'Positive Framing', description: 'Language emphasizes what students should do rather than what they should not do. Constructive tone maintained.', weight: 6.25, order: 13 },
+          { name: 'Strong Voice - Presence', description: 'Teacher demonstrates confident authority through posture, tone, and clear communication.', weight: 6.25, order: 14 },
+          { name: 'Stretch It', description: 'Extension of correct answers to build deeper understanding and higher-order thinking.', weight: 6.25, order: 15 },
+          { name: 'Ratio - Student Talk Time', description: 'Percentage of lesson time students spend engaged in academic talk vs teacher talk. Target: 40%+ student talk.', weight: 6.26, order: 16 }
+        ]
+      }
+    ];
+
+    const importedTemplates = [];
+
+    // Import each template
+    for (const templateData of tlcTemplates) {
+      // Check if template already exists for this school
+      const [existingRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT id FROM templates WHERE school_id = ? AND template_name = ?',
+        [schoolId, templateData.template_name]
+      );
+
+      if (Array.isArray(existingRows) && existingRows.length > 0) {
+        continue; // Skip if template already exists
+      }
+
+      // Create template
+      const [templateResult] = await pool.execute<ResultSetHeader>(
+        `INSERT INTO templates (template_name, description, category_id, category, grade_levels, subjects, is_global, school_id, created_by, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          templateData.template_name,
+          templateData.description,
+          teachingMethodsCategoryId,
+          'Teaching Methods',
+          '["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]',
+          '["Math", "English", "Science", "Social Studies", "Arts", "Physical Education", "Other"]',
+          0, // is_global = false
+          schoolId,
+          user.id,
+          1 // is_active = true
+        ]
+      );
+
+      const templateId = templateResult.insertId;
+
+      // Create template criteria
+      for (const criteria of templateData.criteria) {
+        await pool.execute<ResultSetHeader>(
+          `INSERT INTO template_criteria (template_id, criteria_name, criteria_description, weight, order_index, is_active)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [templateId, criteria.name, criteria.description, criteria.weight, criteria.order, 1]
+        );
+      }
+
+      importedTemplates.push({
+        id: templateId,
+        name: templateData.template_name,
+        criteriaCount: templateData.criteria.length
+      });
+    }
+
+    res.json({
+      message: `Successfully imported ${importedTemplates.length} Teach Like a Champion templates to school "${school.name}"`,
+      school: {
+        id: school.id,
+        name: school.name
+      },
+      imported: importedTemplates,
+      categoryCreated: !categoryRows.length
+    });
+
+  } catch (error) {
+    console.error('Error importing TLC templates:', error);
+    res.status(500).json({ error: 'Failed to import Teach Like a Champion templates' });
+  }
+});
+
 export default router;

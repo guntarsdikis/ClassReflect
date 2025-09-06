@@ -130,6 +130,7 @@
       "Bash(npm run start)",
       "Bash(npm run start:*)"
     ],
-    "ask": []
+    "ask": [],
+    "defaultMode": "acceptEdits"
   }
 }

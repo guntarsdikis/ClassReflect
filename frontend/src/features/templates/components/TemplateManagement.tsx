@@ -44,11 +44,13 @@ import {
   IconChartBar,
   IconCategory,
   IconAlertCircle,
+  IconDownload,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { useAuthStore } from '@store/auth.store';
 import { 
   templatesService, 
@@ -212,6 +214,107 @@ export function TemplateManagement() {
       criteria: [],
     });
     openModal();
+  };
+
+  const handleImportTLCTemplates = () => {
+    // For super admin, show school selector
+    // For school manager, use their own school
+    if (isSuperAdmin) {
+      modals.openConfirmModal({
+        title: 'Import Teach Like a Champion Templates',
+        children: (
+          <Stack>
+            <Text size="sm">
+              This will import 2 research-proven TLC templates to <strong>"{selectedSchool?.name || 'the selected school'}"</strong>:
+            </Text>
+            <Stack gap="xs" ml="md">
+              <Text size="sm">• <strong>Foundation Techniques</strong> (19 criteria) - Ideal for new teachers</Text>
+              <Text size="sm">• <strong>Complete Framework</strong> (16 criteria) - For experienced teachers</Text>
+            </Stack>
+            <Text size="sm" c="dimmed">
+              Templates will be available immediately for all teachers in this school to use in their upload wizard and analysis.
+            </Text>
+          </Stack>
+        ),
+        labels: { confirm: 'Import Templates', cancel: 'Cancel' },
+        confirmProps: { color: 'green' },
+        onConfirm: async () => {
+          if (!currentUserSchoolId) {
+            notifications.show({
+              title: 'Error',
+              message: 'Please select a school first',
+              color: 'red'
+            });
+            return;
+          }
+          
+          try {
+            const result = await schoolsService.importTLCTemplates(currentUserSchoolId);
+            notifications.show({
+              title: 'Templates Imported Successfully',
+              message: `${result.imported.length} TLC templates added to ${result.school.name}`,
+              color: 'green'
+            });
+            // Refresh templates list
+            loadData();
+          } catch (error: any) {
+            notifications.show({
+              title: 'Import Failed',
+              message: error.message || 'Failed to import templates',
+              color: 'red'
+            });
+          }
+        }
+      });
+    } else {
+      // School manager - import directly to their school
+      modals.openConfirmModal({
+        title: 'Import Teach Like a Champion Templates',
+        children: (
+          <Stack>
+            <Text size="sm">
+              This will import 2 research-proven TLC templates to your school:
+            </Text>
+            <Stack gap="xs" ml="md">
+              <Text size="sm">• <strong>Foundation Techniques</strong> (19 criteria) - Ideal for new teachers</Text>
+              <Text size="sm">• <strong>Complete Framework</strong> (16 criteria) - For experienced teachers</Text>
+            </Stack>
+            <Text size="sm" c="dimmed">
+              Templates will be available immediately for all teachers in your school.
+            </Text>
+          </Stack>
+        ),
+        labels: { confirm: 'Import Templates', cancel: 'Cancel' },
+        confirmProps: { color: 'green' },
+        onConfirm: async () => {
+          if (!currentUserSchoolId) {
+            notifications.show({
+              title: 'Error',
+              message: 'School ID not found',
+              color: 'red'
+            });
+            return;
+          }
+          
+          try {
+            const result = await schoolsService.importTLCTemplates(currentUserSchoolId);
+            notifications.show({
+              title: 'Templates Imported Successfully',
+              message: `${result.imported.length} TLC templates added`,
+              color: 'green'
+            });
+            // Refresh templates list
+            loadData();
+          } catch (error: any) {
+            notifications.show({
+              title: 'Import Failed',
+              message: error.message || 'Failed to import templates',
+              color: 'red'
+            });
+          }
+        }
+      });
+    }
   };
 
   const handleEditTemplate = async (template: Template) => {
@@ -462,6 +565,16 @@ export function TemplateManagement() {
           </Text>
         </div>
         <Group>
+          {isSuperAdmin && currentUserSchoolId && (
+            <Button
+              leftSection={<IconDownload size={16} />}
+              onClick={handleImportTLCTemplates}
+              variant="light"
+              color="green"
+            >
+              Import TLC Templates
+            </Button>
+          )}
           <Button
             leftSection={<IconPlus size={16} />}
             onClick={handleCreateTemplate}

@@ -30,6 +30,7 @@ import {
   IconAlertCircle,
   IconCheck,
   IconX,
+  IconTemplate,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
@@ -148,6 +149,46 @@ export function SchoolManagement() {
       labels: { confirm: 'Suspend School', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
       onConfirm: () => confirmSuspendSchool(school.id),
+    });
+  };
+
+  const handleImportTLC = (school: School) => {
+    modals.openConfirmModal({
+      title: 'Import Teach Like a Champion Templates',
+      children: (
+        <Stack>
+          <Text size="sm">
+            This will import 2 research-proven TLC templates to <strong>"{school.name}"</strong>:
+          </Text>
+          <Stack gap="xs" ml="md">
+            <Text size="sm">• <strong>Foundation Techniques</strong> (19 criteria) - Ideal for new teachers</Text>
+            <Text size="sm">• <strong>Complete Framework</strong> (16 criteria) - For experienced teachers</Text>
+          </Stack>
+          <Text size="sm" c="dimmed">
+            Templates will be available immediately for all teachers in this school to use in their upload wizard and analysis.
+          </Text>
+        </Stack>
+      ),
+      labels: { confirm: 'Import Templates', cancel: 'Cancel' },
+      confirmProps: { color: 'green' },
+      onConfirm: async () => {
+        try {
+          const result = await schoolsService.importTLCTemplates(school.id);
+          notifications.show({
+            title: 'Templates Imported Successfully',
+            message: `${result.imported.length} TLC templates added to ${school.name}`,
+            color: 'green'
+          });
+          // Optionally refresh the schools list if needed
+          // loadSchools();
+        } catch (error: any) {
+          notifications.show({
+            title: 'Import Failed',
+            message: error.message || 'Failed to import templates',
+            color: 'red'
+          });
+        }
+      }
     });
   };
 
@@ -308,6 +349,14 @@ export function SchoolManagement() {
                           title="Suspend School"
                         >
                           <IconBan size={16} />
+                        </ActionIcon>
+                        <ActionIcon 
+                          variant="subtle" 
+                          color="green"
+                          onClick={() => handleImportTLC(school)}
+                          title="Import Teach Like a Champion Templates"
+                        >
+                          <IconTemplate size={16} />
                         </ActionIcon>
                       </Group>
                     </Table.Td>

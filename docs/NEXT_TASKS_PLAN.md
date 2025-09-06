@@ -12,75 +12,76 @@ This plan documents remaining gaps and a prioritized action plan for the current
 - Database: MySQL/Aurora compatible
 
 ## Missing Features & Gaps
-1) Profile update endpoint is missing
-- Frontend expects: `PUT /api/auth/profile`
-- Implemented: only `GET /api/auth/profile`
-- References:
-  - `frontend/src/features/profile/components/ProfilePage.tsx`
-  - `frontend/src/shared/services/api.client.ts`
-  - `backend/src/routes/auth.ts`
+1) Profile update endpoint ✅ Completed
+- `PUT /api/auth/profile` implemented with validation and uniqueness check
+- Full profile update functionality working
 
-2) CategoriesManagement uses non‑existent school “criteria” routes
+2) CategoriesManagement uses non‑existent school "criteria" routes
 - Frontend calls: `/api/schools/:id/criteria` (CRUD)
 - Backend provides: `/api/schools/:id/template-categories` (CRUD)
 - References:
   - `frontend/src/features/categories/components/CategoriesManagement.tsx`
   - `backend/src/routes/schools.ts` (template‑categories endpoints exist)
 
-3) User admin endpoints referenced but not implemented
-- Missing: `PATCH /api/users/:id/role`
+3) User admin endpoints ✅ Completed
+- ✅ `PATCH /api/users/:id/role` implemented with proper validation
+- ✅ Server-side users filtering by schoolId implemented
 - Missing or unnecessary: `POST /api/users/admin/schools`
-- References:
-  - `frontend/src/features/users/services/users.service.ts`
-  - `backend/src/routes/users.ts` (no matching routes yet)
 
 4) System Subjects routes ✅ Removed (unused feature)
 - Schools manage their own subjects; platform-wide subjects not needed
 
-5) Password flows are placeholders
+5) TLC Template Import System ✅ Completed
+- ✅ Backend API: `POST /api/schools/:schoolId/import-tlc-templates`
+- ✅ Frontend UI: Import button in Templates Management page
+- ✅ Service method: `schoolsService.importTLCTemplates(schoolId)`
+- ✅ Smart features: duplicate prevention, category creation, error handling
+- ✅ Two templates: Foundation Techniques (19 criteria) + Complete Framework (16 criteria)
+- ✅ Perfect weight balance: Both templates sum to exactly 100%
+- References:
+  - `backend/src/routes/schools.ts:690` - API endpoint
+  - `frontend/src/features/templates/components/TemplateManagement.tsx:568` - UI button
+  - `frontend/src/features/schools/services/schools.service.ts:133` - Service method
+
+6) Password flows are placeholders
 - Forgot/reset password lack token+email implementation
 - References:
   - `backend/src/routes/auth.ts` (TODOs noted)
 
-6) Dev CORS vs Proxy
+7) Dev CORS vs Proxy ✅ Completed
 - Many frontend calls go direct to `http://localhost:3001`, causing CORS footguns in dev
 - Use Vite proxy (`/api`) for dev to avoid CORS config
 - References:
   - `frontend/vite.config.ts` proxy defined
   - `frontend/src/shared/services/api.client.ts` uses absolute base URL
 
-7) Duplicate API client layers
+8) Duplicate API client layers
 - Both `api` object and service classes (`ApiClient`) exist; risk of drift
 - References:
   - `frontend/src/shared/services/api.client.ts` and feature `services/*.ts`
 
 ## Action Plan (Prioritized)
 
-P0 — Unblock Core UX
-- Implement `PUT /api/auth/profile`
-  - Validate: firstName, lastName, email (unique)
-  - Update `users`; return updated user
-  - Acceptance: Profile save works; returns 200 with user payload
+✅ **COMPLETED TASKS:**
+- ✅ `PUT /api/auth/profile` implemented with validation and uniqueness check
+- ✅ `PATCH /api/users/:id/role` with proper validation and super_admin restriction
+- ✅ Server-side users filtering via `GET /api/users?schoolId=` 
+- ✅ TLC Template Import System (backend API + frontend UI + service integration)
+- ✅ System subjects cleanup (removed unused routes)
+- ✅ Dev CORS/proxy setup (API client uses relative '/api' in dev)
+- ✅ JWT-only documentation cleanup
+
+P0 — Remaining Core UX Issues  
 - Resolve CategoriesManagement mismatch
   - Option A (recommended): Remove/disable `CategoriesManagement` and standardize on Template Categories UI
   - Option B: Implement `/api/schools/:id/criteria` CRUD and DB schema if the concept is required
   - Acceptance: No calls to non‑existent `/criteria` routes
 
 P1 — Admin & Consistency
-- Add `PATCH /api/users/:id/role` ✅ Implemented
-  - Validates role; requires `schoolId` for `school_manager`; restricted to `super_admin`
- - Add server-side users filtering for super_admin via `GET /api/users?schoolId=` ✅ Implemented
-   - Frontend updated to pass `schoolId` when a school is selected
 - Remove or implement `POST /api/users/admin/schools`
   - Prefer existing `/schools` + `/users` flows; remove unused endpoint from client
 
-P2 — Dev UX + Docs
-- Default to relative API base in dev (avoid CORS)
-  - If `import.meta.env.DEV`, set baseURL to `/api`
-  - Keep `VITE_API_URL` for preview/prod
-- Clean JWT‑only docs ✅ Completed
-  - Annotated Cognito instructions in dev guides as production-only
-  - Updated setup scripts to reflect JWT-only local development
+P2 — Dev UX + Docs  
 - Consolidate on a single client layer
   - Choose `ApiClient` services and phase out the top‑level `api` object (or vice versa)
 
@@ -99,9 +100,9 @@ P3 — Quality & Enhancements (Optional)
   - `PATCH /users/:id/role`, `POST /users/admin/schools`
 
 ## Execution Order
-1) P0: Profile update + resolve Categories vs Template Categories (A or B)
-2) P1: Role endpoint + remove/implement admin schools
-3) P2: Dev proxy default + docs cleanup + client consolidation
+1) P0: Resolve Categories vs Template Categories (A or B) - Only major gap remaining
+2) P1: Remove/implement admin schools endpoint
+3) P2: Client layer consolidation  
 4) P3: Optional quality features
 
 ## Acceptance Checklist
@@ -110,9 +111,11 @@ P3 — Quality & Enhancements (Optional)
 - [x] `PATCH /api/users/:id/role` available and guarded by `super_admin`
 - [ ] No dead client endpoints (e.g., `/users/admin/schools`)
 - [x] System subjects: removed (unused feature)
-- [ ] Dev API base is relative (`/api`) in dev; CORS issues gone
+- [x] Dev API base is relative (`/api`) in dev; CORS issues resolved
 - [x] Docs reflect JWT‑only local development; no misleading Cognito steps
 - [ ] Single client layer in use across the app
+- [x] TLC Template Import System fully functional in Templates page
+- [x] Server-side users filtering by schoolId implemented
 
 ## References
 - Backend

@@ -129,6 +129,18 @@ export class SchoolsService {
   }): Promise<any> {
     return this.api.post(`/schools/${schoolId}/criteria`, data);
   }
+
+  /**
+   * Import Teach Like a Champion templates to school (SuperAdmin only)
+   */
+  async importTLCTemplates(schoolId: number): Promise<{
+    message: string;
+    school: { id: number; name: string };
+    imported: Array<{ id: number; name: string; criteriaCount: number }>;
+    categoryCreated: boolean;
+  }> {
+    return this.api.post(`/schools/${schoolId}/import-tlc-templates`);
+  }
 }
 
 // Export singleton instance

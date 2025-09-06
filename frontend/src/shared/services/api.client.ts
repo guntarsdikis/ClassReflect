@@ -111,13 +111,6 @@ export const api = {
     },
     // Keep profile-only methods here; prefer typed services for user CRUD.
   },
-  
-  // Jobs and results
-  jobs: {
-    getTeacherJobs: (teacherId: string) =>
-      apiClient.get(`/jobs/teacher/${teacherId}`),
-    // other job helpers are provided via feature services
-  },
 };
 
 // Generic API Client class for services

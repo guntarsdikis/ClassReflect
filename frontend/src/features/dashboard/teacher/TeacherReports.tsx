@@ -37,7 +37,7 @@ import {
   IconCheck,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@shared/services/api.client';
+import { jobsService } from '@features/jobs/services/jobs.service';
 import { useAuthStore } from '@store/auth.store';
 import { format } from 'date-fns';
 import { useState, useMemo, useEffect } from 'react';
@@ -95,12 +95,12 @@ export function TeacherReports() {
   // Fetch teacher's recordings
   const { data: recordings, isLoading, refetch } = useQuery({
     queryKey: ['teacher-recordings', user?.id],
-    queryFn: () => api.jobs.getTeacherJobs(user!.id.toString()),
+    queryFn: () => jobsService.getTeacherJobs(user!.id.toString()),
     enabled: !!user?.id,
   });
 
   // Backend returns { jobs: [...], count: N } structure
-  const recordingsData = Array.isArray(recordings?.data?.jobs) ? recordings.data.jobs : (Array.isArray(recordings?.jobs) ? recordings.jobs : []);
+  const recordingsData = Array.isArray(recordings?.jobs) ? recordings.jobs : [];
 
   // Handle URL parameter to auto-open specific recording
   useEffect(() => {

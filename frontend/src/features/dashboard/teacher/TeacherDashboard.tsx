@@ -30,7 +30,7 @@ import {
   IconCheck,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@shared/services/api.client';
+import { jobsService } from '@features/jobs/services/jobs.service';
 import { useAuthStore } from '@store/auth.store';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -81,13 +81,13 @@ export function TeacherDashboard() {
   // Fetch teacher's jobs/recordings
   const { data: jobs, isLoading: jobsLoading, error: jobsError, refetch: refetchJobs } = useQuery({
     queryKey: ['teacher-jobs', user?.id],
-    queryFn: () => api.jobs.getTeacherJobs(user!.id.toString()),
+    queryFn: () => jobsService.getTeacherJobs(user!.id.toString()),
     enabled: !!user?.id,
     refetchInterval: 30000, // Auto-refresh every 30 seconds as per plan
   });
 
   // Ensure jobs data is always an array - backend returns { jobs: [...], count: N }
-  const jobsData = Array.isArray(jobs?.data?.jobs) ? jobs.data.jobs : (Array.isArray(jobs?.jobs) ? jobs.jobs : []);
+  const jobsData = Array.isArray(jobs?.jobs) ? jobs.jobs : [];
   
   const recentJobs = jobsData.slice(0, 5); // Last 5-7 recordings as per plan
   

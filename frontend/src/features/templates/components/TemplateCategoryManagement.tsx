@@ -33,103 +33,12 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { useAuthStore } from '@store/auth.store';
 import { useSchoolContextStore } from '@store/school-context.store';
-
-export interface TemplateCategory {
-  id: number;
-  category_name: string;
-  description?: string;
-  color?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by_first_name?: string;
-  created_by_last_name?: string;
-  template_count: number;
-}
-
-export interface CreateTemplateCategoryRequest {
-  category_name: string;
-  description?: string;
-  color?: string;
-}
+import { schoolsService, TemplateCategory, CreateTemplateCategoryRequest } from '@features/schools/services/schools.service';
 
 interface CategoryFormData extends CreateTemplateCategoryRequest {
   color?: string;
 }
 
-// Template category service functions
-const templateCategoryService = {
-  async getTemplateCategories(schoolId: number, token: string): Promise<TemplateCategory[]> {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch template categories');
-    }
-    return response.json();
-  },
-
-  async createTemplateCategory(schoolId: number, data: CreateTemplateCategoryRequest, token: string): Promise<{
-    id: number;
-    schoolId: number;
-    category_name: string;
-    description?: string;
-    color?: string;
-    message: string;
-  }> {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create template category');
-    }
-    return response.json();
-  },
-
-  async updateTemplateCategory(schoolId: number, categoryId: number, data: Partial<CreateTemplateCategoryRequest & { is_active?: boolean }>, token: string): Promise<{
-    id: number;
-    message: string;
-  }> {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories/${categoryId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update template category');
-    }
-    return response.json();
-  },
-
-  async deleteTemplateCategory(schoolId: number, categoryId: number, token: string): Promise<{
-    id: number;
-    message: string;
-  }> {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/schools/${schoolId}/template-categories/${categoryId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete template category');
-    }
-    return response.json();
-  },
-};
 
 export function TemplateCategoryManagement() {
   const currentUser = useAuthStore((state) => state.user);
@@ -171,7 +80,7 @@ export function TemplateCategoryManagement() {
     try {
       setLoading(true);
       if (currentSchoolId && token) {
-        const data = await templateCategoryService.getTemplateCategories(currentSchoolId, token);
+        const data = await schoolsService.getSchoolTemplateCategories(currentSchoolId);
         setCategories(data);
       }
     } catch (error) {
@@ -227,14 +136,14 @@ export function TemplateCategoryManagement() {
       }
 
       if (editingCategory) {
-        await templateCategoryService.updateTemplateCategory(currentSchoolId, editingCategory.id, formData, token!);
+        await schoolsService.updateSchoolTemplateCategory(currentSchoolId, editingCategory.id, formData);
         notifications.show({
           title: 'Success',
           message: 'Template category updated successfully',
           color: 'green',
         });
       } else {
-        await templateCategoryService.createTemplateCategory(currentSchoolId, formData, token!);
+        await schoolsService.createSchoolTemplateCategory(currentSchoolId, formData);
         notifications.show({
           title: 'Success',
           message: 'Template category created successfully',
@@ -279,7 +188,7 @@ export function TemplateCategoryManagement() {
       onConfirm: async () => {
         try {
           if (currentSchoolId && token) {
-            await templateCategoryService.deleteTemplateCategory(currentSchoolId, category.id, token);
+            await schoolsService.deleteSchoolTemplateCategory(currentSchoolId, category.id);
             notifications.show({
               title: 'Success',
               message: 'Template category deleted successfully',

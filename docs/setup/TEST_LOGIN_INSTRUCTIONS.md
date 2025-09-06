@@ -12,6 +12,8 @@ Note: Local development uses JWT authentication (no Cognito). The credentials be
 | **School Manager** | manager@test.local | ManagerPass2024!@ |
 | **Teacher** | teacher@test.local | TeacherPass2024!@ |
 
+guntars@gdwd.co.uk d%u3iefCnxnEsdYe#9YD
+
 ## 🚀 How to Test
 
 ### 1. Ensure Services Are Running

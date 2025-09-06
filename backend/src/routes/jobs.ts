@@ -158,17 +158,35 @@ router.get('/teacher/:teacherId',
     // Use query instead of execute to avoid prepared statement issues
     let queryStr = `
       SELECT 
-        aj.*,
+        aj.id,
+        aj.teacher_id,
+        aj.school_id,
+        aj.file_name,
+        aj.file_size,
+        aj.status,
+        aj.created_at,
+        aj.processing_started_at,
+        aj.processing_completed_at,
+        aj.error_message,
+        aj.class_name,
+        aj.subject,
+        aj.grade,
+        aj.duration_minutes,
+        aj.notes,
         u.first_name,
         u.last_name,
         s.name as school_name,
         tr.transcript_text as transcript_content,
         tr.word_count,
-        tr.confidence_score
+        tr.confidence_score,
+        COUNT(DISTINCT ar.id) as analysis_count,
+        CASE WHEN COUNT(DISTINCT ar.id) > 0 THEN 1 ELSE 0 END as has_analysis,
+        MAX(ar.overall_score) as latest_score
       FROM audio_jobs aj
       JOIN users u ON aj.teacher_id = u.id
       JOIN schools s ON aj.school_id = s.id
       LEFT JOIN transcripts tr ON aj.id = tr.job_id
+      LEFT JOIN analysis_results ar ON aj.id = ar.job_id
       WHERE aj.teacher_id = ${pool.escape(teacherIdNum)}
     `;
 
@@ -176,6 +194,7 @@ router.get('/teacher/:teacherId',
       queryStr += ` AND aj.status = ${pool.escape(status)}`;
     }
 
+    queryStr += ` GROUP BY aj.id, aj.teacher_id, aj.school_id, aj.file_name, aj.file_size, aj.status, aj.created_at, aj.processing_started_at, aj.processing_completed_at, aj.error_message, aj.class_name, aj.subject, aj.grade, aj.duration_minutes, aj.notes, u.first_name, u.last_name, s.name, tr.transcript_text, tr.word_count, tr.confidence_score`;
     queryStr += ` ORDER BY aj.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
 
     console.log('Executing query:', queryStr);

@@ -21,12 +21,10 @@ import {
   IconFileText,
   IconClock,
   IconChartBar,
-  IconTemplate,
   IconPlus,
   IconEye,
   IconEdit,
   IconTrash,
-  IconDownload,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
@@ -136,7 +134,7 @@ export function ManagerDashboard() {
 
       <Grid gutter="lg">
         {/* Recent Uploads */}
-        <Grid.Col span={{ base: 12, lg: 8 }}>
+        <Grid.Col span={{ base: 12, lg: 12 }}>
           <Card shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
               <Title order={3}>Recent Uploads</Title>
@@ -210,109 +208,6 @@ export function ManagerDashboard() {
             >
               Upload New Recording
             </Button>
-          </Card>
-        </Grid.Col>
-
-        {/* Quick Actions & Teachers */}
-        <Grid.Col span={{ base: 12, lg: 4 }}>
-          {/* Quick Actions */}
-          <Card shadow="sm" p="lg" radius="md" withBorder mb="lg">
-            <Title order={3} mb="md">Quick Actions</Title>
-            <Stack>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconUpload size={16} />}
-                onClick={() => navigate('/upload')}
-              >
-                Upload Recording
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconFileText size={16} />}
-                onClick={() => navigate('/recordings')}
-              >
-                View All Recordings
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconPlus size={16} />}
-                onClick={() => navigate('/teachers/new')}
-              >
-                Add New Teacher
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconTemplate size={16} />}
-                onClick={() => navigate('/templates')}
-              >
-                Manage Templates
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconChartBar size={16} />}
-                onClick={() => navigate('/analytics')}
-              >
-                View Analytics
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconDownload size={16} />}
-                onClick={() => navigate('/export')}
-              >
-                Export Reports
-              </Button>
-            </Stack>
-          </Card>
-
-          {/* Top Teachers */}
-          <Card shadow="sm" p="lg" radius="md" withBorder>
-            <Group justify="space-between" mb="md">
-              <Title order={3}>Top Teachers</Title>
-              <Button
-                variant="subtle"
-                size="sm"
-                onClick={() => navigate('/teachers')}
-              >
-                View All
-              </Button>
-            </Group>
-
-            {teachers.length > 0 ? (
-              <Stack gap="sm">
-                {teachers.slice(0, 3).map((teacher, index) => (
-                  <Paper key={teacher.id} p="sm" withBorder>
-                    <Group justify="space-between">
-                      <div>
-                        <Text size="sm" fw={500}>
-                          {index + 1}. {teacher.name}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {teacher.evaluations} evaluations
-                        </Text>
-                      </div>
-                      <Badge
-                        color={teacher.averageScore >= 90 ? 'green' : teacher.averageScore >= 80 ? 'blue' : 'yellow'}
-                        variant="light"
-                      >
-                        {teacher.averageScore}%
-                      </Badge>
-                    </Group>
-                  </Paper>
-                ))}
-              </Stack>
-            ) : (
-              <Paper p="md" ta="center">
-                <Text c="dimmed" size="sm">
-                  No teacher data available yet.
-                </Text>
-              </Paper>
-            )}
           </Card>
         </Grid.Col>
       </Grid>

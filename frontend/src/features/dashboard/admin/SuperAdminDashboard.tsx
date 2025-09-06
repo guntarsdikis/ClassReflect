@@ -8,32 +8,18 @@ import {
   Group,
   Stack,
   Button,
-  Paper,
   SimpleGrid,
   ThemeIcon,
-  Progress,
-  Table,
-  ActionIcon,
 } from '@mantine/core';
 import {
   IconBuildingBank,
   IconUsers,
   IconChartBar,
-  IconClock,
-  IconTemplate,
   IconPlus,
   IconEye,
-  IconEdit,
-  IconTrash,
-  IconSettings,
-  IconShield,
-  IconDatabase,
-  IconCloudUpload,
-  IconFileText,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
-import { format } from 'date-fns';
 
 
 export function SuperAdminDashboard() {
@@ -64,24 +50,6 @@ export function SuperAdminDashboard() {
     },
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'green';
-      case 'trial': return 'blue';
-      case 'expired': return 'red';
-      case 'suspended': return 'yellow';
-      default: return 'gray';
-    }
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'school_created': return IconBuildingBank;
-      case 'subscription_expired': return IconClock;
-      case 'user_created': return IconUsers;
-      default: return IconSettings;
-    }
-  };
 
   return (
     <Container size="xl">
@@ -138,7 +106,7 @@ export function SuperAdminDashboard() {
 
       <Grid gutter="lg">
         {/* Recent Activity */}
-        <Grid.Col span={{ base: 12, lg: 8 }}>
+        <Grid.Col span={{ base: 12, lg: 12 }}>
           <Card shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
               <Title order={3}>Recent Platform Activity</Title>
@@ -165,82 +133,6 @@ export function SuperAdminDashboard() {
             >
               View All Activity
             </Button>
-          </Card>
-        </Grid.Col>
-
-        {/* System Operations & Quick Actions */}
-        <Grid.Col span={{ base: 12, lg: 4 }}>
-          {/* System Operations */}
-          <Card shadow="sm" p="lg" radius="md" withBorder mb="lg">
-            <Title order={3} mb="md">System Operations</Title>
-            <Stack>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconDatabase size={16} />}
-                onClick={() => navigate('/admin/system')}
-              >
-                Database Status
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconFileText size={16} />}
-                onClick={() => navigate('/admin/recordings')}
-              >
-                All Recordings
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconCloudUpload size={16} />}
-                onClick={() => navigate('/admin/processing')}
-              >
-                Processing Queue
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconUsers size={16} />}
-                onClick={() => navigate('/admin/users')}
-              >
-                Manage Users
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconShield size={16} />}
-                onClick={() => navigate('/admin/security')}
-              >
-                Security Logs
-              </Button>
-              <Button
-                variant="subtle"
-                justify="space-between"
-                rightSection={<IconTemplate size={16} />}
-                onClick={() => navigate('/admin/templates')}
-              >
-                Global Templates
-              </Button>
-            </Stack>
-          </Card>
-
-          {/* Top Schools */}
-          <Card shadow="sm" p="lg" radius="md" withBorder>
-            <Group justify="space-between" mb="md">
-              <Title order={3}>Top Performing Schools</Title>
-              <Button
-                variant="subtle"
-                size="sm"
-                onClick={() => navigate('/admin/schools')}
-              >
-                View All
-              </Button>
-            </Group>
-
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <Text c="dimmed">No schools available</Text>
-            </div>
           </Card>
         </Grid.Col>
       </Grid>

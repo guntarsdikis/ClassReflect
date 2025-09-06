@@ -134,14 +134,17 @@ export function TeacherReports() {
   // Load analysis results for a recording
   const loadAnalysisResults = async (recording: TeacherRecording) => {
     try {
+      console.log('🔍 Loading analysis results for recording:', recording.id);
+      console.log('📄 Recording has transcript_id:', recording.transcript_id);
+      console.log('📊 Recording has_analysis count:', recording.has_analysis);
+      
       setLoadingAnalysis(true);
       
       // Try to get transcript_id from recording data
       let transcriptId = recording.transcript_id;
       
       if (!transcriptId) {
-        // Fallback: find transcript by job_id (this might need backend support)
-        // For now, just show an error message
+        console.error('❌ No transcript_id found for recording:', recording);
         notifications.show({
           title: 'Analysis Error',
           message: 'Unable to find transcript for this recording. Please try refreshing the page.',
@@ -150,15 +153,18 @@ export function TeacherReports() {
         return;
       }
       
+      console.log('🔄 Fetching analysis results for transcript_id:', transcriptId);
       const results = await analysisService.getAnalysisResults(transcriptId);
+      console.log('📈 Analysis results loaded:', results.length, results);
+      
       setAnalysisResults(results);
       setSelectedRecording(recording);
       openAnalysisModal();
     } catch (error: any) {
-      console.error('Failed to load analysis results:', error);
+      console.error('❌ Failed to load analysis results:', error);
       notifications.show({
         title: 'Error',
-        message: 'Failed to load analysis results',
+        message: `Failed to load analysis results: ${error.message}`,
         color: 'red',
       });
     } finally {
@@ -169,10 +175,15 @@ export function TeacherReports() {
   // Handle PDF export
   const handleExportPDF = async (recording: TeacherRecording, analysisResult?: AnalysisResult) => {
     try {
+      console.log('🔄 Starting PDF export for recording:', recording.id);
+      console.log('📄 Recording transcript_id:', recording.transcript_id);
+      console.log('📊 Analysis result provided:', !!analysisResult);
+      
       // If no analysis result provided, get the first one
       let analysis = analysisResult;
       if (!analysis) {
         if (!recording.transcript_id) {
+          console.error('❌ No transcript_id found for recording:', recording);
           notifications.show({
             title: 'Export Error',
             message: 'Unable to find transcript for this recording. Please try refreshing the page.',
@@ -181,7 +192,10 @@ export function TeacherReports() {
           return;
         }
         
+        console.log('🔍 Fetching analysis results for transcript_id:', recording.transcript_id);
         const results = await analysisService.getAnalysisResults(recording.transcript_id);
+        console.log('📈 Analysis results found:', results.length);
+        
         if (results.length === 0) {
           notifications.show({
             title: 'No Analysis Found',
@@ -191,12 +205,17 @@ export function TeacherReports() {
           return;
         }
         analysis = results[0]; // Export the first/latest analysis
+        console.log('✅ Using analysis result:', analysis.id);
       }
+
+      console.log('📝 Generating PDF for analysis:', analysis.id);
 
       // Generate PDF blob
       const doc = <AnalysisReportPDF analysis={analysis} />;
       const asPdf = pdf(doc);
+      console.log('🔄 Converting to blob...');
       const blob = await asPdf.toBlob();
+      console.log('✅ PDF blob generated, size:', blob.size);
       
       // Create download link
       const url = URL.createObjectURL(blob);
@@ -207,14 +226,18 @@ export function TeacherReports() {
       const date = new Date().toISOString().split('T')[0];
       const className = recording.class_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'recording';
       const templateName = analysis.template_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'analysis';
-      link.download = `ClassReflect_${className}_${templateName}_${date}.pdf`;
+      const filename = `ClassReflect_${className}_${templateName}_${date}.pdf`;
+      link.download = filename;
+      console.log('📁 Generated filename:', filename);
       
       // Trigger download
+      console.log('⬇️ Triggering download...');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
+      console.log('🎉 PDF export completed successfully');
       notifications.show({
         title: 'PDF Downloaded',
         message: 'Analysis report has been downloaded successfully',
@@ -222,10 +245,17 @@ export function TeacherReports() {
         icon: <IconDownload />,
       });
     } catch (error: any) {
-      console.error('Failed to export PDF:', error);
+      console.error('❌ Failed to export PDF:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        recording: recording,
+        analysis: analysis
+      });
+      
       notifications.show({
         title: 'Export Failed',
-        message: 'Failed to generate PDF report. Please try again.',
+        message: `Failed to generate PDF report: ${error.message}. Please try again.`,
         color: 'red',
       });
     }
@@ -583,7 +613,10 @@ export function TeacherReports() {
                           </Tooltip>
                           {recording.has_analysis > 0 && (
                             <Tooltip label="Download PDF">
-                              <ActionIcon variant="subtle">
+                              <ActionIcon 
+                                variant="subtle"
+                                onClick={() => handleExportPDF(recording)}
+                              >
                                 <IconDownload size={16} />
                               </ActionIcon>
                             </Tooltip>

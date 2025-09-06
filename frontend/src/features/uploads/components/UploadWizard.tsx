@@ -488,13 +488,21 @@ export function UploadWizard() {
           </Stepper.Completed>
         </Stepper>
         
-        {active < 3 && (
+        {active < 2 && (
           <Group justify="space-between" mt="xl">
             <Button variant="default" onClick={prevStep} disabled={active === 0}>
               Back
             </Button>
             <Button onClick={nextStep} disabled={!isStepValid()}>
               Next
+            </Button>
+          </Group>
+        )}
+        
+        {active === 2 && !isUploading && (
+          <Group justify="center" mt="xl">
+            <Button variant="default" onClick={prevStep}>
+              Back
             </Button>
           </Group>
         )}

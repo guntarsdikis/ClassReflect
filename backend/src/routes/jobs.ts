@@ -171,7 +171,7 @@ router.get('/teacher/:teacherId',
         aj.class_name,
         aj.subject,
         aj.grade,
-        aj.duration_minutes,
+        aj.class_duration_minutes as duration_minutes,
         aj.notes,
         u.first_name,
         u.last_name,
@@ -194,7 +194,7 @@ router.get('/teacher/:teacherId',
       queryStr += ` AND aj.status = ${pool.escape(status)}`;
     }
 
-    queryStr += ` GROUP BY aj.id, aj.teacher_id, aj.school_id, aj.file_name, aj.file_size, aj.status, aj.created_at, aj.processing_started_at, aj.processing_completed_at, aj.error_message, aj.class_name, aj.subject, aj.grade, aj.duration_minutes, aj.notes, u.first_name, u.last_name, s.name, tr.transcript_text, tr.word_count, tr.confidence_score`;
+    queryStr += ` GROUP BY aj.id, aj.teacher_id, aj.school_id, aj.file_name, aj.file_size, aj.status, aj.created_at, aj.processing_started_at, aj.processing_completed_at, aj.error_message, aj.class_name, aj.subject, aj.grade, aj.class_duration_minutes, aj.notes, u.first_name, u.last_name, s.name, tr.transcript_text, tr.word_count, tr.confidence_score`;
     queryStr += ` ORDER BY aj.created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
 
     console.log('Executing query:', queryStr);

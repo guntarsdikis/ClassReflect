@@ -8,7 +8,7 @@ export interface AuthenticatedUser {
   firstName: string;
   lastName: string;
   role: 'teacher' | 'school_manager' | 'super_admin';
-  schoolId: number;
+  schoolId: number | null; // null for super_admin users
 }
 
 // Extend Express Request type
@@ -67,13 +67,18 @@ export const authenticate = async (
         isNaN: isNaN(parseInt(decoded.schoolId))
       });
 
+      // Handle schoolId - super_admin users have "platform" as schoolId, others have numeric IDs
+      const schoolIdValue = decoded.role === 'super_admin' 
+        ? null  // Super admin can access all schools, so no specific schoolId
+        : parseInt(decoded.schoolId);
+        
       req.user = {
         id: parseInt(decoded.userId),
         email: decoded.email,
         firstName: '', // JWT doesn't have these fields
         lastName: '',
         role: decoded.role,
-        schoolId: parseInt(decoded.schoolId),
+        schoolId: schoolIdValue,
       };
       
       console.log('🔐 Auth Debug - User attached to request:', {
@@ -81,7 +86,7 @@ export const authenticate = async (
         email: req.user.email,
         role: req.user.role,
         schoolId: req.user.schoolId,
-        schoolIdIsNaN: isNaN(req.user.schoolId)
+        schoolIdIsNull: req.user.schoolId === null
       });
       
       next();
@@ -138,7 +143,7 @@ export const authorizeSchool = async (
   // Check if the resource belongs to the user's school
   const resourceSchoolId = req.params.schoolId || req.body.schoolId;
   
-  if (resourceSchoolId && resourceSchoolId !== req.user.schoolId) {
+  if (resourceSchoolId && parseInt(resourceSchoolId) !== req.user.schoolId) {
     res.status(403).json({ error: 'Access denied to this school\'s resources' });
     return;
   }

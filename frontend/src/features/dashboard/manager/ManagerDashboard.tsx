@@ -29,53 +29,81 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
 import { format } from 'date-fns';
-
-// TODO: Replace with real API calls when backend endpoints are ready
-// const { data: stats, isLoading: statsLoading } = useQuery(['school-stats']);
-// const { data: recentUploads, isLoading: uploadsLoading } = useQuery(['recent-uploads']);
-// const { data: teachers, isLoading: teachersLoading } = useQuery(['school-teachers']);
-
-// Placeholder stats - will be replaced with real data
-const stats = {
-  totalTeachers: 0,
-  activeRecordings: 0,
-  completedThisMonth: 0,
-  averageScore: 0,
-};
-
-const recentUploads: any[] = [];
-const teachers: any[] = [];
+import { useQuery } from '@tanstack/react-query';
+import { jobsService } from '@features/jobs/services/jobs.service';
+import { usersService } from '@features/users/services/users.service';
+import { analysisService } from '@features/analysis/services/analysis.service';
 
 export function ManagerDashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const schoolId = user?.schoolId;
+
+  // Fetch real data from API
+  const { data: jobStats, isLoading: jobStatsLoading } = useQuery({
+    queryKey: ['school-job-stats', schoolId],
+    queryFn: () => jobsService.getSchoolJobStats(schoolId!),
+    enabled: !!schoolId,
+    refetchInterval: 30000,
+  });
+
+  const { data: teachers, isLoading: teachersLoading } = useQuery({
+    queryKey: ['school-teachers', schoolId],
+    queryFn: () => usersService.getTeachers(schoolId),
+    enabled: !!schoolId,
+  });
+
+  const { data: analysisSummary, isLoading: analysisLoading } = useQuery({
+    queryKey: ['school-analysis-summary', schoolId],
+    queryFn: () => analysisService.getSchoolSummary(schoolId),
+    enabled: !!schoolId,
+  });
+
+  const { data: recentJobs, isLoading: recentJobsLoading } = useQuery({
+    queryKey: ['recent-jobs', schoolId],
+    queryFn: async () => {
+      // Get recent jobs from teachers in this school
+      const teacherList = await usersService.getTeachers(schoolId);
+      if (teacherList.length === 0) return [];
+      
+      // For now, just return empty array - we'd need a school-wide recent jobs endpoint
+      // This could be implemented later as jobsService.getSchoolRecentJobs(schoolId)
+      return [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Calculate real stats
+  const totalTeachers = teachers?.length || 0;
+  const activeRecordings = jobStats?.processing_jobs || 0;
+  const completedThisMonth = jobStats?.completed_jobs || 0;
+  const averageScore = analysisSummary?.summary.average_score || 0;
 
   const statsCards = [
     {
       title: 'Total Teachers',
-      value: stats.totalTeachers.toString(),
+      value: totalTeachers.toString(),
       icon: IconUsers,
       color: 'blue',
       action: () => navigate('/teachers'),
     },
     {
       title: 'Active Recordings',
-      value: stats.activeRecordings.toString(),
+      value: activeRecordings.toString(),
       icon: IconClock,
       color: 'orange',
     },
     {
       title: 'Completed This Month',
-      value: stats.completedThisMonth.toString(),
+      value: completedThisMonth.toString(),
       icon: IconFileText,
       color: 'green',
     },
     {
       title: 'Average Score',
-      value: stats.averageScore > 0 ? `${stats.averageScore}%` : 'N/A',
+      value: averageScore > 0 ? `${Math.round(averageScore)}%` : 'N/A',
       icon: IconChartBar,
       color: 'teal',
-      action: () => navigate('/analytics'),
     },
   ];
 
@@ -148,9 +176,13 @@ export function ManagerDashboard() {
               </Button>
             </Group>
 
-            {recentUploads.length > 0 ? (
+            {recentJobsLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <Text c="dimmed">Loading recent uploads...</Text>
+              </div>
+            ) : (recentJobs && recentJobs.length > 0) ? (
               <Stack gap="md">
-                {recentUploads.map((upload) => (
+                {recentJobs.map((upload) => (
                   <Paper key={upload.id} p="md" withBorder>
                     <Group justify="space-between" mb="xs">
                       <div>
@@ -235,7 +267,11 @@ export function ManagerDashboard() {
           </Group>
         </Group>
 
-        {teachers.length > 0 ? (
+        {teachersLoading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <Text c="dimmed">Loading teachers...</Text>
+          </div>
+        ) : teachers && teachers.length > 0 ? (
           <Table>
             <Table.Thead>
               <Table.Tr>
@@ -253,7 +289,7 @@ export function ManagerDashboard() {
                 <Table.Tr key={teacher.id}>
                   <Table.Td>
                     <div>
-                      <Text size="sm" fw={500}>{teacher.name}</Text>
+                      <Text size="sm" fw={500}>{teacher.firstName} {teacher.lastName}</Text>
                       <Text size="xs" c="dimmed">{teacher.email}</Text>
                     </div>
                   </Table.Td>
@@ -267,21 +303,12 @@ export function ManagerDashboard() {
                     </Group>
                   </Table.Td>
                   <Table.Td>{teacher.grades?.join(', ') || 'N/A'}</Table.Td>
-                  <Table.Td>{teacher.evaluations || 0}</Table.Td>
+                  <Table.Td>0</Table.Td>
                   <Table.Td>
-                    {teacher.averageScore ? (
-                      <Badge
-                        color={teacher.averageScore >= 90 ? 'green' : teacher.averageScore >= 80 ? 'blue' : 'yellow'}
-                        variant="light"
-                      >
-                        {teacher.averageScore}%
-                      </Badge>
-                    ) : (
-                      <Text size="sm" c="dimmed">N/A</Text>
-                    )}
+                    <Text size="sm" c="dimmed">N/A</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="sm">{teacher.lastActive ? format(new Date(teacher.lastActive), 'MMM dd') : 'N/A'}</Text>
+                    <Text size="sm">{teacher.lastLogin ? format(new Date(teacher.lastLogin), 'MMM dd') : 'N/A'}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Group gap={4}>

@@ -10,6 +10,8 @@ import {
   Button,
   SimpleGrid,
   ThemeIcon,
+  Table,
+  ActionIcon,
 } from '@mantine/core';
 import {
   IconBuildingBank,
@@ -20,33 +22,51 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
-
+import { format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { schoolsService } from '@features/schools/services/schools.service';
+import { usersService } from '@features/users/services/users.service';
 
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
 
+  // Fetch real data from API
+  const { data: schools, isLoading: schoolsLoading } = useQuery({
+    queryKey: ['all-schools'],
+    queryFn: () => schoolsService.getAllSchools(),
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  const { data: allTeachers, isLoading: teachersLoading } = useQuery({
+    queryKey: ['all-teachers'],
+    queryFn: () => usersService.getTeachers(), // No schoolId = all teachers
+  });
+
+  // Calculate real stats
+  const totalSchools = schools?.length || 0;
+  const totalUsers = allTeachers?.length || 0;
+  
   const stats = [
     {
       title: 'Total Schools',
-      value: '0',
+      value: totalSchools.toString(),
       icon: IconBuildingBank,
       color: 'blue',
       action: () => navigate('/admin/schools'),
     },
     {
       title: 'Total Users',
-      value: '0',
+      value: totalUsers.toString(),
       icon: IconUsers,
       color: 'green',
       action: () => navigate('/admin/users'),
     },
     {
-      title: 'Monthly Revenue',
-      value: '$0',
+      title: 'Active Schools',
+      value: schools?.filter(school => school.status === 'active').length.toString() || '0',
       icon: IconChartBar,
       color: 'teal',
-      action: () => navigate('/admin/analytics'),
     },
   ];
 
@@ -160,9 +180,67 @@ export function SuperAdminDashboard() {
           </Group>
         </Group>
 
-        <div style={{ textAlign: 'center', padding: '2rem' }}>
-          <Text c="dimmed">No schools available</Text>
-        </div>
+        {schoolsLoading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <Text c="dimmed">Loading schools...</Text>
+          </div>
+        ) : schools && schools.length > 0 ? (
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>School Name</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Teachers</Table.Th>
+                <Table.Th>Created</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {schools.map((school) => {
+                const schoolTeachers = allTeachers?.filter(t => t.schoolId === school.id) || [];
+                return (
+                  <Table.Tr key={school.id}>
+                    <Table.Td>
+                      <div>
+                        <Text size="sm" fw={500}>{school.name}</Text>
+                        <Text size="xs" c="dimmed">{school.address}</Text>
+                      </div>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge 
+                        color={school.status === 'active' ? 'green' : 'gray'} 
+                        variant="light"
+                      >
+                        {school.status}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>{schoolTeachers.length}</Table.Td>
+                    <Table.Td>
+                      <Text size="sm">
+                        {school.createdAt ? format(new Date(school.createdAt), 'MMM dd, yyyy') : 'N/A'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4}>
+                        <ActionIcon 
+                          variant="subtle" 
+                          color="blue" 
+                          onClick={() => navigate(`/admin/schools/${school.id}`)}
+                        >
+                          <IconEye size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <Text c="dimmed">No schools available</Text>
+          </div>
+        )}
       </Card>
     </Container>
   );

@@ -29,17 +29,26 @@ router.get('/teachers',
       console.log('🔍 Teachers Debug - Final schoolId for query:', schoolId);
       console.log('🔍 Teachers Debug - schoolId type:', typeof schoolId);
       
-      const [rows] = await pool.execute(
-        `SELECT u.id, u.email, u.first_name, u.last_name, u.school_id, u.created_at,
+      let sql = `SELECT u.id, u.email, u.first_name, u.last_name, u.school_id, u.created_at,
                 u.is_active, u.subjects, u.grades, 
                 COUNT(DISTINCT aj.id) as total_evaluations
          FROM users u
          LEFT JOIN audio_jobs aj ON u.id = aj.teacher_id AND aj.status = 'completed'
-         WHERE u.role = 'teacher' AND u.school_id = ?
-         GROUP BY u.id
-         ORDER BY u.last_name, u.first_name`,
-        [schoolId]
-      );
+         WHERE u.role = 'teacher'`;
+      let params: any[] = [];
+      
+      // Only add school filter if schoolId is provided and valid
+      if (schoolId !== undefined && schoolId !== null && !isNaN(Number(schoolId))) {
+        sql += ' AND u.school_id = ?';
+        params.push(Number(schoolId));
+      }
+      
+      sql += ' GROUP BY u.id ORDER BY u.last_name, u.first_name';
+      
+      console.log('🔍 Teachers Debug - Final SQL:', sql);
+      console.log('🔍 Teachers Debug - Final params:', params);
+      
+      const [rows] = await pool.execute(sql, params);
       
       console.log('🔍 Teachers Debug - Raw query results:', {
         rowCount: Array.isArray(rows) ? rows.length : 'Not array',

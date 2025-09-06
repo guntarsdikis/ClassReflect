@@ -131,7 +131,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#059669',
     backgroundColor: '#D1FAE5',
-    padding: '4 8',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 12,
   },
   feedbackText: {
@@ -279,7 +280,7 @@ export function AnalysisReportPDF({ analysis }: AnalysisReportPDFProps) {
           </View>
         )}
 
-        <View break />
+        {/* Page break - content will flow to next page automatically */}
 
         {/* Detailed Feedback */}
         {analysis.detailed_feedback && Object.keys(analysis.detailed_feedback).length > 0 && (

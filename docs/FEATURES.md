@@ -110,11 +110,10 @@ References:
 - Manage schools with quotas and status:
   - Create, update, suspend/activate
   - Fields include: `domain`, `contact_email`, `max_teachers`, `max_monthly_uploads`, `is_active`
-- Subject management per school (and system subjects list)
+- Subject management per school
 
 References:
 - `backend/src/routes/schools.ts`
-- `backend/src/routes/system-subjects.ts`
 
 ## Frontend Features (React)
 
@@ -161,9 +160,7 @@ References:
 - Email flows (invites, notifications) are placeholders
 - WebSocket references exist but not required for current flows
 - Some manager dashboard analytics are scaffolded but not fully implemented
-- Profile update endpoint `PUT /api/auth/profile` is missing; UI calls this route but backend doesn’t implement it yet
-- CategoriesManagement UI points to `/api/schools/:id/criteria` which isn’t implemented; backend provides `/api/schools/:id/template-categories` instead
-- System subjects routes exist (`backend/src/routes/system-subjects.ts`) but are not mounted in `backend/src/index.ts`, so they are not reachable
+- CategoriesManagement UI points to `/api/schools/:id/criteria` which isn't implemented; backend provides `/api/schools/:id/template-categories` instead
 
 ## Quick Start (Local)
 

@@ -34,10 +34,8 @@ This plan documents remaining gaps and a prioritized action plan for the current
   - `frontend/src/features/users/services/users.service.ts`
   - `backend/src/routes/users.ts` (no matching routes yet)
 
-4) System Subjects routes not mounted
-- File exists but not mounted in `backend/src/index.ts`
-- References:
-  - `backend/src/routes/system-subjects.ts`
+4) System Subjects routes ✅ Removed (unused feature)
+- Schools manage their own subjects; platform-wide subjects not needed
 
 5) Password flows are placeholders
 - Forgot/reset password lack token+email implementation
@@ -75,8 +73,6 @@ P1 — Admin & Consistency
    - Frontend updated to pass `schoolId` when a school is selected
 - Remove or implement `POST /api/users/admin/schools`
   - Prefer existing `/schools` + `/users` flows; remove unused endpoint from client
-- Mount or remove System Subjects routes
-  - If kept, mount at `/api/system-subjects` (super_admin only)
 
 P2 — Dev UX + Docs
 - Default to relative API base in dev (avoid CORS)
@@ -101,21 +97,19 @@ P3 — Quality & Enhancements (Optional)
   - If yes → add `/schools/:id/criteria` CRUD + schema
 - Implement admin endpoints or refactor UI to existing endpoints?
   - `PATCH /users/:id/role`, `POST /users/admin/schools`
-- Keep System Subjects as a platform catalog?
-  - Mount and document, or remove
 
 ## Execution Order
 1) P0: Profile update + resolve Categories vs Template Categories (A or B)
-2) P1: Role endpoint + remove/implement admin schools + system subjects decision
+2) P1: Role endpoint + remove/implement admin schools
 3) P2: Dev proxy default + docs cleanup + client consolidation
 4) P3: Optional quality features
 
 ## Acceptance Checklist
-- [ ] `PUT /api/auth/profile` implemented and used by Profile page
-- [ ] No references to `/api/schools/:id/criteria` unless implemented server‑side
-- [ ] `PATCH /api/users/:id/role` available and guarded by `super_admin`
+- [x] `PUT /api/auth/profile` implemented and used by Profile page
+- [ ] No references to `/api/schools/:id/criteria` unless implemented server‑side  
+- [x] `PATCH /api/users/:id/role` available and guarded by `super_admin`
 - [ ] No dead client endpoints (e.g., `/users/admin/schools`)
-- [ ] System subjects: mounted or removed
+- [x] System subjects: removed (unused feature)
 - [ ] Dev API base is relative (`/api`) in dev; CORS issues gone
 - [x] Docs reflect JWT‑only local development; no misleading Cognito steps
 - [ ] Single client layer in use across the app
@@ -129,7 +123,6 @@ P3 — Quality & Enhancements (Optional)
   - `backend/src/routes/templates.ts`
   - `backend/src/routes/analysis.ts`
   - `backend/src/routes/jobs.ts`
-  - `backend/src/routes/system-subjects.ts`
 - Frontend
   - `frontend/vite.config.ts`
   - `frontend/src/shared/services/api.client.ts`

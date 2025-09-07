@@ -39,6 +39,22 @@
           "value": "classreflect-audio-files-573524060586"
         },
         {
+          "name": "ASSEMBLYAI_UPLOAD_MODE",
+          "value": "s3"
+        },
+        {
+          "name": "ASSEMBLYAI_DIRECT_MAX_MB",
+          "value": "25"
+        },
+        {
+          "name": "S3_PRESIGNED_EXPIRES_SECONDS",
+          "value": "7200"
+        },
+        {
+          "name": "S3_PRESIGNED_PUT_EXPIRES_SECONDS",
+          "value": "3600"
+        },
+        {
           "name": "SQS_QUEUE_URL",
           "value": "https://sqs.eu-west-2.amazonaws.com/573524060586/classreflect-processing-queue"
         }

@@ -70,7 +70,8 @@ router.post('/presigned-put',
         return res.status(500).json({ error: 'S3 bucket not configured' });
       }
 
-      const s3 = new AWS.S3({ region });
+      // Use virtual-hosted–style URLs for better CORS behavior in browsers
+      const s3 = new AWS.S3({ region, signatureVersion: 'v4', s3ForcePathStyle: false });
       const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
       const s3Key = `uploads/jobs/${jobId}/${safeName}`;
 
@@ -159,6 +160,7 @@ router.post('/presigned-put',
       } as AWS.S3.PresignedPost.Params & any;
 
       const uploadUrl = s3.getSignedUrl('putObject', params);
+      console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
 
       res.json({ jobId, uploadUrl, s3Key, bucket, region });
     } catch (error) {

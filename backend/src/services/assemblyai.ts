@@ -40,6 +40,40 @@ class AssemblyAIService {
   }
 
   /**
+   * Generate a robust presigned GET URL for S3 object (bucket-hosted preferred, path-style fallback)
+   */
+  private async presignS3GetUrl(bucket: string, key: string, region: string, expiresSeconds: number): Promise<string> {
+    const bucketEndpoint = new AWS.Endpoint(`${bucket}.s3.${region}.amazonaws.com`);
+    const s3BucketHosted = new AWS.S3({ region, endpoint: bucketEndpoint, signatureVersion: 'v4', s3ForcePathStyle: false });
+
+    let url = s3BucketHosted.getSignedUrl('getObject', {
+      Bucket: bucket,
+      Key: key,
+      Expires: expiresSeconds,
+    });
+
+    try {
+      const u = new URL(url);
+      console.log(`🔗 Presigned GET (bucket-hosted): host=${u.host} path=${u.pathname}`);
+      if (!u.pathname || u.pathname === '/') {
+        const regionalEndpoint = new AWS.Endpoint(`s3.${region}.amazonaws.com`);
+        const s3Path = new AWS.S3({ region, endpoint: regionalEndpoint, signatureVersion: 'v4', s3ForcePathStyle: true });
+        url = s3Path.getSignedUrl('getObject', {
+          Bucket: bucket,
+          Key: key,
+          Expires: expiresSeconds,
+        });
+        const u2 = new URL(url);
+        console.log(`🔗 Presigned GET (path-style): host=${u2.host} path=${u2.pathname}`);
+      }
+    } catch (e) {
+      console.warn('⚠️ Presigned GET URL parse issue:', (e as any)?.message || e);
+    }
+
+    return url;
+  }
+
+  /**
    * Transcribe audio buffer directly with AssemblyAI
    */
   async transcribeBuffer(jobId: string, audioBuffer: Buffer): Promise<void> {
@@ -182,16 +216,16 @@ class AssemblyAIService {
         ['processing', s3Key, jobId]
       );
 
-      // Generate presigned GET URL
+      // Generate presigned GET URL (robust)
       const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'classreflect-audio-files-573524060586';
       const region = process.env.AWS_REGION || 'eu-west-2';
-      const s3 = new AWS.S3({ region });
       const expirySeconds = parseInt(process.env.S3_PRESIGNED_EXPIRES_SECONDS || '7200', 10);
-      const presignedUrl = s3.getSignedUrl('getObject', {
-        Bucket: bucket,
-        Key: s3Key,
-        Expires: isNaN(expirySeconds) ? 7200 : expirySeconds,
-      });
+      const presignedUrl = await this.presignS3GetUrl(
+        bucket,
+        s3Key,
+        region,
+        isNaN(expirySeconds) ? 7200 : expirySeconds
+      );
 
       // Persist URL for retry purposes
       await pool.execute(
@@ -281,11 +315,12 @@ class AssemblyAIService {
         }
 
         const expirySeconds = parseInt(process.env.S3_PRESIGNED_EXPIRES_SECONDS || '7200', 10);
-        const presignedUrl = s3.getSignedUrl('getObject', {
-          Bucket: bucket,
-          Key: s3Key,
-          Expires: isNaN(expirySeconds) ? 7200 : expirySeconds,
-        });
+        const presignedUrl = await this.presignS3GetUrl(
+          bucket,
+          s3Key,
+          region,
+          isNaN(expirySeconds) ? 7200 : expirySeconds
+        );
 
         try {
           await pool.execute(

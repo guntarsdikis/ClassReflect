@@ -70,8 +70,9 @@ router.post('/presigned-put',
         return res.status(500).json({ error: 'S3 bucket not configured' });
       }
 
-      // Use virtual-hosted–style URLs for better CORS behavior in browsers
-      const s3 = new AWS.S3({ region, signatureVersion: 'v4', s3ForcePathStyle: false });
+      // Use bucket endpoint (virtual-hosted–style) to ensure CORS preflight targets the bucket host
+      const bucketEndpoint = new AWS.Endpoint(`${bucket}.s3.${region}.amazonaws.com`);
+      const s3 = new AWS.S3({ region, endpoint: bucketEndpoint, signatureVersion: 'v4', s3ForcePathStyle: false });
       const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
       const s3Key = `uploads/jobs/${jobId}/${safeName}`;
 
@@ -156,13 +157,13 @@ router.post('/presigned-put',
         Bucket: bucket,
         Key: s3Key,
         Expires: isNaN(putExpires) ? 3600 : putExpires,
-        ContentType: fileType
+        ContentType: fileType || 'application/octet-stream'
       } as AWS.S3.PresignedPost.Params & any;
 
       const uploadUrl = s3.getSignedUrl('putObject', params);
       try {
         const u = new URL(uploadUrl);
-        console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} -> host=${u.host} path=${u.pathname} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
+        console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} -> host=${u.host} path=${u.pathname} endpointHost=${bucketEndpoint.host} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
       } catch {}
 
       // Return debug fields to help diagnose any client-side CORS issues

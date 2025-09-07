@@ -9,9 +9,8 @@ import { processingService } from '../services/processing';
 import { config } from '../config/environment';
 import { authenticate, authorize } from '../middleware/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
-import AWS from 'aws-sdk';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl as getSignedUrlV3 } from '@aws-sdk/s3-request-presigner';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const router = Router();
 
@@ -72,10 +71,8 @@ router.post('/presigned-put',
         return res.status(500).json({ error: 'S3 bucket not configured' });
       }
 
-      // Prefer AWS SDK v3 presigner for reliable virtual-hosted URLs
-      const s3v3 = new S3Client({ region, forcePathStyle: false });
-      const bucketEndpoint = new AWS.Endpoint(`${bucket}.s3.${region}.amazonaws.com`);
-      const s3v2 = new AWS.S3({ region, endpoint: bucketEndpoint, signatureVersion: 'v4', s3ForcePathStyle: false });
+      // Use AWS SDK v3 for S3 operations
+      const s3Client = new S3Client({ region });
       const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
       const s3Key = `uploads/jobs/${jobId}/${safeName}`;
 
@@ -153,48 +150,21 @@ router.post('/presigned-put',
         }
       }
 
-      // Sign a PUT URL valid for 1 hour (configurable)
-      // Allow long uploads for large files; 4 hours default if not configured
+      // Generate presigned PUT URL using AWS SDK v3
       const putExpires = parseInt(process.env.S3_PRESIGNED_PUT_EXPIRES_SECONDS || '14400', 10);
-      // Try v3 first
-      let uploadUrl: string | undefined;
-      try {
-        const cmd = new PutObjectCommand({
-          Bucket: bucket,
-          Key: s3Key,
-          ContentType: fileType || 'application/octet-stream'
-        });
-        uploadUrl = await getSignedUrlV3(s3v3, cmd, { expiresIn: isNaN(putExpires) ? 3600 : putExpires });
-      } catch (e) {
-        console.warn('⚠️ v3 presign failed, falling back to v2:', (e as any)?.message || e);
-      }
-      if (!uploadUrl) {
-        const paramsV2 = {
-          Bucket: bucket,
-          Key: s3Key,
-          Expires: isNaN(putExpires) ? 3600 : putExpires,
-          ContentType: fileType || 'application/octet-stream'
-        } as AWS.S3.PutObjectRequest & any;
-        uploadUrl = s3v2.getSignedUrl('putObject', paramsV2);
-      }
+      const cmd = new PutObjectCommand({
+        Bucket: bucket,
+        Key: s3Key,
+        ContentType: fileType || 'application/octet-stream'
+      });
+      
+      const uploadUrl = await getSignedUrl(s3Client, cmd, { 
+        expiresIn: isNaN(putExpires) ? 3600 : putExpires 
+      });
+      
       try {
         const u = new URL(uploadUrl);
-        console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} -> host=${u.host} path=${u.pathname} endpointHost=${bucketEndpoint.host} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
-        // Fallback: if path is root ("/"), generate a path-style URL which S3 CORS also supports
-        if (!u.pathname || u.pathname === '/') {
-          console.warn('⚠️ Presign returned empty path; falling back to path-style URL');
-          const regionalEndpoint = new AWS.Endpoint(`s3.${region}.amazonaws.com`);
-          const s3PathStyle = new AWS.S3({ region, endpoint: regionalEndpoint, signatureVersion: 'v4', s3ForcePathStyle: true });
-          const paramsV2 = {
-            Bucket: bucket,
-            Key: s3Key,
-            Expires: isNaN(putExpires) ? 3600 : putExpires,
-            ContentType: fileType || 'application/octet-stream'
-          } as AWS.S3.PutObjectRequest & any;
-          uploadUrl = s3PathStyle.getSignedUrl('putObject', paramsV2);
-          const u2 = new URL(uploadUrl);
-          console.log(`📝 Path-style Presigned PUT -> host=${u2.host} path=${u2.pathname}`);
-        }
+        console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} -> host=${u.host} path=${u.pathname} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
       } catch (e) {
         console.error('Presign URL parse error:', e);
       }

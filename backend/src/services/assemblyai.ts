@@ -4,10 +4,10 @@
  */
 
 import { AssemblyAI } from 'assemblyai';
-import AWS from 'aws-sdk';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import pool from '../database';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { config } from '../config/environment';
+import { RowDataPacket } from 'mysql2';
 
 export interface AssemblyAITranscriptResult {
   id: string;
@@ -40,32 +40,21 @@ class AssemblyAIService {
   }
 
   /**
-   * Generate a robust presigned GET URL for S3 object (bucket-hosted preferred, path-style fallback)
+   * Generate a presigned GET URL for S3 object using AWS SDK v3
    */
   private async presignS3GetUrl(bucket: string, key: string, region: string, expiresSeconds: number): Promise<string> {
-    const bucketEndpoint = new AWS.Endpoint(`${bucket}.s3.${region}.amazonaws.com`);
-    const s3BucketHosted = new AWS.S3({ region, endpoint: bucketEndpoint, signatureVersion: 'v4', s3ForcePathStyle: false });
-
-    let url = s3BucketHosted.getSignedUrl('getObject', {
+    const s3Client = new S3Client({ region });
+    
+    const command = new GetObjectCommand({
       Bucket: bucket,
       Key: key,
-      Expires: expiresSeconds,
     });
 
+    const url = await getSignedUrl(s3Client, command, { expiresIn: expiresSeconds });
+    
     try {
       const u = new URL(url);
-      console.log(`🔗 Presigned GET (bucket-hosted): host=${u.host} path=${u.pathname}`);
-      if (!u.pathname || u.pathname === '/') {
-        const regionalEndpoint = new AWS.Endpoint(`s3.${region}.amazonaws.com`);
-        const s3Path = new AWS.S3({ region, endpoint: regionalEndpoint, signatureVersion: 'v4', s3ForcePathStyle: true });
-        url = s3Path.getSignedUrl('getObject', {
-          Bucket: bucket,
-          Key: key,
-          Expires: expiresSeconds,
-        });
-        const u2 = new URL(url);
-        console.log(`🔗 Presigned GET (path-style): host=${u2.host} path=${u2.pathname}`);
-      }
+      console.log(`🔗 Presigned GET URL: host=${u.host} path=${u.pathname}`);
     } catch (e) {
       console.warn('⚠️ Presigned GET URL parse issue:', (e as any)?.message || e);
     }
@@ -270,12 +259,12 @@ class AssemblyAIService {
   }
 
   /**
-   * Upload audio buffer to S3 with retries and return a presigned GET URL
+   * Upload audio buffer to S3 with retries and return a presigned GET URL using AWS SDK v3
    */
   private async uploadToS3AndGetUrl(jobId: string, job: any, audioBuffer: Buffer): Promise<string> {
     const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'classreflect-audio-files-573524060586';
     const region = process.env.AWS_REGION || 'eu-west-2';
-    const s3 = new AWS.S3({ region });
+    const s3Client = new S3Client({ region });
 
     const originalName = job.file_name || 'audio';
     const safeName = String(originalName).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -288,12 +277,15 @@ class AssemblyAIService {
       attempt++;
       try {
         console.log(`📦 Uploading to S3 (attempt ${attempt}) -> s3://${bucket}/${s3Key}`);
-        await s3.upload({
+        
+        const putCommand = new PutObjectCommand({
           Bucket: bucket,
           Key: s3Key,
           Body: audioBuffer,
           ContentType: 'application/octet-stream'
-        }).promise();
+        });
+        
+        await s3Client.send(putCommand);
 
         try {
           await pool.execute(

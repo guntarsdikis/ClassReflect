@@ -160,11 +160,22 @@ router.post('/presigned-put',
         ContentType: fileType || 'application/octet-stream'
       } as AWS.S3.PresignedPost.Params & any;
 
-      const uploadUrl = s3.getSignedUrl('putObject', params);
+      let uploadUrl = s3.getSignedUrl('putObject', params);
       try {
         const u = new URL(uploadUrl);
         console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} -> host=${u.host} path=${u.pathname} endpointHost=${bucketEndpoint.host} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
-      } catch {}
+        // Fallback: if path is root ("/"), generate a path-style URL which S3 CORS also supports
+        if (!u.pathname || u.pathname === '/') {
+          console.warn('⚠️ Presign returned empty path; falling back to path-style URL');
+          const regionalEndpoint = new AWS.Endpoint(`s3.${region}.amazonaws.com`);
+          const s3PathStyle = new AWS.S3({ region, endpoint: regionalEndpoint, signatureVersion: 'v4', s3ForcePathStyle: true });
+          uploadUrl = s3PathStyle.getSignedUrl('putObject', params);
+          const u2 = new URL(uploadUrl);
+          console.log(`📝 Path-style Presigned PUT -> host=${u2.host} path=${u2.pathname}`);
+        }
+      } catch (e) {
+        console.error('Presign URL parse error:', e);
+      }
 
       // Return debug fields to help diagnose any client-side CORS issues
       let uploadHost: string | undefined;

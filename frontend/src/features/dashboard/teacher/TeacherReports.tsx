@@ -631,16 +631,18 @@ export function TeacherReports() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs">
-                          <Tooltip label="View Analysis">
-                            <ActionIcon
-                              variant="subtle"
-                              onClick={() => {
-                                loadAnalysisResults(recording);
-                              }}
-                            >
-                              <IconEye size={16} />
-                            </ActionIcon>
-                          </Tooltip>
+                          {recording.has_analysis > 0 && (
+                            <Tooltip label="View Analysis">
+                              <ActionIcon
+                                variant="subtle"
+                                onClick={() => {
+                                  loadAnalysisResults(recording);
+                                }}
+                              >
+                                <IconEye size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                          )}
                           {recording.has_analysis > 0 && (
                             <Tooltip label="Download PDF">
                               <ActionIcon 

@@ -243,7 +243,9 @@ class AssemblyAIService {
     const region = process.env.AWS_REGION || 'eu-west-2';
     const s3 = new AWS.S3({ region });
 
-    const s3Key = `uploads/jobs/${jobId}/${(job.file_name || 'audio')}`;
+    const originalName = job.file_name || 'audio';
+    const safeName = String(originalName).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const s3Key = `uploads/jobs/${jobId}/${safeName}`;
 
     const maxAttempts = 3;
     let attempt = 0;

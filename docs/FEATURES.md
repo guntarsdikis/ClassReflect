@@ -44,6 +44,7 @@ References:
     - Max Size: 500 MB
   - Creates an audio job (`audio_jobs`) with status `queued`
   - Immediately enqueues processing via AssemblyAI using the file buffer
+  - Limit: keep under 500MB to avoid server memory pressure (use S3 flow for larger files)
 - Job Status
   - GET `/api/upload/status/:jobId` → processing status and metadata
   - Finalizes transcript into `transcripts` table
@@ -130,6 +131,7 @@ References:
       - `direct`: only direct upload to AssemblyAI (no S3)
       - `s3`: always upload to S3 and pass a presigned URL to AssemblyAI
     - `ASSEMBLYAI_DIRECT_MAX_MB` (default `25`) threshold used in `auto` mode
+    - Large files: S3 direct uploads support up to 1GB+; default presigned PUT expiry is 4h (configurable via `S3_PRESIGNED_PUT_EXPIRES_SECONDS`).
     - Requires `AWS_REGION` and `S3_BUCKET_NAME` (or `S3_BUCKET`) when using S3 path
 - Dashboards
   - Teacher Dashboard: recent jobs, statuses, quick actions

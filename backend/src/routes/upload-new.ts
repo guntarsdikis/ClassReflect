@@ -149,7 +149,8 @@ router.post('/presigned-put',
       }
 
       // Sign a PUT URL valid for 1 hour (configurable)
-      const putExpires = parseInt(process.env.S3_PRESIGNED_PUT_EXPIRES_SECONDS || '3600', 10);
+      // Allow long uploads for large files; 4 hours default if not configured
+      const putExpires = parseInt(process.env.S3_PRESIGNED_PUT_EXPIRES_SECONDS || '14400', 10);
       const params = {
         Bucket: bucket,
         Key: s3Key,

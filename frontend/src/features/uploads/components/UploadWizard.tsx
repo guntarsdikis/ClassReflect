@@ -186,7 +186,10 @@ export function UploadWizard() {
       });
 
       if (!presignRes.ok) {
-        // Fallback to direct upload path
+        // If file is very large, avoid direct memory upload fallback
+        if (audioFile.size > 500 * 1024 * 1024) {
+          throw new Error('S3 presign failed. Cannot upload large files via direct path. Please retry.');
+        }
         console.warn('⚠️ Presign failed; falling back to direct upload');
         await directUploadViaBackend(token);
         return;
@@ -218,7 +221,7 @@ export function UploadWizard() {
         xhr.addEventListener('timeout', () => reject(new Error('S3 upload timeout')));
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', audioFile.type || 'application/octet-stream');
-        xhr.timeout = 60 * 60 * 1000; // 60 minutes for large files
+        xhr.timeout = 4 * 60 * 60 * 1000; // up to 4 hours for very large files
         xhr.send(audioFile);
       });
 
@@ -290,7 +293,7 @@ export function UploadWizard() {
       xhr.addEventListener('timeout', () => reject(new Error('Upload failed: Request timeout')));
       xhr.open('POST', apiUrl);
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.timeout = 10 * 60 * 1000;
+      xhr.timeout = 4 * 60 * 60 * 1000;
       xhr.send(formData);
     });
 
@@ -384,7 +387,7 @@ export function UploadWizard() {
                 onChange={handleFileChange}
                 required
                 disabled={isFileLoading}
-                description="Supported formats: MP3, WAV, M4A, OGG (max 500MB)"
+                description="Supported: MP3, WAV, M4A, OGG. Large files (≤ 1GB) upload via S3 with progress."
               />
               
               {isFileLoading && (

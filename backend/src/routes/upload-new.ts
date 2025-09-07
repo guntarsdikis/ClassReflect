@@ -160,9 +160,20 @@ router.post('/presigned-put',
       } as AWS.S3.PresignedPost.Params & any;
 
       const uploadUrl = s3.getSignedUrl('putObject', params);
-      console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
+      try {
+        const u = new URL(uploadUrl);
+        console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} -> host=${u.host} path=${u.pathname} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
+      } catch {}
 
-      res.json({ jobId, uploadUrl, s3Key, bucket, region });
+      // Return debug fields to help diagnose any client-side CORS issues
+      let uploadHost: string | undefined;
+      let uploadPath: string | undefined;
+      try {
+        const u = new URL(uploadUrl);
+        uploadHost = u.host;
+        uploadPath = u.pathname;
+      } catch {}
+      res.json({ jobId, uploadUrl, uploadHost, uploadPath, s3Key, bucket, region });
     } catch (error) {
       console.error('Presigned URL error:', error);
       res.status(500).json({ error: 'Failed to generate presigned URL' });

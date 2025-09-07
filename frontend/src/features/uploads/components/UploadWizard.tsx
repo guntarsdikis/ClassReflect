@@ -195,9 +195,19 @@ export function UploadWizard() {
         return;
       }
 
-      const { jobId, uploadUrl } = await presignRes.json();
+      const { jobId, uploadUrl, uploadHost, uploadPath } = await presignRes.json();
+      console.log('🚀 Frontend Upload Debug - Presigned URL details:', { uploadHost, uploadPath, hasUrl: !!uploadUrl });
       if (!jobId || !uploadUrl) {
         throw new Error('Invalid presigned URL response');
+      }
+      try {
+        const u = new URL(uploadUrl);
+        console.log('🚀 Frontend Upload Debug - Using upload URL:', { host: u.host, path: u.pathname });
+        if (u.host === 's3.eu-west-2.amazonaws.com' && (u.pathname === '/' || u.pathname === '')) {
+          throw new Error('Invalid presigned URL host/path (root S3). Please retry.');
+        }
+      } catch (e) {
+        console.warn('⚠️ Invalid presigned URL format', e);
       }
 
       // 2) PUT to S3 with progress

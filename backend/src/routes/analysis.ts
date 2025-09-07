@@ -386,7 +386,8 @@ router.get('/results/:transcriptId',
           aj.class_name,
           aj.subject,
           aj.grade,
-          aj.file_name
+          aj.file_name,
+          aj.school_id
         FROM analysis_results ar
         LEFT JOIN templates t ON ar.template_id = t.id
         LEFT JOIN users u1 ON ar.teacher_id = u1.id
@@ -400,13 +401,14 @@ router.get('/results/:transcriptId',
         return res.status(404).json({ error: 'No analysis results found' });
       }
 
-      // Verify access rights
-      const result = rows[0] as any;
-      if (req.user!.role === 'teacher' && result.teacher_id !== req.user!.id) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-      if (req.user!.role === 'school_manager' && result.school_id !== req.user!.schoolId) {
-        return res.status(403).json({ error: 'Access denied' });
+      // Verify access rights for all results
+      for (const result of rows as any[]) {
+        if (req.user!.role === 'teacher' && result.teacher_id !== req.user!.id) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        if (req.user!.role === 'school_manager' && result.school_id !== req.user!.schoolId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
       }
 
       // Parse JSON fields with error handling

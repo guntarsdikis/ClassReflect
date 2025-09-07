@@ -54,13 +54,20 @@ router.post('/direct',
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      const { teacherId, schoolId } = req.body;
+      const { teacherId, schoolId, className, subject, grade, duration, notes } = req.body;
 
       if (!teacherId || !schoolId) {
         return res.status(400).json({ 
           error: 'Missing required fields: teacherId, schoolId' 
         });
       }
+
+      // Process form data - convert empty strings to null, handle types
+      const processedClassName = className && className.trim() !== '' ? className.trim() : null;
+      const processedSubject = subject && subject.trim() !== '' ? subject.trim() : null;
+      const processedGrade = grade && grade.trim() !== '' ? grade.trim() : null;
+      const processedDuration = duration && !isNaN(parseInt(duration)) ? parseInt(duration) : null;
+      const processedNotes = notes && notes.trim() !== '' ? notes.trim() : null;
 
       // Role-based access control
       const accessCheckResult = await validateUploadAccess(req, parseInt(teacherId), parseInt(schoolId));
@@ -73,9 +80,9 @@ router.post('/direct',
 
       // Create job record in database (AssemblyAI-only, no S3/storage)
       await pool.execute<ResultSetHeader>(
-        `INSERT INTO audio_jobs (id, teacher_id, school_id, file_name, file_size, status) 
-         VALUES (?, ?, ?, ?, ?, 'queued')`,
-        [jobId, teacherId, schoolId, req.file.originalname, req.file.size]
+        `INSERT INTO audio_jobs (id, teacher_id, school_id, class_name, subject, grade, class_duration_minutes, notes, file_name, file_size, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
+        [jobId, teacherId, schoolId, processedClassName, processedSubject, processedGrade, processedDuration, processedNotes, req.file.originalname, req.file.size]
       );
 
       // Process directly with AssemblyAI using file buffer

@@ -13,6 +13,13 @@ export interface Recording {
   error_message?: string;
   assemblyai_upload_url?: string;
   assemblyai_transcript_id?: string;
+  // Class information
+  class_name?: string;
+  subject?: string;
+  grade?: string;
+  class_duration_minutes?: number;
+  notes?: string;
+  // User information
   first_name: string;
   last_name: string;
   teacher_email: string;

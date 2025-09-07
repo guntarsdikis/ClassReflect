@@ -88,9 +88,25 @@ export function TeacherReports() {
   
   // Analysis-related state
   const [analysisResultsModalOpened, { open: openAnalysisModal, close: closeAnalysisModal }] = useDisclosure(false);
+  const [analysisSelectionModalOpened, { open: openAnalysisSelectionModal, close: closeAnalysisSelectionModal }] = useDisclosure(false);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
+  
+  // Match manager-style date display for analysis list
+  const formatDisplayDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
   
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -119,29 +135,24 @@ export function TeacherReports() {
     if (recordingId && recordingsData.length > 0) {
       const recording = recordingsData.find((r: TeacherRecording) => r.id === recordingId);
       if (recording) {
-        setSelectedRecording(recording);
-        openDetailsModal();
+        // Open analysis list/results directly like manager view
+        loadAnalysisResults(recording);
         // Clear the URL parameter after opening
         searchParams.delete('recording');
         setSearchParams(searchParams, { replace: true });
       }
     }
-  }, [recordingsData, searchParams, setSearchParams, openDetailsModal]);
+  }, [recordingsData, searchParams, setSearchParams]);
 
   // Load analysis results for a recording
   const loadAnalysisResults = async (recording: TeacherRecording) => {
     try {
-      console.log('🔍 Loading analysis results for recording:', recording.id);
-      console.log('📄 Recording has transcript_id:', recording.transcript_id);
-      console.log('📊 Recording has_analysis count:', recording.has_analysis);
-      
       setLoadingAnalysis(true);
       
       // Try to get transcript_id from recording data
       let transcriptId = recording.transcript_id;
       
       if (!transcriptId) {
-        console.error('❌ No transcript_id found for recording:', recording);
         notifications.show({
           title: 'Analysis Error',
           message: 'Unable to find transcript for this recording. Please try refreshing the page.',
@@ -150,13 +161,25 @@ export function TeacherReports() {
         return;
       }
       
-      console.log('🔄 Fetching analysis results for transcript_id:', transcriptId);
       const results = await analysisService.getAnalysisResults(transcriptId);
-      console.log('📈 Analysis results loaded:', results.length, results);
       
       setAnalysisResults(results);
       setSelectedRecording(recording);
-      openAnalysisModal();
+      
+      if (results.length === 1) {
+        // Single analysis - show directly
+        setSelectedAnalysis(results[0]);
+        openAnalysisModal();
+      } else if (results.length > 1) {
+        // Multiple analyses - show selection modal first
+        openAnalysisSelectionModal();
+      } else {
+        notifications.show({
+          title: 'No Analysis Results',
+          message: 'No analysis results found for this recording',
+          color: 'orange',
+        });
+      }
     } catch (error: any) {
       console.error('❌ Failed to load analysis results:', error);
       notifications.show({
@@ -167,6 +190,13 @@ export function TeacherReports() {
     } finally {
       setLoadingAnalysis(false);
     }
+  };
+
+  // Handle selecting a specific analysis from the selection modal
+  const handleSelectAnalysis = (analysis: AnalysisResult) => {
+    setSelectedAnalysis(analysis);
+    closeAnalysisSelectionModal();
+    openAnalysisModal();
   };
 
   // Handle PDF export
@@ -571,8 +601,12 @@ export function TeacherReports() {
                         <div>
                           <Text size="sm" fw={500}>{recording.class_name || 'Untitled Class'}</Text>
                           <Group gap="xs" mt={2}>
-                            {recording.subject && <Badge variant="light" size="sm">{recording.subject}</Badge>}
-                            {recording.grade && <Badge variant="outline" size="sm">Grade {recording.grade}</Badge>}
+                            <Badge variant="light" size="sm">
+                              {recording.subject || 'No Subject'}
+                            </Badge>
+                            <Badge variant="outline" size="sm">
+                              {recording.grade ? `Grade ${recording.grade}` : 'No Grade'}
+                            </Badge>
                           </Group>
                         </div>
                       </Table.Td>
@@ -587,7 +621,7 @@ export function TeacherReports() {
                       <Table.Td>
                         {recording.has_analysis > 0 ? (
                           <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>
-                            {recording.has_analysis === 1 ? '1 Analysis' : `${recording.has_analysis} Analyses`}
+                            {recording.analysis_count === 1 ? '1 Analysis' : `${recording.analysis_count} Analyses`}
                           </Badge>
                         ) : (
                           <Badge color="gray" variant="light">
@@ -597,12 +631,11 @@ export function TeacherReports() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs">
-                          <Tooltip label="View Details">
+                          <Tooltip label="View Analysis">
                             <ActionIcon
                               variant="subtle"
                               onClick={() => {
-                                setSelectedRecording(recording);
-                                openDetailsModal();
+                                loadAnalysisResults(recording);
                               }}
                             >
                               <IconEye size={16} />
@@ -651,11 +684,13 @@ export function TeacherReports() {
             <Grid>
               <Grid.Col span={6}>
                 <Text size="sm" c="dimmed">Class Name</Text>
-                <Text fw={500}>{selectedRecording.class_name}</Text>
+                <Text fw={500}>{selectedRecording.class_name || 'Untitled Class'}</Text>
               </Grid.Col>
               <Grid.Col span={6}>
                 <Text size="sm" c="dimmed">Subject & Grade</Text>
-                <Text fw={500}>{selectedRecording.subject} - Grade {selectedRecording.grade}</Text>
+                <Text fw={500}>
+                  {(selectedRecording.subject || 'No Subject')} - {selectedRecording.grade ? `Grade ${selectedRecording.grade}` : 'No Grade'}
+                </Text>
               </Grid.Col>
               <Grid.Col span={6}>
                 <Text size="sm" c="dimmed">Upload Date</Text>
@@ -723,8 +758,15 @@ export function TeacherReports() {
       {/* Analysis Results Modal */}
       <Modal
         opened={analysisResultsModalOpened}
-        onClose={closeAnalysisModal}
-        title="Analysis Results"
+        onClose={() => {
+          closeAnalysisModal();
+          setSelectedAnalysis(null);
+        }}
+        title={
+          selectedAnalysis 
+            ? `Analysis Results - ${selectedAnalysis.template_name}`
+            : "Analysis Results"
+        }
         size="xl"
         overflow="inside"
       >
@@ -733,31 +775,42 @@ export function TeacherReports() {
             <IconClock size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
             <Text>Loading analysis results...</Text>
           </div>
-        ) : analysisResults.length > 0 ? (
+        ) : selectedAnalysis ? (
           <Stack>
-            {analysisResults.map((result, index) => (
-              <div key={result.id}>
-                {index > 0 && <Divider my="md" />}
-                <Group justify="space-between" mb="md">
-                  <div>
-                    <Text size="lg" fw={600}>{result.template_name}</Text>
-                    <Text size="sm" c="dimmed">
-                      Applied by {result.applied_by_first_name} {result.applied_by_last_name} • {' '}
-                      {format(new Date(result.created_at), 'MMM d, yyyy \'at\' h:mm a')}
-                    </Text>
-                  </div>
-                  <Button
-                    leftSection={<IconDownload size={16} />}
-                    variant="light"
-                    size="sm"
-                    onClick={() => handleExportPDF(selectedRecording!, result)}
-                  >
-                    Export PDF
-                  </Button>
-                </Group>
-                <AnalysisResults analysis={result} />
+            <Group justify="space-between" mb="md">
+              <div>
+                <Text size="lg" fw={600}>{selectedAnalysis.template_name}</Text>
+                <Text size="sm" c="dimmed">
+                  Applied by {selectedAnalysis.applied_by_first_name} {selectedAnalysis.applied_by_last_name} • {' '}
+                  {format(new Date(selectedAnalysis.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                </Text>
               </div>
-            ))}
+              <Button
+                leftSection={<IconDownload size={16} />}
+                variant="light"
+                size="sm"
+                onClick={() => handleExportPDF(selectedRecording!, selectedAnalysis)}
+              >
+                Export PDF
+              </Button>
+            </Group>
+            <AnalysisResults analysis={selectedAnalysis} />
+            
+            {/* Show "Back to Selection" button if there are multiple analyses */}
+            {analysisResults.length > 1 && (
+              <Group justify="center" mt="lg">
+                <Button 
+                  variant="subtle" 
+                  onClick={() => {
+                    closeAnalysisModal();
+                    setSelectedAnalysis(null);
+                    openAnalysisSelectionModal();
+                  }}
+                >
+                  ← Back to Analysis Selection
+                </Button>
+              </Group>
+            )}
           </Stack>
         ) : (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -765,6 +818,80 @@ export function TeacherReports() {
             <Text>No analysis results found for this recording.</Text>
           </div>
         )}
+      </Modal>
+
+      {/* Analysis Selection Modal (manager-style) */}
+      <Modal
+        opened={analysisSelectionModalOpened}
+        onClose={() => {
+          closeAnalysisSelectionModal();
+          setAnalysisResults([]);
+          setSelectedRecording(null);
+        }}
+        title="Select Analysis to View"
+        size="lg"
+      >
+        <Stack>
+          <Text size="sm" c="dimmed">
+            This recording has multiple analyses. Select one to view:
+          </Text>
+          
+          {analysisResults.map((analysis) => (
+            <Paper
+              key={analysis.id}
+              p="md"
+              withBorder
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleSelectAnalysis(analysis)}
+            >
+              <Group justify="space-between">
+                <div>
+                  <Text fw={500} mb="xs">
+                    {analysis.template_name || 'Unknown Template'}
+                  </Text>
+                  <Group gap="xs" mb="xs">
+                    <Badge size="sm" variant="light" color="blue">
+                      Score: {analysis.overall_score}
+                    </Badge>
+                    <Badge size="sm" variant="outline" color="gray">
+                      {formatDisplayDate(analysis.created_at)}
+                    </Badge>
+                    {analysis.template_id !== undefined && (
+                      <Badge size="sm" variant="filled" color="green">
+                        Template ID: {analysis.template_id}
+                      </Badge>
+                    )}
+                  </Group>
+                  {analysis.template_description && (
+                    <Text size="xs" c="dimmed" mt="xs">
+                      {analysis.template_description}
+                    </Text>
+                  )}
+                  {analysis.applied_by_first_name && (
+                    <Text size="xs" c="dimmed">
+                      Applied by: {analysis.applied_by_first_name} {analysis.applied_by_last_name}
+                    </Text>
+                  )}
+                </div>
+                <ActionIcon variant="light" color="blue">
+                  <IconEye size={16} />
+                </ActionIcon>
+              </Group>
+            </Paper>
+          ))}
+          
+          <Button 
+            variant="subtle" 
+            onClick={() => {
+              closeAnalysisSelectionModal();
+              setAnalysisResults([]);
+              setSelectedRecording(null);
+            }} 
+            mt="md"
+          >
+            Cancel
+          </Button>
+        </Stack>
       </Modal>
     </Container>
   );

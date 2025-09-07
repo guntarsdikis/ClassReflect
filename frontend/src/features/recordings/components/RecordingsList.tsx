@@ -31,6 +31,9 @@ import {
   IconAlertCircle,
   IconTrash,
   IconCheck,
+  IconBook,
+  IconHash,
+  IconChalkboard,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -343,10 +346,10 @@ export function RecordingsList() {
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>File & Teacher</Table.Th>
+                    <Table.Th>Class Information</Table.Th>
                     <Table.Th>School</Table.Th>
                     <Table.Th>Status</Table.Th>
                     <Table.Th>Upload Date</Table.Th>
-                    <Table.Th>Processing Time</Table.Th>
                     <Table.Th>Transcript</Table.Th>
                     <Table.Th>Actions</Table.Th>
                   </Table.Tr>
@@ -371,6 +374,33 @@ export function RecordingsList() {
                         </div>
                       </Table.Td>
                       <Table.Td>
+                        <div>
+                          <Group gap="xs" mb={2}>
+                            <IconChalkboard size={14} />
+                            <Text size="sm" fw={500}>
+                              {recording.class_name || 'Untitled Class'}
+                            </Text>
+                          </Group>
+                          <Group gap="xs" mb={2}>
+                            <IconBook size={14} />
+                            <Text size="xs" c="dimmed">
+                              {recording.subject || 'No Subject'}
+                            </Text>
+                          </Group>
+                          <Group gap="xs">
+                            <IconHash size={14} />
+                            <Text size="xs" c="dimmed">
+                              {recording.grade ? `Grade ${recording.grade}` : 'No Grade'}
+                            </Text>
+                          </Group>
+                          {recording.class_duration_minutes && (
+                            <Text size="xs" c="dimmed" mt={2}>
+                              {recording.class_duration_minutes} min
+                            </Text>
+                          )}
+                        </div>
+                      </Table.Td>
+                      <Table.Td>
                         <Group gap="xs">
                           <IconSchool size={14} />
                           <Text size="sm">{recording.school_name}</Text>
@@ -390,14 +420,6 @@ export function RecordingsList() {
                         </Text>
                         <Text size="xs" c="dimmed">
                           {format(new Date(recording.created_at), 'HH:mm')}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">
-                          {RecordingsService.formatProcessingTime(
-                            recording.processing_started_at,
-                            recording.processing_completed_at
-                          )}
                         </Text>
                       </Table.Td>
                       <Table.Td>

@@ -9,6 +9,7 @@ import { processingService } from '../services/processing';
 import { config } from '../config/environment';
 import { authenticate, authorize } from '../middleware/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import AWS from 'aws-sdk';
 
 const router = Router();
 
@@ -39,6 +40,132 @@ const upload = multer({
 });
 
 // Note: Presigned URL endpoint removed - AssemblyAI-only direct uploads
+// Re-added: Presigned URL for direct S3 uploads
+
+/**
+ * Generate a presigned PUT URL for direct browser-to-S3 upload.
+ * Creates the job record in status 'uploading'.
+ */
+router.post('/presigned-put', 
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { fileName, fileType, fileSize, teacherId, schoolId, className, subject, grade, duration, notes } = req.body;
+
+      if (!fileName || !fileType || !fileSize || !teacherId || !schoolId) {
+        return res.status(400).json({ error: 'Missing required fields: fileName, fileType, fileSize, teacherId, schoolId' });
+      }
+
+      const accessCheckResult = await validateUploadAccess(req, parseInt(teacherId), parseInt(schoolId));
+      if (!accessCheckResult.allowed) {
+        return res.status(403).json({ error: accessCheckResult.error });
+      }
+
+      const jobId = uuidv4();
+      const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET;
+      const region = process.env.AWS_REGION || 'eu-west-2';
+
+      if (!bucket) {
+        return res.status(500).json({ error: 'S3 bucket not configured' });
+      }
+
+      const s3 = new AWS.S3({ region });
+      const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const s3Key = `uploads/jobs/${jobId}/${safeName}`;
+
+      // Create DB job in 'uploading' status (store metadata if provided)
+      try {
+        await pool.execute<ResultSetHeader>(
+          `INSERT INTO audio_jobs (
+            id, teacher_id, school_id, file_name, file_size, status, s3_key,
+            class_name, subject, grade, class_duration_minutes, notes
+          ) VALUES (?, ?, ?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?)`,
+          [
+            jobId,
+            parseInt(teacherId),
+            parseInt(schoolId),
+            fileName,
+            parseInt(fileSize),
+            s3Key,
+            className?.trim() || null,
+            subject?.trim() || null,
+            grade?.trim() || null,
+            duration ? parseInt(duration) : null,
+            notes?.trim() || null
+          ]
+        );
+      } catch (e: any) {
+        const msg: string = e?.message || '';
+        if (msg.includes("Unknown column 's3_key'")) {
+          console.warn('🛠️  Adding missing column audio_jobs.s3_key on the fly');
+          await pool.query(`ALTER TABLE audio_jobs ADD COLUMN s3_key VARCHAR(500) NULL`);
+          // retry insert
+          await pool.execute<ResultSetHeader>(
+            `INSERT INTO audio_jobs (
+              id, teacher_id, school_id, file_name, file_size, status, s3_key,
+              class_name, subject, grade, class_duration_minutes, notes
+            ) VALUES (?, ?, ?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?)`,
+            [
+              jobId,
+              parseInt(teacherId),
+              parseInt(schoolId),
+              fileName,
+              parseInt(fileSize),
+              s3Key,
+              className?.trim() || null,
+              subject?.trim() || null,
+              grade?.trim() || null,
+              duration ? parseInt(duration) : null,
+              notes?.trim() || null
+            ]
+          );
+        } else if (msg.includes('Incorrect') && msg.includes('status')) {
+          console.warn('🛠️  Adjusting audio_jobs.status enum to include uploading');
+          await pool.query(`ALTER TABLE audio_jobs MODIFY COLUMN status ENUM('pending','uploading','queued','processing','completed','failed') DEFAULT 'pending'`);
+          // retry insert
+          await pool.execute<ResultSetHeader>(
+            `INSERT INTO audio_jobs (
+              id, teacher_id, school_id, file_name, file_size, status, s3_key,
+              class_name, subject, grade, class_duration_minutes, notes
+            ) VALUES (?, ?, ?, ?, ?, 'uploading', ?, ?, ?, ?, ?, ?)`,
+            [
+              jobId,
+              parseInt(teacherId),
+              parseInt(schoolId),
+              fileName,
+              parseInt(fileSize),
+              s3Key,
+              className?.trim() || null,
+              subject?.trim() || null,
+              grade?.trim() || null,
+              duration ? parseInt(duration) : null,
+              notes?.trim() || null
+            ]
+          );
+        } else {
+          throw e;
+        }
+      }
+
+      // Sign a PUT URL valid for 1 hour (configurable)
+      const putExpires = parseInt(process.env.S3_PRESIGNED_PUT_EXPIRES_SECONDS || '3600', 10);
+      const params = {
+        Bucket: bucket,
+        Key: s3Key,
+        Expires: isNaN(putExpires) ? 3600 : putExpires,
+        ContentType: fileType
+      } as AWS.S3.PresignedPost.Params & any;
+
+      const uploadUrl = s3.getSignedUrl('putObject', params);
+
+      res.json({ jobId, uploadUrl, s3Key, bucket, region });
+    } catch (error) {
+      console.error('Presigned URL error:', error);
+      res.status(500).json({ error: 'Failed to generate presigned URL' });
+    }
+  }
+);
 
 /**
  * Direct file upload endpoint
@@ -114,6 +241,55 @@ router.post('/direct',
 // Note: Local upload endpoint removed - AssemblyAI-only system
 
 // Note: Upload completion webhook removed - no presigned URLs in AssemblyAI-only system
+
+/**
+ * Upload completion callback for direct S3 uploads.
+ * Starts AssemblyAI processing from the uploaded S3 object.
+ */
+router.post('/complete',
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.body;
+      if (!jobId) {
+        return res.status(400).json({ error: 'Missing jobId' });
+      }
+
+      // Fetch job and verify access
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        'SELECT * FROM audio_jobs WHERE id = ?',
+        [jobId]
+      );
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      const job = rows[0];
+
+      const accessCheckResult = await validateUploadAccess(req, job.teacher_id, job.school_id);
+      if (!accessCheckResult.allowed) {
+        return res.status(403).json({ error: accessCheckResult.error });
+      }
+
+      if (!job.s3_key) {
+        return res.status(400).json({ error: 'No S3 key associated with job; cannot start processing' });
+      }
+
+      // Transition to queued, then enqueue processing from S3
+      await pool.execute(
+        'UPDATE audio_jobs SET status = ? WHERE id = ?',
+        ['queued', jobId]
+      );
+
+      await processingService.enqueueJobFromS3(jobId);
+
+      res.json({ jobId, status: 'queued', message: 'Upload complete. Processing has started.' });
+    } catch (error) {
+      console.error('Upload complete error:', error);
+      res.status(500).json({ error: 'Failed to mark upload complete' });
+    }
+  }
+);
 
 /**
  * Get upload/processing status

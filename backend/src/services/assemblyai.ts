@@ -25,11 +25,18 @@ export interface AssemblyAITranscriptResult {
 
 class AssemblyAIService {
   private client: AssemblyAI;
+  private uploadMode: 'auto' | 'direct' | 's3';
+  private directMaxBytes: number;
 
   constructor(apiKey: string) {
     this.client = new AssemblyAI({
       apiKey: apiKey
     });
+    // Configure upload strategy
+    const mode = (process.env.ASSEMBLYAI_UPLOAD_MODE || 'auto').toLowerCase();
+    this.uploadMode = (mode === 'direct' || mode === 's3') ? (mode as any) : 'auto';
+    const maxMb = parseInt(process.env.ASSEMBLYAI_DIRECT_MAX_MB || '25', 10);
+    this.directMaxBytes = (isNaN(maxMb) ? 25 : maxMb) * 1024 * 1024;
   }
 
   /**
@@ -58,65 +65,48 @@ class AssemblyAIService {
         ['processing', jobId]
       );
 
-      // Step 1: Upload audio to AssemblyAI with retries, fallback to S3 if needed
-      console.log(`📤 Uploading audio buffer to AssemblyAI...`);
+      // Step 1: Determine upload path and obtain an audio URL AssemblyAI can access
       let uploadUrl: string | null = null;
 
-      // Retry logic for transient network issues
-      const maxAttempts = 3;
-      let attempt = 0;
-      while (attempt < maxAttempts && !uploadUrl) {
-        attempt++;
-        try {
-          uploadUrl = await this.client.files.upload(audioBuffer);
-          console.log(`✅ Audio file uploaded to AssemblyAI (attempt ${attempt}): ${uploadUrl}`);
+      const preferS3First =
+        this.uploadMode === 's3' ||
+        (this.uploadMode === 'auto' && ((job.file_size || audioBuffer.length) > this.directMaxBytes));
 
-          // Store the upload URL in database for retry logic (valid 24h)
-          await pool.execute(
-            'UPDATE audio_jobs SET assemblyai_upload_url = ? WHERE id = ?',
-            [uploadUrl, jobId]
-          );
-          console.log(`💾 AssemblyAI upload URL stored in database`);
-        } catch (uploadError: any) {
-          console.error(`❌ AssemblyAI upload failed (attempt ${attempt}) for job ${jobId}:`, uploadError?.message || uploadError);
-          if (attempt < maxAttempts) {
-            const delayMs = 500 * Math.pow(2, attempt - 1);
-            await new Promise(r => setTimeout(r, delayMs));
+      if (preferS3First) {
+        uploadUrl = await this.uploadToS3AndGetUrl(jobId, job, audioBuffer);
+      } else {
+        console.log(`📤 Uploading audio buffer to AssemblyAI...`);
+        const maxAttempts = 3;
+        let attempt = 0;
+        while (attempt < maxAttempts && !uploadUrl) {
+          attempt++;
+          try {
+            uploadUrl = await this.client.files.upload(audioBuffer);
+            console.log(`✅ Audio file uploaded to AssemblyAI (attempt ${attempt}): ${uploadUrl}`);
+
+            // Store the upload URL in database for retry logic (valid ~24h)
+            await pool.execute(
+              'UPDATE audio_jobs SET assemblyai_upload_url = ? WHERE id = ?',
+              [uploadUrl, jobId]
+            );
+            console.log(`💾 AssemblyAI upload URL stored in database`);
+          } catch (uploadError: any) {
+            const msg = uploadError?.message || String(uploadError);
+            console.error(`❌ AssemblyAI upload failed (attempt ${attempt}) for job ${jobId}:`, msg);
+            if (attempt < maxAttempts) {
+              const delayMs = 750 * Math.pow(2, attempt - 1);
+              await new Promise(r => setTimeout(r, delayMs));
+            }
           }
         }
-      }
 
-      // Fallback to S3 -> presigned GET URL if direct upload failed
-      if (!uploadUrl) {
-        console.warn(`⚠️ Direct upload failed after ${maxAttempts} attempts. Falling back to S3 for job ${jobId}`);
-        const bucket = process.env.S3_BUCKET || 'classreflect-audio-files-573524060586';
-        const region = process.env.AWS_REGION || 'eu-west-2';
-        const s3 = new AWS.S3({ region });
-
-        const s3Key = `uploads/jobs/${jobId}/${(job.file_name || 'audio')}`;
-        await s3
-          .putObject({
-            Bucket: bucket,
-            Key: s3Key,
-            Body: audioBuffer,
-            ContentType: 'application/octet-stream',
-          })
-          .promise();
-
-        // Save S3 key to DB for later cleanup
-        await pool.execute(
-          'UPDATE audio_jobs SET s3_key = ? WHERE id = ?',
-          [s3Key, jobId]
-        );
-
-        // Presigned GET URL for AssemblyAI to pull
-        const presignedUrl = s3.getSignedUrl('getObject', {
-          Bucket: bucket,
-          Key: s3Key,
-          Expires: 60 * 60, // 1 hour
-        });
-        uploadUrl = presignedUrl;
-        console.log(`✅ Fallback S3 upload complete. Using presigned URL for transcription.`);
+        if (!uploadUrl) {
+          if (this.uploadMode === 'direct') {
+            throw new Error('File upload failed via AssemblyAI (direct mode)');
+          }
+          console.warn(`⚠️ Direct upload failed after ${maxAttempts} attempts. Falling back to S3 for job ${jobId}`);
+          uploadUrl = await this.uploadToS3AndGetUrl(jobId, job, audioBuffer);
+        }
       }
 
       // Step 2: Submit transcription request
@@ -167,6 +157,166 @@ class AssemblyAIService {
       await this.markJobFailed(jobId, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Transcribe directly from an existing S3 object by generating a presigned GET URL
+   */
+  async transcribeFromS3Key(jobId: string, s3Key: string): Promise<void> {
+    try {
+      console.log(`🎙️ Starting AssemblyAI transcription from S3 for job ${jobId}`);
+
+      // Load job
+      const [jobRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT * FROM audio_jobs WHERE id = ?',
+        [jobId]
+      );
+      if (!jobRows || jobRows.length === 0) {
+        throw new Error(`Job ${jobId} not found`);
+      }
+      const job = jobRows[0];
+
+      // Update job status to processing
+      await pool.execute(
+        'UPDATE audio_jobs SET status = ?, processing_started_at = NOW(), s3_key = ? WHERE id = ?',
+        ['processing', s3Key, jobId]
+      );
+
+      // Generate presigned GET URL
+      const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'classreflect-audio-files-573524060586';
+      const region = process.env.AWS_REGION || 'eu-west-2';
+      const s3 = new AWS.S3({ region });
+      const expirySeconds = parseInt(process.env.S3_PRESIGNED_EXPIRES_SECONDS || '7200', 10);
+      const presignedUrl = s3.getSignedUrl('getObject', {
+        Bucket: bucket,
+        Key: s3Key,
+        Expires: isNaN(expirySeconds) ? 7200 : expirySeconds,
+      });
+
+      // Persist URL for retry purposes
+      await pool.execute(
+        'UPDATE audio_jobs SET assemblyai_upload_url = ? WHERE id = ?',
+        [presignedUrl, jobId]
+      );
+
+      // Submit transcription request using the presigned URL
+      const params = {
+        audio_url: presignedUrl,
+        speech_model: 'best' as const,
+        language_detection: true,
+        punctuate: true,
+        format_text: true
+      };
+
+      console.log(`📝 Submitting transcription request to AssemblyAI (S3)...`);
+      const transcript = await this.client.transcripts.transcribe(params);
+
+      if (transcript.status === 'error') {
+        throw new Error(`Transcription failed: ${transcript.error}`);
+      }
+
+      await pool.execute(
+        'UPDATE audio_jobs SET assemblyai_transcript_id = ? WHERE id = ?',
+        [transcript.id, jobId]
+      );
+
+      await this.storeTranscript(jobId, transcript, job);
+
+      await pool.execute(
+        'UPDATE audio_jobs SET status = ?, processing_completed_at = NOW() WHERE id = ?',
+        ['completed', jobId]
+      );
+
+      console.log(`✅ AssemblyAI transcription (S3) completed for job ${jobId}`);
+    } catch (error: any) {
+      console.error(`❌ AssemblyAI transcription (S3) failed for job ${jobId}:`, error);
+      await this.markJobFailed(jobId, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload audio buffer to S3 with retries and return a presigned GET URL
+   */
+  private async uploadToS3AndGetUrl(jobId: string, job: any, audioBuffer: Buffer): Promise<string> {
+    const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'classreflect-audio-files-573524060586';
+    const region = process.env.AWS_REGION || 'eu-west-2';
+    const s3 = new AWS.S3({ region });
+
+    const s3Key = `uploads/jobs/${jobId}/${(job.file_name || 'audio')}`;
+
+    const maxAttempts = 3;
+    let attempt = 0;
+    let lastError: any = null;
+    while (attempt < maxAttempts) {
+      attempt++;
+      try {
+        console.log(`📦 Uploading to S3 (attempt ${attempt}) -> s3://${bucket}/${s3Key}`);
+        await s3.upload({
+          Bucket: bucket,
+          Key: s3Key,
+          Body: audioBuffer,
+          ContentType: 'application/octet-stream'
+        }).promise();
+
+        try {
+          await pool.execute(
+            'UPDATE audio_jobs SET s3_key = ? WHERE id = ?',
+            [s3Key, jobId]
+          );
+        } catch (e: any) {
+          const msg = e?.message || '';
+          if (msg.includes("Unknown column 's3_key'")) {
+            console.warn('🛠️  Adding missing column audio_jobs.s3_key on the fly');
+            await pool.query(`ALTER TABLE audio_jobs ADD COLUMN s3_key VARCHAR(500) NULL`);
+            await pool.execute(
+              'UPDATE audio_jobs SET s3_key = ? WHERE id = ?',
+              [s3Key, jobId]
+            );
+          } else {
+            throw e;
+          }
+        }
+
+        const expirySeconds = parseInt(process.env.S3_PRESIGNED_EXPIRES_SECONDS || '7200', 10);
+        const presignedUrl = s3.getSignedUrl('getObject', {
+          Bucket: bucket,
+          Key: s3Key,
+          Expires: isNaN(expirySeconds) ? 7200 : expirySeconds,
+        });
+
+        try {
+          await pool.execute(
+            'UPDATE audio_jobs SET assemblyai_upload_url = ? WHERE id = ?',
+            [presignedUrl, jobId]
+          );
+        } catch (e: any) {
+          const msg = e?.message || '';
+          if (msg.includes("Unknown column 'assemblyai_upload_url'")) {
+            console.warn('🛠️  Adding missing column audio_jobs.assemblyai_upload_url on the fly');
+            await pool.query(`ALTER TABLE audio_jobs ADD COLUMN assemblyai_upload_url VARCHAR(500) NULL`);
+            await pool.execute(
+              'UPDATE audio_jobs SET assemblyai_upload_url = ? WHERE id = ?',
+              [presignedUrl, jobId]
+            );
+          } else {
+            throw e;
+          }
+        }
+
+        console.log(`✅ S3 upload complete. Using presigned URL for transcription.`);
+        return presignedUrl;
+      } catch (err: any) {
+        lastError = err;
+        console.error(`❌ S3 upload failed (attempt ${attempt}) for job ${jobId}:`, err?.message || err);
+        if (attempt < maxAttempts) {
+          const delayMs = 1000 * Math.pow(2, attempt - 1);
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+      }
+    }
+
+    throw new Error(`S3 upload failed after ${maxAttempts} attempts: ${lastError?.message || lastError}`);
   }
 
   /**

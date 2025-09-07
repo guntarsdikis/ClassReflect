@@ -142,6 +142,13 @@ DATABASE_NAME=classreflect
 COGNITO_USER_POOL_ID=eu-west-2_E3SFkCKPU
 COGNITO_CLIENT_ID=your-client-id
 COGNITO_CLIENT_SECRET=your-client-secret
+
+# AssemblyAI & Upload Strategy
+ASSEMBLYAI_API_KEY=your-assemblyai-api-key
+ASSEMBLYAI_UPLOAD_MODE=s3
+ASSEMBLYAI_DIRECT_MAX_MB=25
+S3_PRESIGNED_EXPIRES_SECONDS=7200
+S3_PRESIGNED_PUT_EXPIRES_SECONDS=3600
 ```
 
 ### Step 3: Deploy Backend
@@ -166,6 +173,34 @@ export NODE_ENV=development
 unset AWS_ACCESS_KEY_ID
 unset S3_BUCKET_NAME
 npm run dev
+```
+
+### Step 4: S3 Bucket CORS (required for browser → S3 uploads)
+
+Configure the bucket CORS so the browser can PUT directly and report progress:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedOrigins": [
+      "http://localhost:3002",
+      "https://classreflect.gdwd.co.uk",
+      "https://main.djiffqj77jjfx.amplifyapp.com"
+    ],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+Apply via AWS Console or:
+
+```bash
+aws s3api put-bucket-cors \
+  --bucket $S3_BUCKET_NAME \
+  --cors-configuration 'CORSRules=[{AllowedOrigins=["http://localhost:3002","https://classreflect.gdwd.co.uk","https://main.djiffqj77jjfx.amplifyapp.com"],AllowedMethods=["PUT","GET"],AllowedHeaders=["*"],ExposeHeaders=["ETag"],MaxAgeSeconds=3000}]'
 ```
 
 ### Force Production Mode

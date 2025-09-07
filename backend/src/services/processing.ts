@@ -55,6 +55,40 @@ class AssemblyAIProcessingService {
     }
   }
 
+  async enqueueJobFromS3(jobId: string): Promise<void> {
+    console.log(`🎙️ Processing job ${jobId} from S3`);
+    this.processJobFromS3(jobId).catch(error => {
+      console.error(`Failed to process S3 job ${jobId}:`, error);
+      this.markJobFailed(jobId, error.message);
+    });
+  }
+
+  async processJobFromS3(jobId: string): Promise<void> {
+    try {
+      console.log(`🎙️ Starting AssemblyAI processing from S3 for job ${jobId}`);
+
+      // Fetch job to get S3 key
+      const [rows] = await pool.execute(
+        'SELECT * FROM audio_jobs WHERE id = ?',
+        [jobId]
+      );
+      const jobs = rows as any[];
+      if (!jobs.length) {
+        throw new Error(`Job ${jobId} not found`);
+      }
+      const job = jobs[0];
+      if (!job.s3_key) {
+        throw new Error(`No S3 key found for job ${jobId}`);
+      }
+
+      await assemblyAIService.transcribeFromS3Key(jobId, job.s3_key);
+      console.log(`✅ S3 Job ${jobId} completed successfully`);
+    } catch (error: any) {
+      console.error(`❌ S3 Job ${jobId} failed:`, error);
+      await this.markJobFailed(jobId, error.message);
+    }
+  }
+
 
   private async markJobFailed(jobId: string, errorMessage: string): Promise<void> {
     await pool.execute(

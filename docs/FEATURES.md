@@ -124,6 +124,13 @@ References:
   - Multi-step Upload Wizard with class metadata (class, subject, grade, duration, notes)
   - Client-side validation; progress and status polling
   - Reliable processing: direct AssemblyAI upload with retry; S3 fallback (presigned URL) when network issues occur
+  - Upload strategy controls:
+    - `ASSEMBLYAI_UPLOAD_MODE=auto|direct|s3` (default `auto`)
+      - `auto`: direct upload for small files, S3 for larger or on failure
+      - `direct`: only direct upload to AssemblyAI (no S3)
+      - `s3`: always upload to S3 and pass a presigned URL to AssemblyAI
+    - `ASSEMBLYAI_DIRECT_MAX_MB` (default `25`) threshold used in `auto` mode
+    - Requires `AWS_REGION` and `S3_BUCKET_NAME` (or `S3_BUCKET`) when using S3 path
 - Dashboards
   - Teacher Dashboard: recent jobs, statuses, quick actions
   - Manager Dashboard: school-level overview (scaffolding in progress)

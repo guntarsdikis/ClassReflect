@@ -154,109 +154,153 @@ export function UploadWizard() {
     setUploadProgress(0); // Reset progress for new upload
     
     try {
-      // Prepare form data for upload
-      const formData = new FormData();
-      formData.append('audio', audioFile);
-      formData.append('teacherId', selectedTeacher);
-      formData.append('schoolId', currentSchoolId.toString());
-      
-      // Add class information
-      formData.append('className', className);
-      formData.append('subject', subject);
-      formData.append('grade', grade);
-      formData.append('duration', duration.toString());
-      formData.append('notes', notes);
-
-      // Upload file - get token from auth store (consistent with other API calls)
+      // Upload file - get token
       const authStoreToken = useAuthStore.getState().token;
       const localStorageToken = localStorage.getItem('authToken');
-      
-      console.log('🔍 Upload Debug - Auth store token:', authStoreToken ? `Length: ${authStoreToken.length}` : 'NULL');
-      console.log('🔍 Upload Debug - localStorage token:', localStorageToken ? `Length: ${localStorageToken.length}` : 'NULL');
-      
       const token = authStoreToken || localStorageToken;
-      
-      if (!token) {
-        throw new Error('No authentication token available');
+      if (!token) throw new Error('No authentication token available');
+
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const presignUrl = `${baseUrl}/api/upload/presigned-put`;
+
+      // 1) Ask backend for a presigned PUT URL (create job in DB)
+      console.log('🚀 Frontend Upload Debug - Requesting presigned URL:', presignUrl);
+      const presignRes = await fetch(presignUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fileName: audioFile.name,
+          fileType: audioFile.type || 'application/octet-stream',
+          fileSize: audioFile.size,
+          teacherId: selectedTeacher,
+          schoolId: currentSchoolId,
+          className,
+          subject,
+          grade,
+          duration,
+          notes
+        })
+      });
+
+      if (!presignRes.ok) {
+        // Fallback to direct upload path
+        console.warn('⚠️ Presign failed; falling back to direct upload');
+        await directUploadViaBackend(token);
+        return;
       }
-      
-      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/direct`;
-      console.log('🚀 Frontend Upload Debug - Making XMLHttpRequest with progress tracking to:', apiUrl);
-      console.log('🚀 Frontend Upload Debug - Token available:', token ? `Length: ${token.length}` : 'NULL');
-      console.log('🚀 Frontend Upload Debug - File size:', audioFile.size, 'bytes (', Math.round(audioFile.size / 1024 / 1024), 'MB)');
-      
-      // Use XMLHttpRequest for upload progress tracking
-      const result = await new Promise((resolve, reject) => {
+
+      const { jobId, uploadUrl } = await presignRes.json();
+      if (!jobId || !uploadUrl) {
+        throw new Error('Invalid presigned URL response');
+      }
+
+      // 2) PUT to S3 with progress
+      console.log('🚀 Frontend Upload Debug - Uploading to S3:', { jobId });
+      await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        
-        // Track upload progress
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            console.log('📊 Upload progress:', percentComplete, '% (', event.loaded, '/', event.total, 'bytes)');
-            setUploadProgress(percentComplete);
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(percent);
           }
         });
-        
-        // Handle upload completion
         xhr.addEventListener('load', () => {
-          console.log('🚀 Frontend Upload Debug - Response received:', {
-            status: xhr.status,
-            statusText: xhr.statusText,
-            ok: xhr.status >= 200 && xhr.status < 300
-          });
-          
           if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              resolve(response);
-            } catch (e) {
-              reject(new Error('Failed to parse response JSON'));
-            }
+            resolve();
           } else {
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+            reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
           }
         });
-        
-        // Handle upload errors
-        xhr.addEventListener('error', () => {
-          reject(new Error('Upload failed: Network error'));
-        });
-        
-        // Handle upload timeout
-        xhr.addEventListener('timeout', () => {
-          reject(new Error('Upload failed: Request timeout'));
-        });
-        
-        // Configure and send request
-        xhr.open('POST', apiUrl);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.timeout = 10 * 60 * 1000; // 10 minutes timeout for large files
-        xhr.send(formData);
+        xhr.addEventListener('error', () => reject(new Error('S3 upload network error')));
+        xhr.addEventListener('timeout', () => reject(new Error('S3 upload timeout')));
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', audioFile.type || 'application/octet-stream');
+        xhr.timeout = 60 * 60 * 1000; // 60 minutes for large files
+        xhr.send(audioFile);
       });
-      
+
+      // 3) Notify backend to start processing from S3
+      const completeUrl = `${baseUrl}/api/upload/complete`;
+      const completeRes = await fetch(completeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ jobId })
+      });
+      if (!completeRes.ok) {
+        const msg = await completeRes.text();
+        throw new Error(`Failed to start processing: ${msg}`);
+      }
+
       setIsUploading(false);
       notifications.show({
         title: 'Upload Successful',
-        message: 'Recording has been uploaded and processing has started.',
+        message: 'File uploaded to S3. Processing started.',
         color: 'green',
         icon: <IconCheck />,
       });
-      
       navigate('/dashboard');
-      
+
     } catch (error: any) {
       console.error('❌ Frontend Upload Debug - Error occurred:', error);
-      console.error('❌ Frontend Upload Debug - Error message:', error.message);
-      console.error('❌ Frontend Upload Debug - Error stack:', error.stack);
       setIsUploading(false);
-      setUploadProgress(0); // Reset progress on error
+      setUploadProgress(0);
       notifications.show({
         title: 'Upload Failed',
         message: error.message || 'Failed to upload recording',
         color: 'red',
       });
     }
+  };
+
+  // Fallback direct upload to backend (existing behavior)
+  const directUploadViaBackend = async (token: string) => {
+    const formData = new FormData();
+    formData.append('audio', audioFile!);
+    formData.append('teacherId', selectedTeacher);
+    formData.append('schoolId', currentSchoolId!.toString());
+    formData.append('className', className);
+    formData.append('subject', subject);
+    formData.append('grade', grade);
+    formData.append('duration', duration.toString());
+    formData.append('notes', notes);
+
+    const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/direct`;
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+        }
+      });
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(null);
+        } else {
+          reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+        }
+      });
+      xhr.addEventListener('error', () => reject(new Error('Upload failed: Network error')));
+      xhr.addEventListener('timeout', () => reject(new Error('Upload failed: Request timeout')));
+      xhr.open('POST', apiUrl);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.timeout = 10 * 60 * 1000;
+      xhr.send(formData);
+    });
+
+    notifications.show({
+      title: 'Upload Successful',
+      message: 'Recording uploaded. Processing started.',
+      color: 'green',
+      icon: <IconCheck />,
+    });
+    navigate('/dashboard');
   };
   
   const nextStep = () => {

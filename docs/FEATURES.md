@@ -123,6 +123,7 @@ References:
 - Uploads
   - Multi-step Upload Wizard with class metadata (class, subject, grade, duration, notes)
   - Client-side validation; progress and status polling
+  - Reliable processing: direct AssemblyAI upload with retry; S3 fallback (presigned URL) when network issues occur
 - Dashboards
   - Teacher Dashboard: recent jobs, statuses, quick actions
   - Manager Dashboard: school-level overview (scaffolding in progress)

@@ -36,6 +36,7 @@ import {
   IconAlertCircle,
   IconClock,
 } from '@tabler/icons-react';
+import { IconMicrophone, IconUpload } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { jobsService } from '@features/jobs/services/jobs.service';
 import { useAuthStore } from '@store/auth.store';
@@ -43,7 +44,7 @@ import { format } from 'date-fns';
 import { useState, useMemo, useEffect } from 'react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { analysisService, type AnalysisResult } from '@features/analysis/services/analysis.service';
 import { AnalysisResults } from '@features/analysis/components/AnalysisResults';
 import { AnalysisReportPDF } from '@features/analysis/components/AnalysisReportPDF';
@@ -81,6 +82,7 @@ interface FilterState {
 
 export function TeacherReports() {
   const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedRecordings, setSelectedRecordings] = useState<Set<string>>(new Set());
   const [detailsModalOpened, { open: openDetailsModal, close: closeDetailsModal }] = useDisclosure(false);
@@ -438,6 +440,20 @@ export function TeacherReports() {
           </Text>
         </div>
         <Group>
+          <Button
+            variant="filled"
+            leftSection={<IconMicrophone size={16} />}
+            onClick={() => navigate('/upload?mode=record')}
+          >
+            Record Class
+          </Button>
+          <Button
+            variant="subtle"
+            leftSection={<IconUpload size={16} />}
+            onClick={() => navigate('/upload?mode=upload')}
+          >
+            Upload File
+          </Button>
           <Button
             leftSection={<IconDownload size={16} />}
             onClick={handleExportCSV}

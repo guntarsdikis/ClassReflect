@@ -24,6 +24,7 @@ export interface Recording {
   last_name: string;
   teacher_email: string;
   school_name: string;
+  transcript_id?: number;
   transcript_text?: string;
   word_count?: number;
   confidence_score?: number;

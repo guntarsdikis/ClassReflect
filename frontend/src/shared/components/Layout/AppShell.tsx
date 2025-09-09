@@ -42,7 +42,6 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
   ],
   school_manager: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
-    { label: 'Upload Recording', icon: IconUpload, href: '/upload' },
     { label: 'All Recordings', icon: IconFileText, href: '/recordings' },
     { label: 'Template Analysis', icon: IconBrain, href: '/analysis' },
     { label: 'Teachers', icon: IconUsers, href: '/teachers' },
@@ -53,7 +52,6 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
   ],
   super_admin: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
-    { label: 'Upload Recording', icon: IconUpload, href: '/upload' },
     { label: 'Schools', icon: IconSchool, href: '/admin/schools' },
     { label: 'Users', icon: IconUsers, href: '/admin/users' },
     { label: 'All Recordings', icon: IconFileText, href: '/admin/recordings' },

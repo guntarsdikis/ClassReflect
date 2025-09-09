@@ -35,6 +35,10 @@ import {
   IconHash,
   IconChalkboard,
   IconPlayerPlay,
+  IconTemplate,
+  IconChartBar,
+  IconMicrophone,
+  IconUpload,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -42,6 +46,10 @@ import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
 import { RecordingsService, type Recording, type RecordingsFilters } from '../services/recordings.service';
 import { schoolsService } from '@features/schools/services/schools.service';
+import { templatesService, type Template } from '@features/templates/services/templates.service';
+import { analysisService, type AnalysisResult } from '@features/analysis/services/analysis.service';
+import { AnalysisResults } from '@features/analysis/components/AnalysisResults';
+import { useNavigate } from 'react-router-dom';
 import { useSchoolContextStore } from '@store/school-context.store';
 
 const ITEMS_PER_PAGE = 20;
@@ -49,6 +57,7 @@ const ITEMS_PER_PAGE = 20;
 export function RecordingsList() {
   const user = useAuthStore((state) => state.user);
   const { selectedSchool } = useSchoolContextStore();
+  const navigate = useNavigate();
   
   // Determine which school ID to use for filtering
   const getEffectiveSchoolId = () => {
@@ -69,6 +78,12 @@ export function RecordingsList() {
   const [playbackModalOpened, setPlaybackModalOpened] = useState(false);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const [playbackFileName, setPlaybackFileName] = useState<string | null>(null);
+  const [applyModalOpened, setApplyModalOpened] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [resultsModalOpened, setResultsModalOpened] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
 
   // Query for schools list (super admin only)
   const {
@@ -135,6 +150,57 @@ export function RecordingsList() {
       setPlaybackModalOpened(true);
     } catch (e: any) {
       notifications.show({ title: 'Playback Error', message: e?.message || 'Unable to get audio URL', color: 'red' });
+    }
+  };
+
+  const loadTemplates = async () => {
+    try {
+      setLoadingTemplates(true);
+      const schoolId = getEffectiveSchoolId();
+      const data = await templatesService.getTemplates({ school_id: schoolId || undefined });
+      setTemplates(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Failed to load templates:', e);
+      setTemplates([]);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const openApplyTemplate = async (recording: Recording) => {
+    if (!recording.transcript_id) {
+      notifications.show({ title: 'No Transcript', message: 'Transcript not available for this recording yet.', color: 'orange' });
+      return;
+    }
+    setSelectedRecording(recording);
+    setSelectedTemplateId('');
+    await loadTemplates();
+    setApplyModalOpened(true);
+  };
+
+  const applyTemplate = async () => {
+    if (!selectedRecording || !selectedRecording.transcript_id || !selectedTemplateId) return;
+    try {
+      const resp = await analysisService.applyTemplate({ transcriptId: selectedRecording.transcript_id, templateId: parseInt(selectedTemplateId, 10) });
+      notifications.show({ title: 'Analysis Queued', message: 'Template analysis started in background.', color: 'green', icon: <IconCheck /> });
+      setApplyModalOpened(false);
+      // Optional: poll or refresh list
+    } catch (e: any) {
+      notifications.show({ title: 'Failed to Start Analysis', message: e?.message || 'Error applying template', color: 'red' });
+    }
+  };
+
+  const viewAnalysis = async (recording: Recording) => {
+    try {
+      if (!recording.transcript_id) {
+        notifications.show({ title: 'No Transcript', message: 'Transcript not available for this recording yet.', color: 'orange' });
+        return;
+      }
+      const results = await analysisService.getAnalysisResults(recording.transcript_id);
+      setAnalysisResults(results);
+      setResultsModalOpened(true);
+    } catch (e: any) {
+      notifications.show({ title: 'Error', message: 'Failed to load analysis results', color: 'red' });
     }
   };
 
@@ -239,14 +305,11 @@ export function RecordingsList() {
             }
           </Text>
         </div>
-        <Button
-          leftSection={<IconRefresh size={16} />}
-          variant="light"
-          onClick={() => refetch()}
-          loading={isLoading}
-        >
-          Refresh
-        </Button>
+        <Group>
+          <Button leftSection={<IconMicrophone size={16} />} onClick={() => navigate('/upload?mode=record')}>Record Class</Button>
+          <Button variant="subtle" leftSection={<IconUpload size={16} />} onClick={() => navigate('/upload?mode=upload')}>Upload File</Button>
+          <Button leftSection={<IconRefresh size={16} />} variant="light" onClick={() => refetch()} loading={isLoading}>Refresh</Button>
+        </Group>
       </Group>
 
       {/* Stats Cards */}
@@ -475,6 +538,26 @@ export function RecordingsList() {
                               <IconEye size={16} />
                             </ActionIcon>
                           )}
+                          {recording.has_transcript && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="green"
+                              onClick={() => openApplyTemplate(recording)}
+                              title="Apply template analysis"
+                            >
+                              <IconTemplate size={16} />
+                            </ActionIcon>
+                          )}
+                          {recording.has_transcript && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="indigo"
+                              onClick={() => viewAnalysis(recording)}
+                              title="View analysis results"
+                            >
+                              <IconChartBar size={16} />
+                            </ActionIcon>
+                          )}
                           
                           {/* Only show delete button for school managers and super admins */}
                           {(['school_manager', 'super_admin'].includes(user?.role || '')) && (
@@ -555,6 +638,38 @@ export function RecordingsList() {
               </Button>
             </Group>
           </Stack>
+        )}
+      </Modal>
+
+      {/* Apply Template Modal */}
+      <Modal opened={applyModalOpened} onClose={() => setApplyModalOpened(false)} title="Apply Template Analysis" size="md">
+        <Stack>
+          {loadingTemplates ? (
+            <Loader />
+          ) : templates.length === 0 ? (
+            <Alert color="gray">No templates available.</Alert>
+          ) : (
+            <Select
+              label="Select Template"
+              placeholder="Choose a template"
+              data={templates.map(t => ({ value: String(t.id), label: t.template_name }))}
+              value={selectedTemplateId}
+              onChange={(v) => setSelectedTemplateId(v || '')}
+            />
+          )}
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={() => setApplyModalOpened(false)}>Cancel</Button>
+            <Button disabled={!selectedTemplateId} onClick={applyTemplate} leftSection={<IconTemplate size={16} />}>Apply</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Analysis Results Modal */}
+      <Modal opened={resultsModalOpened} onClose={() => setResultsModalOpened(false)} size="lg" title="Analysis Results">
+        {analysisResults.length > 0 ? (
+          <AnalysisResults analysis={analysisResults[0]} />
+        ) : (
+          <Alert color="gray">No analysis results found.</Alert>
         )}
       </Modal>
 

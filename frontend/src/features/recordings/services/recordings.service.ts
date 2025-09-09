@@ -29,6 +29,7 @@ export interface Recording {
   word_count?: number;
   confidence_score?: number;
   assemblyai_external_id?: string;
+  analysis_count?: number;
   teacher_name: string;
   has_transcript: boolean;
   file_size_mb: string | null;

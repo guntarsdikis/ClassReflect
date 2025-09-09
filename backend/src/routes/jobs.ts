@@ -70,12 +70,20 @@ router.get('/recordings',
         tr.transcript_text,
         tr.word_count,
         tr.confidence_score,
-        tr.external_id as assemblyai_external_id
+        tr.external_id as assemblyai_external_id,
+        COUNT(DISTINCT ar.id) AS analysis_count
       FROM audio_jobs aj
       JOIN users u ON aj.teacher_id = u.id
       JOIN schools s ON aj.school_id = s.id
       LEFT JOIN transcripts tr ON aj.id = tr.job_id
+      LEFT JOIN analysis_results ar ON aj.id = ar.job_id
       WHERE ${whereClause}
+      GROUP BY 
+        aj.id, aj.teacher_id, aj.school_id, aj.file_name, aj.file_size, aj.status,
+        aj.created_at, aj.processing_started_at, aj.processing_completed_at, aj.error_message,
+        aj.assemblyai_upload_url, aj.assemblyai_transcript_id, aj.class_name, aj.subject, aj.grade,
+        aj.class_duration_minutes, aj.notes, u.first_name, u.last_name, u.email, s.name,
+        tr.id, tr.transcript_text, tr.word_count, tr.confidence_score, tr.external_id
       ORDER BY aj.created_at DESC 
       LIMIT ${pool.escape(limitNum)} OFFSET ${pool.escape(offsetNum)}
     `;
@@ -101,6 +109,7 @@ router.get('/recordings',
       ...row,
       teacher_name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
       has_transcript: !!row.transcript_text,
+      analysis_count: row.analysis_count || 0,
       file_size_mb: row.file_size ? (row.file_size / (1024 * 1024)).toFixed(2) : null
     }));
 

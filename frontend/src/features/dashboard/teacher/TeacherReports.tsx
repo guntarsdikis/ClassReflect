@@ -19,6 +19,7 @@ import {
   RangeSlider,
   Tooltip,
   Divider,
+  Alert,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import {
@@ -36,7 +37,7 @@ import {
   IconAlertCircle,
   IconClock,
 } from '@tabler/icons-react';
-import { IconMicrophone, IconUpload } from '@tabler/icons-react';
+import { IconMicrophone, IconUpload, IconPlayerPlay, IconTemplate } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { jobsService } from '@features/jobs/services/jobs.service';
 import { useAuthStore } from '@store/auth.store';
@@ -49,6 +50,8 @@ import { analysisService, type AnalysisResult } from '@features/analysis/service
 import { AnalysisResults } from '@features/analysis/components/AnalysisResults';
 import { AnalysisReportPDF } from '@features/analysis/components/AnalysisReportPDF';
 import { pdf } from '@react-pdf/renderer';
+import { templatesService, type Template } from '@features/templates/services/templates.service';
+import { RecordingsService } from '@features/recordings/services/recordings.service';
 
 // Types for teacher recordings data
 interface TeacherRecording {
@@ -94,6 +97,14 @@ export function TeacherReports() {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
+  // Template apply + playback state
+  const [applyModalOpened, setApplyModalOpened] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [playbackModalOpened, setPlaybackModalOpened] = useState(false);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+  const [playbackFileName, setPlaybackFileName] = useState<string | null>(null);
   
   // Match manager-style date display for analysis list
   const formatDisplayDate = (dateString: string) => {
@@ -199,6 +210,55 @@ export function TeacherReports() {
     setSelectedAnalysis(analysis);
     closeAnalysisSelectionModal();
     openAnalysisModal();
+  };
+
+  // Apply template helpers
+  const loadTemplates = async () => {
+    try {
+      setLoadingTemplates(true);
+      const data = await templatesService.getTemplates({});
+      setTemplates(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Failed to load templates:', e);
+      setTemplates([]);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const openApplyTemplate = async (recording: TeacherRecording) => {
+    if (!recording.transcript_id) {
+      notifications.show({ title: 'No Transcript', message: 'Transcript not available for this recording yet.', color: 'orange' });
+      return;
+    }
+    setSelectedRecording(recording);
+    setSelectedTemplateId('');
+    await loadTemplates();
+    setApplyModalOpened(true);
+  };
+
+  const applyTemplate = async () => {
+    if (!selectedRecording || !selectedRecording.transcript_id || !selectedTemplateId) return;
+    try {
+      await analysisService.applyTemplate({ transcriptId: selectedRecording.transcript_id, templateId: parseInt(selectedTemplateId, 10) });
+      notifications.show({ title: 'Analysis Queued', message: 'Template analysis started in background.', color: 'green' });
+      setApplyModalOpened(false);
+      refetch();
+    } catch (e: any) {
+      notifications.show({ title: 'Failed to Start Analysis', message: e?.message || 'Error applying template', color: 'red' });
+    }
+  };
+
+  // Playback helpers
+  const listenRecording = async (recording: TeacherRecording) => {
+    try {
+      const data = await RecordingsService.getPlaybackUrl(recording.id);
+      setPlaybackUrl(data.url);
+      setPlaybackFileName(data.fileName);
+      setPlaybackModalOpened(true);
+    } catch (e: any) {
+      notifications.show({ title: 'Playback Error', message: e?.message || 'Unable to get audio URL', color: 'red' });
+    }
   };
 
   // Handle PDF export
@@ -647,27 +707,34 @@ export function TeacherReports() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs">
-                          {recording.has_analysis > 0 && (
-                            <Tooltip label="View Analysis">
-                              <ActionIcon
-                                variant="subtle"
-                                onClick={() => {
-                                  loadAnalysisResults(recording);
-                                }}
-                              >
-                                <IconEye size={16} />
-                              </ActionIcon>
-                            </Tooltip>
+                          <ActionIcon
+                            variant="subtle"
+                            color="teal"
+                            onClick={() => listenRecording(recording)}
+                            title="Listen"
+                          >
+                            <IconPlayerPlay size={16} />
+                          </ActionIcon>
+                          {recording.transcript_id && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="blue"
+                              onClick={() => loadAnalysisResults(recording)}
+                              title="View analysis results"
+                              disabled={!(recording.has_analysis > 0)}
+                            >
+                              <IconChartBar size={16} />
+                            </ActionIcon>
                           )}
-                          {recording.has_analysis > 0 && (
-                            <Tooltip label="Download PDF">
-                              <ActionIcon 
-                                variant="subtle"
-                                onClick={() => handleExportPDF(recording)}
-                              >
-                                <IconDownload size={16} />
-                              </ActionIcon>
-                            </Tooltip>
+                          {recording.transcript_id && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="green"
+                              onClick={() => openApplyTemplate(recording)}
+                              title="Apply template analysis"
+                            >
+                              <IconTemplate size={16} />
+                            </ActionIcon>
                           )}
                         </Group>
                       </Table.Td>
@@ -910,6 +977,41 @@ export function TeacherReports() {
             Cancel
           </Button>
         </Stack>
+      </Modal>
+
+      {/* Apply Template Modal */}
+      <Modal opened={applyModalOpened} onClose={() => setApplyModalOpened(false)} title="Apply Template Analysis" size="md">
+        <Stack>
+          {loadingTemplates ? (
+            <Text size="sm">Loading templates...</Text>
+          ) : templates.length === 0 ? (
+            <Alert color="gray">No templates available.</Alert>
+          ) : (
+            <Select
+              label="Select Template"
+              placeholder="Choose a template"
+              data={templates.map(t => ({ value: String(t.id), label: t.template_name }))}
+              value={selectedTemplateId}
+              onChange={(v) => setSelectedTemplateId(v || '')}
+            />
+          )}
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={() => setApplyModalOpened(false)}>Cancel</Button>
+            <Button disabled={!selectedTemplateId} onClick={applyTemplate} leftSection={<IconTemplate size={16} />}>Apply</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Playback Modal */}
+      <Modal opened={playbackModalOpened} onClose={() => setPlaybackModalOpened(false)} size="md" title={playbackFileName || 'Playback'}>
+        {playbackUrl ? (
+          <Stack>
+            <audio controls style={{ width: '100%' }} src={playbackUrl} />
+            <Text size="xs" c="dimmed">The link expires in a few minutes.</Text>
+          </Stack>
+        ) : (
+          <Text size="sm">Loading...</Text>
+        )}
       </Modal>
     </Container>
   );

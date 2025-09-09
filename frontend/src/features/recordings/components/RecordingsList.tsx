@@ -43,6 +43,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { notifications } from '@mantine/notifications';
+import { DatePickerInput } from '@mantine/dates';
 import { useAuthStore } from '@store/auth.store';
 import { RecordingsService, type Recording, type RecordingsFilters } from '../services/recordings.service';
 import { schoolsService } from '@features/schools/services/schools.service';
@@ -84,6 +85,8 @@ export function RecordingsList() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [resultsModalOpened, setResultsModalOpened] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+  const [analysisSelectionModalOpened, setAnalysisSelectionModalOpened] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
 
   // Query for schools list (super admin only)
   const {
@@ -197,12 +200,42 @@ export function RecordingsList() {
         return;
       }
       const results = await analysisService.getAnalysisResults(recording.transcript_id);
+      setSelectedRecording(recording);
       setAnalysisResults(results);
-      setResultsModalOpened(true);
+      if (results.length > 1) {
+        setAnalysisSelectionModalOpened(true);
+      } else {
+        setSelectedAnalysis(results[0] || null);
+        setResultsModalOpened(true);
+      }
     } catch (e: any) {
       notifications.show({ title: 'Error', message: 'Failed to load analysis results', color: 'red' });
     }
   };
+
+  const handleSelectAnalysis = (analysis: AnalysisResult) => {
+    setSelectedAnalysis(analysis);
+    setAnalysisSelectionModalOpened(false);
+    setResultsModalOpened(true);
+  };
+
+  // Extra filters (advanced) - derived unique values
+  const [extraFilters, setExtraFilters] = useState<{ subject: string; grade: string; hasAnalysis: string; dateRange: [Date | null, Date | null]; }>({ subject: '', grade: '', hasAnalysis: '', dateRange: [null, null] });
+  const uniqueSubjects = Array.from(new Set((recordingsData?.recordings || []).map(r => r.subject).filter(Boolean))) as string[];
+  const uniqueGrades = Array.from(new Set((recordingsData?.recordings || []).map(r => r.grade).filter(Boolean))) as string[];
+  const filteredRecords = (recordingsData?.recordings || []).filter((r) => {
+    if (extraFilters.subject && r.subject !== extraFilters.subject) return false;
+    if (extraFilters.grade && r.grade !== extraFilters.grade) return false;
+    if (extraFilters.hasAnalysis === 'yes' && !(r.analysis_count && r.analysis_count > 0)) return false;
+    if (extraFilters.hasAnalysis === 'no' && (r.analysis_count && r.analysis_count > 0)) return false;
+    const [from, to] = extraFilters.dateRange;
+    if (from && new Date(r.created_at) < from) return false;
+    if (to) {
+      const end = new Date(to); end.setHours(23,59,59,999);
+      if (new Date(r.created_at) > end) return false;
+    }
+    return true;
+  });
 
   // Handle recording deletion
   const handleDeleteRecording = async (recording: Recording) => {
@@ -380,30 +413,67 @@ export function RecordingsList() {
 
       {/* Filters */}
       <Card shadow="sm" p="md" radius="md" withBorder mb="lg">
-        <Group>
-          <TextInput
-            placeholder="Search by teacher name or file name..."
-            leftSection={<IconSearch size={16} />}
-            style={{ flex: 1 }}
-            value={filters.search || ''}
-            onChange={(e) => handleFilterChange('search', e.target.value || undefined)}
-          />
-          
-          <Select
-            placeholder="Filter by status"
-            data={[
-              { value: '', label: 'All Statuses' },
-              { value: 'completed', label: 'Completed' },
-              { value: 'processing', label: 'Processing' },
-              { value: 'queued', label: 'Queued' },
-              { value: 'failed', label: 'Failed' },
-              { value: 'pending', label: 'Pending' },
-            ]}
-            value={filters.status || ''}
-            onChange={(value) => handleFilterChange('status', value || undefined)}
-            w={150}
-          />
-        </Group>
+        <Grid>
+          <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+            <TextInput
+              placeholder="Search by teacher or file name..."
+              leftSection={<IconSearch size={16} />}
+              value={filters.search || ''}
+              onChange={(e) => handleFilterChange('search', e.target.value || undefined)}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+            <Select
+              placeholder="Status"
+              data={[
+                { value: '', label: 'All Statuses' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'processing', label: 'Processing' },
+                { value: 'queued', label: 'Queued' },
+                { value: 'failed', label: 'Failed' },
+                { value: 'pending', label: 'Pending' },
+              ]}
+              value={filters.status || ''}
+              onChange={(value) => handleFilterChange('status', value || undefined)}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+            <Select
+              placeholder="Subject"
+              data={uniqueSubjects}
+              value={extraFilters.subject}
+              onChange={(v) => setExtraFilters((p) => ({ ...p, subject: v || '' }))}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+            <Select
+              placeholder="Grade"
+              data={uniqueGrades}
+              value={extraFilters.grade}
+              onChange={(v) => setExtraFilters((p) => ({ ...p, grade: v || '' }))}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <DatePickerInput
+              type="range"
+              placeholder="Date range"
+              value={extraFilters.dateRange}
+              onChange={(v) => setExtraFilters((p) => ({ ...p, dateRange: v as [Date | null, Date | null] }))}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+            <Select
+              placeholder="Has analysis?"
+              data={[
+                { value: '', label: 'All' },
+                { value: 'yes', label: 'Yes' },
+                { value: 'no', label: 'No' },
+              ]}
+              value={extraFilters.hasAnalysis}
+              onChange={(v) => setExtraFilters((p) => ({ ...p, hasAnalysis: v || '' }))}
+            />
+          </Grid.Col>
+        </Grid>
       </Card>
 
       {/* Recordings Table */}
@@ -548,16 +618,15 @@ export function RecordingsList() {
                               <IconTemplate size={16} />
                             </ActionIcon>
                           )}
-                          {recording.has_transcript && (
-                            <ActionIcon
-                              variant="subtle"
-                              color="indigo"
-                              onClick={() => viewAnalysis(recording)}
-                              title="View analysis results"
-                            >
-                              <IconChartBar size={16} />
-                            </ActionIcon>
-                          )}
+                          <ActionIcon
+                            variant="subtle"
+                            color={recording.analysis_count && recording.analysis_count > 0 ? 'indigo' : 'gray'}
+                            onClick={() => viewAnalysis(recording)}
+                            title={recording.analysis_count && recording.analysis_count > 0 ? 'View analysis results' : 'No analysis yet'}
+                            disabled={!(recording.analysis_count && recording.analysis_count > 0)}
+                          >
+                            <IconChartBar size={16} />
+                          </ActionIcon>
                           
                           {/* Only show delete button for school managers and super admins */}
                           {(['school_manager', 'super_admin'].includes(user?.role || '')) && (
@@ -666,11 +735,52 @@ export function RecordingsList() {
 
       {/* Analysis Results Modal */}
       <Modal opened={resultsModalOpened} onClose={() => setResultsModalOpened(false)} size="lg" title="Analysis Results">
-        {analysisResults.length > 0 ? (
-          <AnalysisResults analysis={analysisResults[0]} />
+        {selectedAnalysis ? (
+          <Stack>
+            <AnalysisResults analysis={selectedAnalysis} />
+            {analysisResults.length > 1 && (
+              <Group justify="center" mt="md">
+                <Button variant="subtle" onClick={() => { setResultsModalOpened(false); setAnalysisSelectionModalOpened(true); }}>
+                  ← Back to Analysis Selection
+                </Button>
+              </Group>
+            )}
+          </Stack>
         ) : (
           <Alert color="gray">No analysis results found.</Alert>
         )}
+      </Modal>
+
+      {/* Analysis Selection Modal (choose one when multiple exist) */}
+      <Modal
+        opened={analysisSelectionModalOpened}
+        onClose={() => { setAnalysisSelectionModalOpened(false); setAnalysisResults([]); }}
+        title="Select Analysis to View"
+        size="lg"
+      >
+        <Stack>
+          <Text size="sm" c="dimmed">This recording has multiple analyses. Select one to view:</Text>
+          {analysisResults.map((analysis) => (
+            <Paper key={analysis.id} p="md" withBorder style={{ cursor: 'pointer' }} onClick={() => handleSelectAnalysis(analysis)}>
+              <Group justify="space-between">
+                <div>
+                  <Text fw={500} mb="xs">{analysis.template_name || 'Template'}</Text>
+                  <Group gap="xs" mb="xs">
+                    <Badge size="sm" variant="light" color="blue">Score: {analysis.overall_score}</Badge>
+                    <Badge size="sm" variant="outline" color="gray">{new Date(analysis.created_at).toLocaleString()}</Badge>
+                  </Group>
+                  {analysis.template_description && (
+                    <Text size="xs" c="dimmed">{analysis.template_description}</Text>
+                  )}
+                </div>
+                <ActionIcon variant="light" color="blue">
+                  <IconEye size={16} />
+                </ActionIcon>
+              </Group>
+            </Paper>
+          ))}
+          <Button variant="subtle" onClick={() => setAnalysisSelectionModalOpened(false)} mt="md">Cancel</Button>
+        </Stack>
       </Modal>
 
       {/* Playback Modal */}

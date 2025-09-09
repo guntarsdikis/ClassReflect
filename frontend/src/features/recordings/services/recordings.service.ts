@@ -75,6 +75,14 @@ export class RecordingsService {
   }
 
   /**
+   * Get short-lived playback URL for an audio job
+   */
+  static async getPlaybackUrl(jobId: string): Promise<{ jobId: string; fileName: string; url: string; expiresIn: number }> {
+    const response = await apiClient.get(`/upload/playback-url/${jobId}`);
+    return response.data;
+  }
+
+  /**
    * Get single recording details including full transcript
    */
   static async getRecording(jobId: string): Promise<Recording> {

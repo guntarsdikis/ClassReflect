@@ -42,8 +42,8 @@ export function AppRouter() {
             {/* <Route path="/feedback/:jobId" element={<FeedbackView />} /> */}
           </Route>
           
-          {/* School Manager and Super Admin Only Routes */}
-          <Route element={<RoleRoute roles={['school_manager', 'super_admin']} />}>
+          {/* Upload/Record: allow Teachers, Managers, and Super Admins */}
+          <Route element={<RoleRoute roles={['teacher', 'school_manager', 'super_admin']} />}>
             <Route path="/upload" element={<UploadWizard />} />
           </Route>
 

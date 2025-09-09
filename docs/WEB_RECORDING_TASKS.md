@@ -40,7 +40,7 @@ Non-goal: A complete mobile-native app (considered as an alternative path below)
 
 ## Prerequisites & Decisions
 
-- [ ] Decide audience: allow Teachers to access recording (recommended) or keep Managers/Admins only.
+- [x] Decide audience: allow Teachers to access recording (recommended) or keep Managers/Admins only.
   - If allowing Teachers, enable the route for role `teacher` in `frontend/src/app/AppRouter.tsx`.
 - [ ] Confirm env vars for S3 path (if using S3 for large files): `AWS_REGION`, `S3_BUCKET_NAME` or `S3_BUCKET` (backend).
 - [ ] Confirm `FRONTEND_URL` CORS origin in `backend/.env` matches dev/prod web origins.
@@ -54,34 +54,40 @@ Non-goal: A complete mobile-native app (considered as an alternative path below)
 Ship a simple, reliable path first: capture audio with MediaRecorder, upload as a single blob using existing endpoints, and start processing.
 
 Frontend
-- [ ] Add a recording method choice to the Upload Wizard (Record vs Upload)
+- [x] Add a recording method choice to the Upload Wizard (Record vs Upload)
   - File: `frontend/src/features/uploads/components/UploadWizard.tsx`
   - UX: New step/cards to pick “Record in Browser” or “Upload File”
-- [ ] Implement recording service (MediaRecorder wrapper)
+- [x] Implement recording service (MediaRecorder wrapper)
   - File: `frontend/src/services/recording.service.ts` (new)
   - Features: `getUserMedia`, mime detection, start/pause/resume/stop, timeslice support, error handling
   - Mimes: Prefer `audio/webm;codecs=opus`; fallback to `audio/mp4` or `audio/wav` in Safari
-- [ ] Implement recording UI
+- [x] Implement recording UI
   - File: `frontend/src/features/uploads/components/RecordingPanel.tsx` (new)
   - Controls: Start, Pause, Stop; timer; simple audio level meter
   - States: permission prompt, not supported, recording, paused, stopped
-- [ ] Hook submission to existing upload flow
+- [x] Hook submission to existing upload flow
   - Small/medium blobs: `POST /api/upload/direct`
   - Large blobs: request `POST /api/upload/presigned-put` → PUT to S3 → `POST /api/upload/complete`
   - Reuse current metadata fields (teacherId, schoolId, class info, notes)
-- [ ] Route access (if enabling Teachers)
+- [x] Route access (if enabling Teachers)
   - File: `frontend/src/app/AppRouter.tsx`
   - Allow teachers to access `/upload` (or add `/record` route that reuses the wizard)
-- [ ] Visual guidance banners
+- [x] Visual guidance banners
   - Explain keeping the screen awake on mobile; “Upload a file instead” fallback CTA
 
+Playback
+- [x] Expose playback URL endpoint (presigned S3 GET)
+  - File: `backend/src/routes/upload-new.ts` → `GET /api/upload/playback-url/:jobId`
+- [x] Add Play action and audio modal in recordings list
+  - File: `frontend/src/features/recordings/components/RecordingsList.tsx`
+
 Backend
-- [ ] Verify `upload-new.ts` allows the recorded mime types (webm, ogg, m4a, wav) — already present, confirm on test
-- [ ] Validate S3 presign path works with recorded content types
-- [ ] Confirm job creation and status polling show up in dashboards
+- [x] Verify `upload-new.ts` allows the recorded mime types (webm, ogg, m4a, wav) — already present, confirm on test
+- [x] Validate S3 presign path works with recorded content types
+- [x] Confirm job creation and status polling show up in dashboards
 
 Docs & Comms
-- [ ] Add a short “Recording Tips” section in user docs (iOS keep-awake, stable Wi‑Fi, headset optional)
+- [x] Add a short “Recording Tips” section in user docs (iOS keep-awake, stable Wi‑Fi, headset optional)
 
 Exit Criteria
 - [ ] Record 10–15 min on desktop Chrome; job completes and transcript is stored
@@ -207,12 +213,12 @@ WebRTC Ingest
 
 ## Checklist Snapshot (MVP)
 
-- [ ] Frontend recording method selector
-- [ ] MediaRecorder wrapper service with feature detection
-- [ ] Recording UI with basic controls and meter
-- [ ] Upload integration (direct + S3 paths)
-- [ ] Route access for Teachers (if approved)
-- [ ] Docs: Recording Tips
+- [x] Frontend recording method selector
+- [x] MediaRecorder wrapper service with feature detection
+- [x] Recording UI with basic controls and meter
+- [x] Upload integration (direct + S3 paths)
+- [x] Route access for Teachers (if approved)
+- [x] Docs: Recording Tips
 - [ ] Desktop + iOS basic validation sessions
 
 ---
@@ -221,3 +227,11 @@ WebRTC Ingest
 
 - Related doc: `Web_Recording_Implementation_Plan.md` (high-level design). This task list is the execution-ready version with concrete steps and file pointers.
 
+---
+
+## Basic Usage (Developer Preview)
+
+- In the Upload Wizard, Step 1 now offers two tabs: "Record in Browser" and "Upload File".
+- Click "Record in Browser" to start/pause/stop. On stop, the captured recording is attached as the selected file and you can proceed to the next step.
+- Format defaults to `audio/webm;codecs=opus` where supported; the UI falls back to file upload if recording is not supported.
+- The rest of the flow (class info → upload) is unchanged; large recordings will use S3 presigned PUT, smaller recordings can fall back to direct upload.

@@ -34,6 +34,7 @@ import {
   IconBook,
   IconHash,
   IconChalkboard,
+  IconPlayerPlay,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -65,6 +66,9 @@ export function RecordingsList() {
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
   const [transcriptModalOpened, setTranscriptModalOpened] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [playbackModalOpened, setPlaybackModalOpened] = useState(false);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+  const [playbackFileName, setPlaybackFileName] = useState<string | null>(null);
 
   // Query for schools list (super admin only)
   const {
@@ -121,6 +125,17 @@ export function RecordingsList() {
   const viewTranscript = (recording: Recording) => {
     setSelectedRecording(recording);
     setTranscriptModalOpened(true);
+  };
+
+  const listenRecording = async (recording: Recording) => {
+    try {
+      const data = await RecordingsService.getPlaybackUrl(recording.id);
+      setPlaybackUrl(data.url);
+      setPlaybackFileName(data.fileName);
+      setPlaybackModalOpened(true);
+    } catch (e: any) {
+      notifications.show({ title: 'Playback Error', message: e?.message || 'Unable to get audio URL', color: 'red' });
+    }
   };
 
   // Handle recording deletion
@@ -442,6 +457,14 @@ export function RecordingsList() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs">
+                          <ActionIcon
+                            variant="subtle"
+                            color="teal"
+                            onClick={() => listenRecording(recording)}
+                            title="Listen"
+                          >
+                            <IconPlayerPlay size={16} />
+                          </ActionIcon>
                           {recording.has_transcript && (
                             <ActionIcon
                               variant="subtle"
@@ -532,6 +555,31 @@ export function RecordingsList() {
               </Button>
             </Group>
           </Stack>
+        )}
+      </Modal>
+
+      {/* Playback Modal */}
+      <Modal
+        opened={playbackModalOpened}
+        onClose={() => setPlaybackModalOpened(false)}
+        size="md"
+        title={
+          <Group>
+            <IconPlayerPlay size={20} />
+            <div>
+              <Text fw={500}>Playback</Text>
+              <Text size="sm" c="dimmed">{playbackFileName || 'Audio'}</Text>
+            </div>
+          </Group>
+        }
+      >
+        {playbackUrl ? (
+          <Stack>
+            <audio controls style={{ width: '100%' }} src={playbackUrl} />
+            <Text size="xs" c="dimmed">The link expires in a few minutes.</Text>
+          </Stack>
+        ) : (
+          <Loader />
         )}
       </Modal>
     </Container>

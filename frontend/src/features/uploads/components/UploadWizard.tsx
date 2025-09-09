@@ -22,6 +22,8 @@ import {
   Progress,
   Checkbox,
   Radio,
+  Tabs,
+  Divider,
 } from '@mantine/core';
 import {
   IconUpload,
@@ -37,6 +39,7 @@ import { useAuthStore } from '@store/auth.store';
 import { useSchoolContextStore } from '@store/school-context.store';
 import { templatesService, Template } from '@features/templates/services/templates.service';
 import { usersService, User } from '@features/users/services/users.service';
+import { RecordingPanel } from './RecordingPanel';
 
 interface CriterionConfig {
   id: string;
@@ -51,6 +54,7 @@ export function UploadWizard() {
   const user = useAuthStore((state) => state.user);
   const { selectedSchool } = useSchoolContextStore();
   const [active, setActive] = useState(0);
+  const [inputMode, setInputMode] = useState<'record' | 'upload'>('upload');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isFileLoading, setIsFileLoading] = useState(false);
@@ -121,6 +125,17 @@ export function UploadWizard() {
       setAudioFile(null);
       setIsFileLoading(false);
     }
+  };
+
+  const handleRecordingComplete = (file: File) => {
+    // When recording completes, set as selected audio file and switch to Upload mode for clarity
+    setAudioFile(file);
+    setInputMode('upload');
+    notifications.show({
+      title: 'Recording Ready',
+      message: `Captured ${file.name}. You can proceed to the next step.`,
+      color: 'green',
+    });
   };
   
   const handleSubmit = async () => {
@@ -383,36 +398,48 @@ export function UploadWizard() {
         
         <Stepper active={active} onStepClick={setActive}>
           <Stepper.Step
-            label="Upload File"
-            description="Select audio file"
+            label="Select Recording"
+            description="Record or choose a file"
             icon={<IconUpload size={18} />}
           >
             <Stack mt="xl">
-              <FileInput
-                label="Audio Recording"
-                placeholder={isFileLoading ? "Processing file..." : "Click to select audio file"}
-                leftSection={<IconFileMusic size={16} />}
-                accept="audio/*"
-                value={audioFile}
-                onChange={handleFileChange}
-                required
-                disabled={isFileLoading}
-                description="Supported: MP3, WAV, M4A, OGG. Large files (≤ 1GB) upload via S3 with progress."
-              />
-              
-              {isFileLoading && (
-                <Alert icon={<IconInfoCircle size={16} />} variant="light" color="blue">
-                  <Text size="sm">Processing file...</Text>
-                  <Text size="xs" c="dimmed">Please wait while we prepare your file</Text>
-                </Alert>
-              )}
-              
-              {audioFile && !isFileLoading && (
-                <Alert icon={<IconInfoCircle size={16} />} variant="light">
-                  <Text size="sm">File: {audioFile.name}</Text>
-                  <Text size="sm">Size: {(audioFile.size / 1024 / 1024).toFixed(2)} MB</Text>
-                </Alert>
-              )}
+              <Tabs value={inputMode} onChange={(v) => setInputMode((v as any) || 'upload')}>
+                <Tabs.List>
+                  <Tabs.Tab value="record">Record in Browser</Tabs.Tab>
+                  <Tabs.Tab value="upload">Upload File</Tabs.Tab>
+                </Tabs.List>
+                <Tabs.Panel value="record" pl="xs" pt="md">
+                  <RecordingPanel
+                    onRecorded={handleRecordingComplete}
+                    onError={(msg) => notifications.show({ title: 'Recording Error', message: msg, color: 'red' })}
+                  />
+                </Tabs.Panel>
+                <Tabs.Panel value="upload" pl="xs" pt="md">
+                  <FileInput
+                    label="Audio Recording"
+                    placeholder={isFileLoading ? "Processing file..." : "Click to select audio file"}
+                    leftSection={<IconFileMusic size={16} />}
+                    accept="audio/*"
+                    value={audioFile}
+                    onChange={handleFileChange}
+                    required
+                    disabled={isFileLoading}
+                    description="Supported: MP3, WAV, M4A, OGG, WEBM. Large files (≤ 1GB) upload via S3 with progress."
+                  />
+                  {isFileLoading && (
+                    <Alert icon={<IconInfoCircle size={16} />} variant="light" color="blue" mt="md">
+                      <Text size="sm">Processing file...</Text>
+                      <Text size="xs" c="dimmed">Please wait while we prepare your file</Text>
+                    </Alert>
+                  )}
+                  {audioFile && !isFileLoading && (
+                    <Alert icon={<IconInfoCircle size={16} />} variant="light" mt="md">
+                      <Text size="sm">File: {audioFile.name}</Text>
+                      <Text size="sm">Size: {(audioFile.size / 1024 / 1024).toFixed(2)} MB</Text>
+                    </Alert>
+                  )}
+                </Tabs.Panel>
+              </Tabs>
             </Stack>
           </Stepper.Step>
           

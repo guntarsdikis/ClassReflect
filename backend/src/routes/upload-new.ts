@@ -186,6 +186,50 @@ router.post('/presigned-put',
 );
 
 /**
+ * Get a presigned GET URL for audio playback for a given jobId
+ */
+router.get('/playback-url/:jobId',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+      if (!jobId) return res.status(400).json({ error: 'Missing jobId' });
+
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        'SELECT id, teacher_id, school_id, s3_key, file_name FROM audio_jobs WHERE id = ? LIMIT 1',
+        [jobId]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Job not found' });
+      const job = rows[0];
+
+      // Access: teacher owns it, manager of same school, or super admin
+      const user = req.user!;
+      const allowed = user.role === 'super_admin' ||
+        (user.role === 'teacher' && user.id === job.teacher_id) ||
+        (user.role === 'school_manager' && user.schoolId === job.school_id);
+      if (!allowed) return res.status(403).json({ error: 'Access denied' });
+
+      if (!job.s3_key) return res.status(400).json({ error: 'No audio file available for playback' });
+
+      const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET;
+      const region = process.env.AWS_REGION || 'eu-west-2';
+      if (!bucket) return res.status(500).json({ error: 'S3 not configured' });
+
+      const s3 = new S3Client({ region });
+      // Lazily import to avoid ESM named import mismatch here
+      const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+      const expiry = parseInt(process.env.S3_PRESIGNED_PLAY_EXPIRES_SECONDS || '600', 10);
+      const cmd = new GetObjectCommand({ Bucket: bucket, Key: job.s3_key });
+      const url = await getSignedUrl(s3, cmd, { expiresIn: isNaN(expiry) ? 600 : expiry });
+      res.json({ jobId, fileName: job.file_name, url, expiresIn: isNaN(expiry) ? 600 : expiry });
+    } catch (err) {
+      console.error('Playback URL error:', err);
+      res.status(500).json({ error: 'Failed to create playback URL' });
+    }
+  }
+);
+
+/**
  * Direct file upload endpoint
  * AssemblyAI-only processing (no file storage)
  */

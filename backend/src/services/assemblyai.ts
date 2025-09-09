@@ -27,6 +27,7 @@ class AssemblyAIService {
   private client: AssemblyAI;
   private uploadMode: 'auto' | 'direct' | 's3';
   private directMaxBytes: number;
+  private languageCode: string; // 'en' or 'auto' to enable detection
 
   constructor(apiKey: string) {
     this.client = new AssemblyAI({
@@ -37,6 +38,12 @@ class AssemblyAIService {
     this.uploadMode = (mode === 'direct' || mode === 's3') ? (mode as any) : 'auto';
     const maxMb = parseInt(process.env.ASSEMBLYAI_DIRECT_MAX_MB || '25', 10);
     this.directMaxBytes = (isNaN(maxMb) ? 25 : maxMb) * 1024 * 1024;
+
+    // Language handling
+    // Set ASSEMBLYAI_LANGUAGE="auto" to enable detection; otherwise specify a BCP-47 code like "en".
+    // Default to English to avoid failures on silent audio when detection is enabled.
+    const lang = (process.env.ASSEMBLYAI_LANGUAGE || 'en').toLowerCase();
+    this.languageCode = lang === 'auto' ? 'auto' : lang;
   }
 
   /**
@@ -134,13 +141,17 @@ class AssemblyAIService {
 
       // Step 2: Submit transcription request
       try {
-        const params = {
+        const params: any = {
           audio_url: uploadUrl,
           speech_model: 'best' as const,
-          language_detection: true,
           punctuate: true,
           format_text: true
         };
+        if (this.languageCode === 'auto') {
+          params.language_detection = true;
+        } else {
+          params.language_code = this.languageCode;
+        }
 
         console.log(`📝 Submitting transcription request to AssemblyAI...`);
         const transcript = await this.client.transcripts.transcribe(params);
@@ -223,13 +234,17 @@ class AssemblyAIService {
       );
 
       // Submit transcription request using the presigned URL
-      const params = {
+      const params: any = {
         audio_url: presignedUrl,
         speech_model: 'best' as const,
-        language_detection: true,
         punctuate: true,
         format_text: true
       };
+      if (this.languageCode === 'auto') {
+        params.language_detection = true;
+      } else {
+        params.language_code = this.languageCode;
+      }
 
       console.log(`📝 Submitting transcription request to AssemblyAI (S3)...`);
       const transcript = await this.client.transcripts.transcribe(params);

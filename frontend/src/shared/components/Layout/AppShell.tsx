@@ -35,6 +35,7 @@ import { SchoolSwitcher } from '../SchoolSwitcher/SchoolSwitcher';
 const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: string }>> = {
   teacher: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
+    { label: 'Upload Recording', icon: IconUpload, href: '/upload' },
     { label: 'My Reports', icon: IconFileText, href: '/reports' },
   ],
   school_manager: [

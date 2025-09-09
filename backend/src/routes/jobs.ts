@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import pool from '../database';
 import { RowDataPacket } from 'mysql2';
 import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } from '../middleware/auth';
-import AWS from 'aws-sdk';
+import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 const router = Router();
 
@@ -467,12 +467,16 @@ router.delete('/:jobId',
     // Delete file from S3 (if s3_key exists)
     if (job.s3_key) {
       try {
-        const s3 = new AWS.S3();
+        const s3Client = new S3Client({ 
+          region: process.env.AWS_REGION || 'eu-west-2' 
+        });
         
-        await s3.deleteObject({
+        const deleteCommand = new DeleteObjectCommand({
           Bucket: process.env.S3_BUCKET || 'classreflect-audio-files-573524060586',
           Key: job.s3_key
-        }).promise();
+        });
+        
+        await s3Client.send(deleteCommand);
         
         console.log(`🗑️ Successfully deleted S3 file: ${job.s3_key}`);
       } catch (s3Error) {

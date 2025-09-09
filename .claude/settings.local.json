@@ -120,7 +120,8 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "Bash(pandoc:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "Bash(scripts/deployment/deploy.sh:*)"
     ],
     "deny": [
       "Bash(npm start)",

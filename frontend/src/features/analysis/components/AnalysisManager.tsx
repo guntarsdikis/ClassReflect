@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import {
   Container,
   Paper,
@@ -44,6 +46,8 @@ import { pdf } from '@react-pdf/renderer';
 export function AnalysisManager() {
   const user = useAuthStore((state) => state.user);
   const { selectedSchool } = useSchoolContextStore();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   const [recordings, setRecordings] = useState<RecordingForAnalysis[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -462,7 +466,7 @@ export function AnalysisManager() {
             <Alert icon={<IconFileText size={16} />} color="gray">
               No completed recordings with transcripts found. Upload and process some recordings first.
             </Alert>
-          ) : (
+          ) : !isMobile ? (
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
@@ -625,6 +629,63 @@ export function AnalysisManager() {
                 ))}
               </Table.Tbody>
             </Table>
+          ) : (
+            <Stack>
+              {recordings.map((recording) => (
+                <Paper key={recording.job_id} withBorder p="md" radius="md">
+                  <Stack gap="xs">
+                    <Group justify="space-between" align="flex-start">
+                      <div>
+                        <Group gap="xs" align="center">
+                          <IconMusic size={14} color="#666" />
+                          <Text fw={600}>{recording.class_name}</Text>
+                        </Group>
+                        <Group gap={6} mt={6}>
+                          <Badge size="xs" variant="light" color="blue">{recording.subject}</Badge>
+                          <Badge size="xs" variant="light" color="green">Grade {recording.grade}</Badge>
+                          <Badge size="xs" variant="light" color="orange">{recording.class_duration_minutes}min</Badge>
+                        </Group>
+                        <Text size="xs" c="dimmed" mt={4}>Uploaded {formatDate(recording.uploaded_at)}</Text>
+                      </div>
+                      <Badge variant="light" color={recording.analysis_count > 0 ? 'green' : 'gray'}>
+                        {recording.analysis_count > 0 ? `${recording.analysis_count} ${recording.analysis_count === 1 ? 'Analysis' : 'Analyses'}` : 'Not analyzed'}
+                      </Badge>
+                    </Group>
+
+                    <Group gap="xs">
+                      <IconFileText size={14} color="#666" />
+                      <Text size="sm" fw={500}>{recording.word_count?.toLocaleString() || 0} words</Text>
+                      {recording.confidence_score && (
+                        <Badge size="xs" color={
+                          recording.confidence_score > 0.8 ? 'green' :
+                          recording.confidence_score > 0.6 ? 'yellow' : 'red'
+                        }>
+                          {Math.round((recording.confidence_score || 0) * 100)}% accuracy
+                        </Badge>
+                      )}
+                    </Group>
+
+                    {recording.notes && (
+                      <Text size="xs" c="dimmed">
+                        {recording.notes.length > 120 ? `${recording.notes.substring(0, 120)}…` : recording.notes}
+                      </Text>
+                    )}
+
+                    <Group justify="flex-end" mt="xs">
+                      <Button size="xs" variant="light" leftSection={<IconTemplate size={14} />} onClick={() => openApplyModal(recording)}>
+                        Apply Template
+                      </Button>
+                      <Button size="xs" variant="subtle" leftSection={<IconChartBar size={14} />} onClick={() => handleViewResults(recording)} disabled={!recording.has_analysis}>
+                        View Results
+                      </Button>
+                      <ActionIcon variant="light" color="red" onClick={() => handleDeleteRecording(recording)}>
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
           )}
         </div>
       </Paper>

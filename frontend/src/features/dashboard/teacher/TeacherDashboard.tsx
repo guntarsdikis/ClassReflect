@@ -15,6 +15,7 @@ import {
   Loader,
   Alert,
   ActionIcon,
+  Modal,
 } from '@mantine/core';
 import {
   IconFileText,
@@ -28,7 +29,9 @@ import {
   IconRefresh,
   IconCheck,
   IconMicrophone,
+  IconPlayerPlay,
 } from '@tabler/icons-react';
+import { RecordingsService } from '@features/recordings/services/recordings.service';
 import { useQuery } from '@tanstack/react-query';
 import { jobsService } from '@features/jobs/services/jobs.service';
 import { useAuthStore } from '@store/auth.store';
@@ -77,6 +80,9 @@ const getStatusInfo = (job: TeacherJob) => {
 export function TeacherDashboard() {
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
+  const [playbackModalOpened, setPlaybackModalOpened] = useState(false);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+  const [playbackFileName, setPlaybackFileName] = useState<string | null>(null);
   
   // Fetch teacher's jobs/recordings
   const { data: jobs, isLoading: jobsLoading, error: jobsError, refetch: refetchJobs } = useQuery({
@@ -130,6 +136,18 @@ export function TeacherDashboard() {
       color: 'teal',
     },
   ];
+
+  const listenRecording = async (job: TeacherJob) => {
+    try {
+      const data = await RecordingsService.getPlaybackUrl(job.id);
+      setPlaybackUrl(data.url);
+      setPlaybackFileName(data.fileName);
+      setPlaybackModalOpened(true);
+    } catch (e: any) {
+      // Silent fail with a subtle hint via console; UI is already busy
+      console.error('Playback error:', e);
+    }
+  };
 
   // Count pending actions
   const pendingTranscriptions = jobsData.filter((job: TeacherJob) => 
@@ -297,6 +315,14 @@ export function TeacherDashboard() {
                           <Button
                             size="xs"
                             variant="subtle"
+                            leftSection={<IconPlayerPlay size={14} />}
+                            onClick={() => listenRecording(job)}
+                          >
+                            Listen
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="subtle"
                             leftSection={<IconDownload size={14} />}
                             onClick={() => {
                               // TODO: Implement PDF download for specific recording
@@ -393,6 +419,31 @@ export function TeacherDashboard() {
 
         </Grid.Col>
       </Grid>
+
+      {/* Playback Modal */}
+      <Modal
+        opened={playbackModalOpened}
+        onClose={() => setPlaybackModalOpened(false)}
+        size="md"
+        title={
+          <Group>
+            <IconPlayerPlay size={20} />
+            <div>
+              <Text fw={500}>Playback</Text>
+              <Text size="sm" c="dimmed">{playbackFileName || 'Audio'}</Text>
+            </div>
+          </Group>
+        }
+      >
+        {playbackUrl ? (
+          <Stack>
+            <audio controls style={{ width: '100%' }} src={playbackUrl} />
+            <Text size="xs" c="dimmed">The link expires in a few minutes.</Text>
+          </Stack>
+        ) : (
+          <Loader />
+        )}
+      </Modal>
     </Container>
   );
 }

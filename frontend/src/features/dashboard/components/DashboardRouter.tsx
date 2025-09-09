@@ -1,6 +1,5 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore, type UserRole } from '@store/auth.store';
-import { TeacherDashboard } from '@features/dashboard/teacher/TeacherDashboard';
 import { ManagerDashboard } from '@features/dashboard/manager/ManagerDashboard';
 import { SuperAdminDashboard } from '@features/dashboard/admin/SuperAdminDashboard';
 
@@ -14,7 +13,8 @@ export function DashboardRouter() {
   // Route to appropriate dashboard based on user role
   switch (user.role) {
     case 'teacher':
-      return <TeacherDashboard />;
+      // Simplified teacher experience: use one-pager at /reports
+      return <Navigate to="/reports" replace />;
     case 'school_manager':
       return <ManagerDashboard />;
     case 'super_admin':

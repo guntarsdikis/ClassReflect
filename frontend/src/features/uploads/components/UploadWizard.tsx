@@ -279,7 +279,8 @@ export function UploadWizard() {
         color: 'green',
         icon: <IconCheck />,
       });
-      navigate('/dashboard');
+      // After successful upload, return to one-pager recordings view
+      navigate('/reports');
 
     } catch (error: any) {
       console.error('❌ Frontend Upload Debug - Error occurred:', error);
@@ -335,7 +336,8 @@ export function UploadWizard() {
       color: 'green',
       icon: <IconCheck />,
     });
-    navigate('/dashboard');
+    // After successful upload, return to one-pager recordings view
+    navigate('/reports');
   };
   
   const nextStep = () => {

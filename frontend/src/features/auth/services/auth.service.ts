@@ -76,7 +76,8 @@ export const useLogin = () => {
           navigate('/dashboard');
           break;
         case 'teacher':
-          navigate('/dashboard');
+          // One-pager for teachers
+          navigate('/reports');
           break;
         default:
           navigate('/');
@@ -122,7 +123,8 @@ export const useCompleteChallenge = () => {
           navigate('/dashboard');
           break;
         case 'teacher':
-          navigate('/dashboard');
+          // One-pager for teachers
+          navigate('/reports');
           break;
         default:
           navigate('/');

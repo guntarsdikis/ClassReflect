@@ -117,7 +117,8 @@ const LoginPage: React.FC = () => {
   const redirectAfterLogin = (role: string) => {
     switch (role) {
       case 'teacher':
-        navigate('/dashboard/teacher');
+        // One-pager for teachers
+        navigate('/reports');
         break;
       case 'school_manager':
         navigate('/dashboard/manager');

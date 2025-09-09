@@ -36,8 +36,7 @@ import { SchoolSwitcher } from '../SchoolSwitcher/SchoolSwitcher';
 // Define navigation items for each role
 const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: string }>> = {
   teacher: [
-    { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
-    { label: 'My Recordings', icon: IconFileText, href: '/reports' },
+    // One-pager for teachers: remove sidebar navigation entirely
   ],
   school_manager: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
@@ -46,7 +45,6 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
     { label: 'Templates', icon: IconTemplate, href: '/templates' },
     { label: 'Categories', icon: IconTag, href: '/categories' },
     { label: 'Subjects', icon: IconBook, href: '/subjects' },
-    { label: 'Analytics', icon: IconChartBar, href: '/analytics' },
   ],
   super_admin: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
@@ -70,29 +68,44 @@ export function AppShell() {
   if (!user) return null;
   
   const navItems = navigationItems[user.role] || [];
+  const shouldShowNavbar = user.role !== 'teacher';
   
   return (
     <MantineAppShell
       header={{ height: 60 }}
-      navbar={{
-        width: 250,
-        breakpoint: 'sm',
-        collapsed: { mobile: !opened },
-      }}
       padding="md"
+      {...(shouldShowNavbar
+        ? {
+            navbar: {
+              width: 250,
+              breakpoint: 'sm',
+              collapsed: { mobile: !opened },
+            },
+          }
+        : {})}
     >
       <MantineAppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Group>
-            <Burger
-              opened={opened}
-              onClick={() => setOpened(!opened)}
-              hiddenFrom="sm"
-              size="sm"
-            />
-            <Text size="xl" fw={700} c="blue">
-              ClassReflect
-            </Text>
+            {shouldShowNavbar && (
+              <Burger
+                opened={opened}
+                onClick={() => setOpened(!opened)}
+                hiddenFrom="sm"
+                size="sm"
+              />
+            )}
+            {user.role === 'teacher' ? (
+              <Link to="/reports" style={{ textDecoration: 'none' }}>
+                <Text size="xl" fw={700} c="blue">
+                  ClassReflect
+                </Text>
+              </Link>
+            ) : (
+              <Text size="xl" fw={700} c="blue">
+                ClassReflect
+              </Text>
+            )}
           </Group>
           
           <Group gap="lg">
@@ -154,30 +167,32 @@ export function AppShell() {
         </Group>
       </MantineAppShell.Header>
       
-      <MantineAppShell.Navbar p="md">
-        <MantineAppShell.Section grow>
-          {navItems.map((item) => (
-            <NavLink
-              key={item.href}
-              component={Link}
-              to={item.href}
-              label={item.label}
-              leftSection={<item.icon size={20} />}
-              active={location.pathname === item.href}
-              mb="xs"
-              onClick={() => {
-                if (isMobile) setOpened(false);
-              }}
-            />
-          ))}
-        </MantineAppShell.Section>
-        
-        <MantineAppShell.Section>
-          <Text size="xs" c="dimmed" ta="center">
-            © 2024 ClassReflect
-          </Text>
-        </MantineAppShell.Section>
-      </MantineAppShell.Navbar>
+      {shouldShowNavbar && (
+        <MantineAppShell.Navbar p="md">
+          <MantineAppShell.Section grow>
+            {navItems.map((item) => (
+              <NavLink
+                key={item.href}
+                component={Link}
+                to={item.href}
+                label={item.label}
+                leftSection={<item.icon size={20} />}
+                active={location.pathname === item.href}
+                mb="xs"
+                onClick={() => {
+                  if (isMobile) setOpened(false);
+                }}
+              />
+            ))}
+          </MantineAppShell.Section>
+          
+          <MantineAppShell.Section>
+            <Text size="xs" c="dimmed" ta="center">
+              © 2024 ClassReflect
+            </Text>
+          </MantineAppShell.Section>
+        </MantineAppShell.Navbar>
+      )}
       
       <MantineAppShell.Main>
         <Outlet />

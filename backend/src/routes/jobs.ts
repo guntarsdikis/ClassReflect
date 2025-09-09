@@ -430,6 +430,18 @@ router.delete('/:jobId',
       );
       console.log(`🔄 Deleted ${(analysisJobsResult as any).affectedRows} analysis jobs`);
 
+      // Delete word-level timestamps (if exists)
+      try {
+        const [wtRes] = await connection.execute(
+          'DELETE FROM word_timestamps WHERE job_id = ?',
+          [jobId]
+        );
+        console.log(`🕒 Deleted ${(wtRes as any).affectedRows || 0} word timestamp rows`);
+      } catch (wtErr: any) {
+        // Table may not exist in some environments; log and continue
+        console.warn('⚠️ word_timestamps cleanup skipped or failed:', wtErr?.message || wtErr);
+      }
+
       // Delete transcript (if exists)
       if (job.transcript_id) {
         const [transcriptResult] = await connection.execute(
@@ -472,7 +484,7 @@ router.delete('/:jobId',
         });
         
         const deleteCommand = new DeleteObjectCommand({
-          Bucket: process.env.S3_BUCKET || 'classreflect-audio-files-573524060586',
+          Bucket: process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'classreflect-audio-files-573524060586',
           Key: job.s3_key
         });
         

@@ -38,6 +38,7 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
   teacher: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
     { label: 'Upload Recording', icon: IconUpload, href: '/upload' },
+    { label: 'Template Analysis', icon: IconBrain, href: '/analysis' },
     { label: 'My Reports', icon: IconFileText, href: '/reports' },
   ],
   school_manager: [

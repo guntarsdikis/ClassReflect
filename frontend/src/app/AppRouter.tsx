@@ -47,8 +47,8 @@ export function AppRouter() {
             <Route path="/upload" element={<UploadWizard />} />
           </Route>
 
-          {/* School Manager and Super Admin Only Routes */}
-          <Route element={<RoleRoute roles={['school_manager', 'super_admin']} />}>
+          {/* Template Analysis: allow Teachers, Managers, and Super Admins */}
+          <Route element={<RoleRoute roles={['teacher', 'school_manager', 'super_admin']} />}>
             <Route path="/analysis" element={<AnalysisManager />} />
           </Route>
 

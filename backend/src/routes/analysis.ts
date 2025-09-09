@@ -161,13 +161,10 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
  */
 router.get('/recordings', 
   authenticate, 
-  authorize('school_manager', 'super_admin'),
+  authorize('teacher', 'school_manager', 'super_admin'),
   async (req: Request, res: Response) => {
     try {
-      const schoolId = req.user!.role === 'super_admin' 
-        ? req.query.schoolId 
-        : req.user!.schoolId;
-
+      const user = req.user!;
       let query = `
         SELECT 
           aj.id as job_id,
@@ -194,12 +191,20 @@ router.get('/recordings',
         WHERE aj.status = 'completed' 
           AND t.transcript_text IS NOT NULL
       `;
+      const params: any[] = [];
 
-      const params = [];
-      
-      if (schoolId) {
+      if (user.role === 'teacher') {
+        query += ' AND aj.teacher_id = ?';
+        params.push(user.id);
+      } else if (user.role === 'school_manager') {
         query += ' AND aj.school_id = ?';
-        params.push(schoolId);
+        params.push(user.schoolId);
+      } else if (user.role === 'super_admin') {
+        const schoolId = req.query.schoolId;
+        if (schoolId) {
+          query += ' AND aj.school_id = ?';
+          params.push(schoolId);
+        }
       }
 
       query += ' GROUP BY aj.id, t.id ORDER BY aj.created_at DESC LIMIT 50';
@@ -220,7 +225,7 @@ router.get('/recordings',
  */
 router.post('/apply-template',
   authenticate,
-  authorize('school_manager', 'super_admin'), 
+  authorize('teacher', 'school_manager', 'super_admin'), 
   async (req: Request, res: Response) => {
     console.log('🔥 ANALYSIS APPLY-TEMPLATE ROUTE HIT!');
     console.log('   Method:', req.method);
@@ -260,9 +265,16 @@ router.post('/apply-template',
       console.log('   User school_id:', req.user!.schoolId);
       console.log('   Transcript school_id:', transcript.school_id);
 
-      // Verify school access
-      if (req.user!.role !== 'super_admin' && transcript.school_id !== req.user!.schoolId) {
+      // Verify access
+      // Super admin: allowed
+      // School manager: must match school
+      // Teacher: must be owner of the transcript
+      if (req.user!.role === 'school_manager' && transcript.school_id !== req.user!.schoolId) {
         console.log('❌ Access denied - school mismatch');
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user!.role === 'teacher' && transcript.teacher_id !== req.user!.id) {
+        console.log('❌ Access denied - teacher mismatch');
         return res.status(403).json({ error: 'Access denied' });
       }
       

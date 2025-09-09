@@ -26,7 +26,6 @@ import {
   IconEye,
   IconDownload,
   IconChartBar,
-  IconBell,
   IconRefresh,
   IconCheck,
   IconMicrophone,
@@ -150,19 +149,6 @@ export function TeacherDashboard() {
     }
   };
 
-  // Count pending actions
-  const pendingTranscriptions = jobsData.filter((job: TeacherJob) => 
-    job.status === 'pending' || job.status === 'uploading' || job.status === 'queued' || job.status === 'processing'
-  ).length;
-  
-  const readyForAnalysis = jobsData.filter((job: TeacherJob) => 
-    job.status === 'completed' && (!job.has_analysis || job.has_analysis === 0)
-  ).length;
-  
-  const newAnalysisResults = jobsData.filter((job: TeacherJob) => 
-    job.status === 'completed' && job.has_analysis && job.has_analysis > 0
-  ).length;
-  
   if (jobsError) {
     return (
       <Container size="xl">
@@ -232,8 +218,8 @@ export function TeacherDashboard() {
       </SimpleGrid>
       
       <Grid gutter="lg">
-        {/* Recent Recordings Widget (TOP PRIORITY) */}
-        <Grid.Col span={{ base: 12, lg: 9 }}>
+        {/* Recent Recordings Widget */}
+        <Grid.Col span={{ base: 12, lg: 12 }}>
           <Card shadow="sm" p="lg" radius="md" withBorder>
             <Group justify="space-between" mb="md">
               <Title order={3}>Recent Recordings</Title>
@@ -358,66 +344,6 @@ export function TeacherDashboard() {
               </Paper>
             )}
           </Card>
-        </Grid.Col>
-        
-        {/* Sidebar: Pending Actions Panel */}
-        <Grid.Col span={{ base: 12, lg: 3 }}>
-          {/* Pending Actions Panel */}
-          <Card shadow="sm" p="lg" radius="md" withBorder>
-            <Group justify="space-between" mb="md">
-              <Title order={3}>Pending Actions</Title>
-              {(pendingTranscriptions + readyForAnalysis + newAnalysisResults) > 0 && (
-                <ThemeIcon color="orange" variant="light" size="sm">
-                  <IconBell size={16} />
-                </ThemeIcon>
-              )}
-            </Group>
-            
-            <Stack gap="md">
-              {pendingTranscriptions > 0 && (
-                <Paper p="sm" bg="blue.0" radius="sm">
-                  <Group justify="space-between">
-                    <Text size="sm" fw={500}>Transcribing</Text>
-                    <Badge size="sm" color="blue">{pendingTranscriptions}</Badge>
-                  </Group>
-                  <Text size="xs" c="dimmed">Recordings being transcribed</Text>
-                </Paper>
-              )}
-              
-              {readyForAnalysis > 0 && (
-                <Paper p="sm" bg="green.0" radius="sm">
-                  <Group justify="space-between">
-                    <Text size="sm" fw={500}>Ready for Analysis</Text>
-                    <Badge size="sm" color="green">{readyForAnalysis}</Badge>
-                  </Group>
-                  <Text size="xs" c="dimmed">Recordings ready to analyze</Text>
-                </Paper>
-              )}
-              
-              {newAnalysisResults > 0 && (
-                <Paper p="sm" bg="teal.0" radius="sm">
-                  <Group justify="space-between">
-                    <Text size="sm" fw={500}>New Analysis Results</Text>
-                    <Badge size="sm" color="teal">{newAnalysisResults}</Badge>
-                  </Group>
-                  <Text size="xs" c="dimmed">New feedback available</Text>
-                </Paper>
-              )}
-              
-              {(pendingTranscriptions + readyForAnalysis + newAnalysisResults) === 0 && (
-                <Paper p="sm" ta="center">
-                  <Text size="sm" c="dimmed">All caught up! No pending actions.</Text>
-                </Paper>
-              )}
-            </Stack>
-            
-            {newAnalysisResults > 0 && (
-              <Text size="sm" ta="center" mt="md" c="dimmed">
-                New analysis results available - check your recordings below
-              </Text>
-            )}
-          </Card>
-
         </Grid.Col>
       </Grid>
 

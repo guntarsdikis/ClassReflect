@@ -121,6 +121,7 @@ Push to the `main` branch triggers automatic deployment:
 ### Manual Deployment
 ```bash
 ./deploy.sh
+./scripts/deployment/deploy-backend.sh
 ```
 
 ## Configuration

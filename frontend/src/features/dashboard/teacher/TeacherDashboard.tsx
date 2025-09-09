@@ -27,6 +27,7 @@ import {
   IconBell,
   IconRefresh,
   IconCheck,
+  IconMicrophone,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { jobsService } from '@features/jobs/services/jobs.service';
@@ -179,6 +180,14 @@ export function TeacherDashboard() {
           >
             <IconRefresh size={18} />
           </ActionIcon>
+          {/* Mobile-only quick action to start recording */}
+          <Button
+            leftSection={<IconMicrophone size={16} />}
+            onClick={() => navigate('/upload?mode=record')}
+            hiddenFrom="sm"
+          >
+            Record Class
+          </Button>
         </Group>
       </Group>
       

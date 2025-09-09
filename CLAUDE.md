@@ -44,6 +44,7 @@ scripts/deployment/deploy.sh     # Full deployment (Terraform + Docker + ECS)
 # 3. Updates ECS service with new image
 # 4. Frontend deploys automatically via GitHub push to main branch
 ```
+./scripts/deployment/deploy-backend.sh
 
 ### Database Operations
 

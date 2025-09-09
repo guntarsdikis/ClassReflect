@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Container,
   Stepper,
@@ -80,6 +80,13 @@ export function UploadWizard() {
 
   const currentSchoolId = getEffectiveSchoolId();
   const isTeacher = user?.role === 'teacher';
+
+  // If URL contains ?mode=record, default to recording tab
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'record') setInputMode('record');
+  }, [searchParams]);
 
   useEffect(() => {
     // If current user is a teacher, auto-select themselves

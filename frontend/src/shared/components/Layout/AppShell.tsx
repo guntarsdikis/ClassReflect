@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   AppShell as MantineAppShell,
@@ -67,6 +69,8 @@ export function AppShell() {
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const { mutate: logout } = useLogout();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
   
   if (!user) return null;
   
@@ -166,6 +170,9 @@ export function AppShell() {
               leftSection={<item.icon size={20} />}
               active={location.pathname === item.href}
               mb="xs"
+              onClick={() => {
+                if (isMobile) setOpened(false);
+              }}
             />
           ))}
         </MantineAppShell.Section>

@@ -37,13 +37,11 @@ import { SchoolSwitcher } from '../SchoolSwitcher/SchoolSwitcher';
 const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: string }>> = {
   teacher: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
-    { label: 'Template Analysis', icon: IconBrain, href: '/analysis' },
     { label: 'My Recordings', icon: IconFileText, href: '/reports' },
   ],
   school_manager: [
     { label: 'Dashboard', icon: IconHome, href: '/dashboard' },
     { label: 'All Recordings', icon: IconFileText, href: '/recordings' },
-    { label: 'Template Analysis', icon: IconBrain, href: '/analysis' },
     { label: 'Teachers', icon: IconUsers, href: '/teachers' },
     { label: 'Templates', icon: IconTemplate, href: '/templates' },
     { label: 'Categories', icon: IconTag, href: '/categories' },
@@ -55,7 +53,6 @@ const navigationItems: Record<UserRole, Array<{ label: string; icon: any; href: 
     { label: 'Schools', icon: IconSchool, href: '/admin/schools' },
     { label: 'Users', icon: IconUsers, href: '/admin/users' },
     { label: 'All Recordings', icon: IconFileText, href: '/admin/recordings' },
-    { label: 'Template Analysis', icon: IconBrain, href: '/admin/analysis' },
     { label: 'Templates', icon: IconTemplate, href: '/admin/templates' },
     { label: 'Categories', icon: IconTag, href: '/admin/categories' },
     { label: 'Subjects', icon: IconBook, href: '/admin/subjects' },

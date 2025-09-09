@@ -19,6 +19,7 @@ import {
   Alert,
   Grid,
   Paper,
+  RangeSlider,
 } from '@mantine/core';
 import {
   IconSearch,
@@ -220,15 +221,23 @@ export function RecordingsList() {
   };
 
   // Extra filters (advanced) - derived unique values
-  const [extraFilters, setExtraFilters] = useState<{ subject: string; grade: string; hasAnalysis: string; dateRange: [Date | null, Date | null]; }>({ subject: '', grade: '', hasAnalysis: '', dateRange: [null, null] });
+  const [extraFilters, setExtraFilters] = useState<{ subject: string; grade: string; scoreRange: [number, number]; dateFrom: Date | null; dateTo: Date | null; }>(
+    { subject: '', grade: '', scoreRange: [0, 100], dateFrom: null, dateTo: null }
+  );
   const uniqueSubjects = Array.from(new Set((recordingsData?.recordings || []).map(r => r.subject).filter(Boolean))) as string[];
   const uniqueGrades = Array.from(new Set((recordingsData?.recordings || []).map(r => r.grade).filter(Boolean))) as string[];
   const filteredRecords = (recordingsData?.recordings || []).filter((r) => {
     if (extraFilters.subject && r.subject !== extraFilters.subject) return false;
     if (extraFilters.grade && r.grade !== extraFilters.grade) return false;
-    if (extraFilters.hasAnalysis === 'yes' && !(r.analysis_count && r.analysis_count > 0)) return false;
-    if (extraFilters.hasAnalysis === 'no' && (r.analysis_count && r.analysis_count > 0)) return false;
-    const [from, to] = extraFilters.dateRange;
+    // Score filter
+    const rawScore = (r as any).latest_score;
+    const score = rawScore !== undefined && rawScore !== null ? Number(rawScore) : undefined;
+    if (score !== undefined && !Number.isNaN(score)) {
+      if (score < extraFilters.scoreRange[0] || score > extraFilters.scoreRange[1]) return false;
+    }
+    // Date filter
+    const from = extraFilters.dateFrom;
+    const to = extraFilters.dateTo;
     if (from && new Date(r.created_at) < from) return false;
     if (to) {
       const end = new Date(to); end.setHours(23,59,59,999);
@@ -411,8 +420,9 @@ export function RecordingsList() {
         </Grid>
       )}
 
-      {/* Filters */}
-      <Card shadow="sm" p="md" radius="md" withBorder mb="lg">
+      {/* Advanced Filtering & Search */}
+      <Card shadow="sm" p="lg" radius="md" withBorder mb="lg">
+        <Title order={4} mb="md">Advanced Filtering & Search</Title>
         <Grid>
           <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
             <TextInput
@@ -424,54 +434,46 @@ export function RecordingsList() {
           </Grid.Col>
           <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
             <Select
-              placeholder="Status"
-              data={[
-                { value: '', label: 'All Statuses' },
-                { value: 'completed', label: 'Completed' },
-                { value: 'processing', label: 'Processing' },
-                { value: 'queued', label: 'Queued' },
-                { value: 'failed', label: 'Failed' },
-                { value: 'pending', label: 'Pending' },
-              ]}
-              value={filters.status || ''}
-              onChange={(value) => handleFilterChange('status', value || undefined)}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
-            <Select
               placeholder="Subject"
               data={uniqueSubjects}
               value={extraFilters.subject}
               onChange={(v) => setExtraFilters((p) => ({ ...p, subject: v || '' }))}
+              clearable
             />
           </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
             <Select
               placeholder="Grade"
               data={uniqueGrades}
               value={extraFilters.grade}
               onChange={(v) => setExtraFilters((p) => ({ ...p, grade: v || '' }))}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <DatePickerInput
-              type="range"
-              placeholder="Date range"
-              value={extraFilters.dateRange}
-              onChange={(v) => setExtraFilters((p) => ({ ...p, dateRange: v as [Date | null, Date | null] }))}
+              clearable
             />
           </Grid.Col>
           <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
-            <Select
-              placeholder="Has analysis?"
-              data={[
-                { value: '', label: 'All' },
-                { value: 'yes', label: 'Yes' },
-                { value: 'no', label: 'No' },
-              ]}
-              value={extraFilters.hasAnalysis}
-              onChange={(v) => setExtraFilters((p) => ({ ...p, hasAnalysis: v || '' }))}
+            <Button variant="subtle" onClick={() => setExtraFilters({ subject: '', grade: '', scoreRange: [0,100], dateFrom: null, dateTo: null })} fullWidth>
+              Clear
+            </Button>
+          </Grid.Col>
+        </Grid>
+
+        <Grid mt="md">
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Text size="sm" mb={5}>Score Range: {extraFilters.scoreRange[0]}% - {extraFilters.scoreRange[1]}%</Text>
+            <RangeSlider
+              value={extraFilters.scoreRange}
+              onChange={(val) => setExtraFilters((p) => ({ ...p, scoreRange: val as [number, number] }))}
+              min={0}
+              max={100}
+              step={5}
             />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Text size="sm" mb={5}>Date Range</Text>
+            <Group>
+              <DatePickerInput placeholder="From" value={extraFilters.dateFrom} onChange={(v) => setExtraFilters((p) => ({ ...p, dateFrom: v }))} size="sm" />
+              <DatePickerInput placeholder="To" value={extraFilters.dateTo} onChange={(v) => setExtraFilters((p) => ({ ...p, dateTo: v }))} size="sm" />
+            </Group>
           </Grid.Col>
         </Grid>
       </Card>
@@ -483,7 +485,7 @@ export function RecordingsList() {
             <Loader size="md" />
             <Text mt="md" c="dimmed">Loading recordings...</Text>
           </div>
-        ) : recordingsData?.recordings.length === 0 ? (
+        ) : filteredRecords.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <Text c="dimmed">No recordings found.</Text>
           </div>
@@ -503,7 +505,7 @@ export function RecordingsList() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {recordingsData?.recordings.map((recording) => (
+                  {filteredRecords.map((recording) => (
                     <Table.Tr key={recording.id}>
                       <Table.Td>
                         <div>

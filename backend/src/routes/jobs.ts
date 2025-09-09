@@ -71,7 +71,8 @@ router.get('/recordings',
         tr.word_count,
         tr.confidence_score,
         tr.external_id as assemblyai_external_id,
-        COUNT(DISTINCT ar.id) AS analysis_count
+        COUNT(DISTINCT ar.id) AS analysis_count,
+        MAX(ar.overall_score) AS latest_score
       FROM audio_jobs aj
       JOIN users u ON aj.teacher_id = u.id
       JOIN schools s ON aj.school_id = s.id

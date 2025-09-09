@@ -63,7 +63,8 @@ interface TeacherRecording {
   created_at: string;
   status: 'pending' | 'uploading' | 'queued' | 'processing' | 'completed' | 'failed';
   duration_minutes?: number;
-  analysis_score?: number;
+  analysis_score?: number; // optional local score field
+  latest_score?: number;   // value returned by backend (MAX overall_score)
   has_analysis: number;
   analysis_count: number;
   transcript_text?: string;
@@ -141,6 +142,14 @@ export function TeacherReports() {
 
   // Backend returns { jobs: [...], count: N } structure
   const recordingsData = Array.isArray(recordings?.jobs) ? recordings.jobs : [];
+
+  // Stats for cards
+  const totalCount = recordingsData.length;
+  const processingCount = recordingsData.filter((r: TeacherRecording) =>
+    r.status === 'queued' || r.status === 'processing' || r.status === 'uploading'
+  ).length;
+  const completedCount = recordingsData.filter((r: TeacherRecording) => r.status === 'completed').length;
+  const failedCount = recordingsData.filter((r: TeacherRecording) => r.status === 'failed').length;
 
   // Handle URL parameter to auto-open specific recording
   useEffect(() => {
@@ -367,23 +376,28 @@ export function TeacherReports() {
       if (filters.grade && recording.grade !== filters.grade) return false;
 
       // Score range filter
-      if (recording.analysis_score && (recording.analysis_score < filters.scoreRange[0] || recording.analysis_score > filters.scoreRange[1])) {
-        return false;
+      // Prefer backend's latest_score; fall back to analysis_score if present
+      // Coerce score from backend (MySQL DECIMAL may arrive as string)
+      const raw = (recording as any).latest_score ?? (recording as any).analysis_score;
+      const scoreValue = raw !== undefined && raw !== null ? Number(raw) : undefined;
+      if (scoreValue !== undefined && !Number.isNaN(scoreValue)) {
+        if (scoreValue < filters.scoreRange[0] || scoreValue > filters.scoreRange[1]) return false;
       }
 
       // Date range filter
-      if (filters.dateRange[0] && filters.dateRange[1]) {
+      // Date range filter (support from-only, to-only, or both)
+      const [from, to] = filters.dateRange;
+      if (from || to) {
         const uploadDate = new Date(recording.created_at);
-        if (uploadDate < filters.dateRange[0] || uploadDate > filters.dateRange[1]) {
-          return false;
+        if (from && uploadDate < from) return false;
+        if (to) {
+          const end = new Date(to);
+          end.setHours(23,59,59,999);
+          if (uploadDate > end) return false;
         }
       }
 
-      // Template filter
-      if (filters.template && recording.template_name !== filters.template) return false;
-
-      // Status filter
-      if (filters.status && recording.status !== filters.status) return false;
+      // Template filter (disabled for now - dataset may not include template per recording)
 
       return true;
     });
@@ -524,6 +538,62 @@ export function TeacherReports() {
         </Group>
       </Group>
 
+      {/* Stats Cards */}
+      <Grid gutter="md" mb="xl">
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Paper p="md" withBorder>
+            <Group>
+              <IconFileText size={20} color="blue" />
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                  Total Recordings
+                </Text>
+                <Text fw={700} size="xl">{totalCount}</Text>
+              </div>
+            </Group>
+          </Paper>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Paper p="md" withBorder>
+            <Group>
+              <IconClock size={20} color="orange" />
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                  Processing
+                </Text>
+                <Text fw={700} size="xl">{processingCount}</Text>
+              </div>
+            </Group>
+          </Paper>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Paper p="md" withBorder>
+            <Group>
+              <IconFileText size={20} color="green" />
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                  Completed
+                </Text>
+                <Text fw={700} size="xl">{completedCount}</Text>
+              </div>
+            </Group>
+          </Paper>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Paper p="md" withBorder>
+            <Group>
+              <IconAlertCircle size={20} color="red" />
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                  Failed
+                </Text>
+                <Text fw={700} size="xl">{failedCount}</Text>
+              </div>
+            </Group>
+          </Paper>
+        </Grid.Col>
+      </Grid>
+
       {/* All Recordings Section */}
       <div>
           {/* Advanced Filtering */}
@@ -556,24 +626,7 @@ export function TeacherReports() {
                   clearable
                 />
               </Grid.Col>
-              <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
-                <Select
-                  placeholder="Template"
-                  data={uniqueTemplates}
-                  value={filters.template}
-                  onChange={(value) => setFilters(prev => ({ ...prev, template: value || '' }))}
-                  clearable
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
-                <Select
-                  placeholder="Status"
-                  data={uniqueStatuses}
-                  value={filters.status}
-                  onChange={(value) => setFilters(prev => ({ ...prev, status: value || '' }))}
-                  clearable
-                />
-              </Grid.Col>
+              {/* Removed Template and Status dropdowns for clarity */}
               <Grid.Col span={{ base: 12, sm: 6, md: 1 }}>
                 <Button variant="subtle" onClick={clearFilters} fullWidth>
                   Clear

@@ -78,6 +78,14 @@ aws iam put-role-policy \
           "sqs:GetQueueAttributes"
         ],
         "Resource": "arn:aws:sqs:eu-west-2:573524060586:classreflect-processing-queue"
+      },
+      {
+        "Effect": "Allow",
+        "Action": [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ],
+        "Resource": "arn:aws:ses:eu-west-1:573524060586:identity/*"
       }
     ]
   }'

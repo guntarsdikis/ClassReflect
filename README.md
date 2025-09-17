@@ -142,6 +142,7 @@ SSL certificates are automatically managed by:
 - Configure backend with `AWS_SES_REGION` and `SES_FROM_EMAIL` environment variables (see `backend/.env.example`).
 - Provide SES credentials via `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (or an IAM role when running in AWS).
 - Password reset and invitation emails are sent through SES; the reset link uses `FRONTEND_URL` as the base.
+- The ECS task role (`classreflect-ecs-task-role`) must allow `ses:SendEmail`/`ses:SendRawEmail` on the verified identity.
 
 ## Cost Optimization
 

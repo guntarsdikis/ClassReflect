@@ -47,6 +47,14 @@
           "value": "eu-west-2"
         },
         {
+          "name": "AWS_SES_REGION",
+          "value": "eu-west-1"
+        },
+        {
+          "name": "SES_FROM_EMAIL",
+          "value": "info@gdwd.co.uk"
+        },
+        {
           "name": "S3_BUCKET_NAME",
           "value": "classreflect-audio-files-573524060586"
         },

@@ -196,5 +196,13 @@ export const useResetPassword = () => {
       });
       navigate('/login');
     },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.response?.data?.message || 'Unable to reset password.';
+      notifications.show({
+        title: 'Reset failed',
+        message,
+        color: 'red',
+      });
+    },
   });
 };

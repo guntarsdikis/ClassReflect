@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { Pool } from 'mysql2/promise';
 import { authenticate, authorize } from '../middleware/auth';
+import { sendInvitationEmail } from '../services/email';
 
 const router = Router();
 let pool: Pool;
@@ -167,10 +168,25 @@ router.post('/',
         
         await connection.commit();
         
-        // TODO: Send email with temporary password if sendInviteEmail is true
-        
+        let inviteEmailSent = false;
+
+        if (sendInviteEmail) {
+          try {
+            await sendInvitationEmail({
+              recipient: email,
+              temporaryPassword: tempPassword,
+              firstName,
+              lastName,
+            });
+            inviteEmailSent = true;
+            console.log(`✉️ Invitation email sent to ${email}`);
+          } catch (emailError) {
+            console.error('Failed to send invitation email:', emailError);
+          }
+        }
+
         console.log('✅ Create User Debug - User created successfully:', { userId, email, role });
-        
+
         res.status(201).json({
           id: userId,
           email,
@@ -179,7 +195,8 @@ router.post('/',
           role,
           schoolId,
           temporaryPassword: process.env.NODE_ENV === 'development' ? tempPassword : undefined,
-          message: `${role === 'school_manager' ? 'School Manager' : 'Teacher'} account created successfully`,
+          inviteEmailSent,
+          message: `${role === 'school_manager' ? 'School Manager' : 'Teacher'} account created successfully${inviteEmailSent ? ' and email delivered' : ''}`,
         });
       } catch (error) {
         await connection.rollback();

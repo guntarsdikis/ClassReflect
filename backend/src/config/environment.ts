@@ -17,6 +17,10 @@ export interface EnvironmentConfig {
     password: string;
     database: string;
   };
+  email: {
+    region: string;
+    fromAddress: string;
+  };
 }
 
 /**
@@ -57,6 +61,10 @@ export function getEnvironmentConfig(): EnvironmentConfig {
         user: process.env.DATABASE_USER || 'gdwd',
         password: process.env.DATABASE_PASSWORD || '',
         database: process.env.DATABASE_NAME || 'classreflect'
+      },
+      email: {
+        region: process.env.AWS_SES_REGION || process.env.AWS_REGION || 'eu-west-1',
+        fromAddress: process.env.SES_FROM_EMAIL || 'info@gdwd.co.uk'
       }
     };
   } else {
@@ -71,6 +79,10 @@ export function getEnvironmentConfig(): EnvironmentConfig {
         user: process.env.DATABASE_USER || 'root',
         password: process.env.DATABASE_PASSWORD || '',
         database: process.env.DATABASE_NAME || 'classreflect'
+      },
+      email: {
+        region: process.env.AWS_SES_REGION || process.env.AWS_REGION || 'eu-west-1',
+        fromAddress: process.env.SES_FROM_EMAIL || 'info@gdwd.co.uk'
       }
     };
   }
@@ -80,3 +92,4 @@ export const config = getEnvironmentConfig();
 
 console.log(`🌍 Environment: ${config.env}`);
 console.log(`⚙️ Processing: ${config.processing.type}`);
+console.log(`✉️ Email region: ${config.email.region}, from: ${config.email.fromAddress}`);

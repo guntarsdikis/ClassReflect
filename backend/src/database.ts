@@ -47,6 +47,16 @@ async function runMigrations(): Promise<void> {
   const dbName = process.env.DATABASE_NAME || process.env.DB_NAME || 'classreflect';
   const conn = await pool.getConnection();
   try {
+    // Helper to check table existence
+    async function tableExists(table: string): Promise<boolean> {
+      const [rows] = await conn.query(
+        `SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = ?`,
+        [dbName, table]
+      );
+      const r = rows as any[];
+      return (r[0]?.cnt || 0) > 0;
+    }
+
     // Helper to check column existence
     async function columnExists(table: string, column: string): Promise<boolean> {
       const [rows] = await conn.query(
@@ -55,6 +65,24 @@ async function runMigrations(): Promise<void> {
       );
       const r = rows as any[];
       return (r[0]?.cnt || 0) > 0;
+    }
+
+    // Ensure password_reset_tokens table exists for auth workflows
+    if (!(await tableExists('password_reset_tokens'))) {
+      console.log('🛠️  Creating password_reset_tokens table');
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          token VARCHAR(255) UNIQUE NOT NULL,
+          expires_at TIMESTAMP NOT NULL,
+          used BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          INDEX idx_token (token),
+          INDEX idx_expires (expires_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
     }
 
     // 1) audio_jobs.s3_key

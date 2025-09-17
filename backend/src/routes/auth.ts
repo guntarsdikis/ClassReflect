@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { Pool } from 'mysql2/promise';
 import { generateToken, verifyCredentials, authenticate } from '../middleware/auth';
+import { sendPasswordResetEmail } from '../services/email';
 
 const router = Router();
 let pool: Pool;
@@ -333,7 +335,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     
     // Check if user exists
     const [rows] = await pool.execute(
-      'SELECT id FROM users WHERE email = ? AND is_active = true',
+      'SELECT id, first_name, last_name FROM users WHERE email = ? AND is_active = true LIMIT 1',
       [email]
     );
     
@@ -343,8 +345,41 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
       return;
     }
     
-    // TODO: Generate reset token and send email
-    // For now, just acknowledge the request
+    const userRow = rows[0] as any;
+    const userId = userRow.id as number;
+    const firstName = userRow.first_name as string | undefined;
+    const lastName = userRow.last_name as string | undefined;
+
+    // Generate secure token and store hash
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
+
+    // Invalidate existing tokens for this user
+    await pool.execute(
+      'UPDATE password_reset_tokens SET used = true WHERE user_id = ?',
+      [userId]
+    );
+
+    await pool.execute(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at, used) VALUES (?, ?, ?, false)',
+      [userId, hashedToken, expiresAt]
+    );
+
+    const frontendUrl = (process.env.FRONTEND_URL || 'https://classreflect.gdwd.co.uk').replace(/\/$/, '');
+    const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    try {
+      await sendPasswordResetEmail({
+        recipient: email,
+        resetLink,
+        firstName,
+        lastName,
+      });
+      console.log(`✉️ Password reset email enqueued for ${email}`);
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+    }
     
     res.json({ message: 'If the email exists, a reset link will be sent' });
   } catch (error) {
@@ -370,10 +405,65 @@ router.post('/reset-password', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Password must be at least 8 characters' });
       return;
     }
-    
-    // TODO: Verify reset token and get user ID
-    // For now, this is a placeholder
-    
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const [tokenRows] = await pool.execute(
+      `SELECT id, user_id, expires_at, used
+       FROM password_reset_tokens
+       WHERE token = ?
+       LIMIT 1`,
+      [hashedToken]
+    );
+
+    if (!Array.isArray(tokenRows) || tokenRows.length === 0) {
+      res.status(400).json({ error: 'Invalid or expired token' });
+      return;
+    }
+
+    const tokenRow = tokenRows[0] as any;
+
+    if (tokenRow.used) {
+      res.status(400).json({ error: 'Invalid or expired token' });
+      return;
+    }
+
+    const expiresAt = new Date(tokenRow.expires_at);
+    if (expiresAt.getTime() < Date.now()) {
+      res.status(400).json({ error: 'Invalid or expired token' });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      await connection.execute(
+        'UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?',
+        [hashedPassword, tokenRow.user_id]
+      );
+
+      await connection.execute(
+        'UPDATE password_reset_tokens SET used = true WHERE id = ?',
+        [tokenRow.id]
+      );
+
+      // Invalidate any other outstanding tokens for this user
+      await connection.execute(
+        'UPDATE password_reset_tokens SET used = true WHERE user_id = ? AND used = false',
+        [tokenRow.user_id]
+      );
+
+      await connection.commit();
+    } catch (innerError) {
+      await connection.rollback();
+      throw innerError;
+    } finally {
+      connection.release();
+    }
+
     res.json({ message: 'Password reset successfully' });
   } catch (error) {
     console.error('Reset password error:', error);

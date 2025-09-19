@@ -1011,9 +1011,32 @@ export function TeacherReports() {
                     </Text>
                   )}
                 </div>
-                <ActionIcon variant="light" color="blue">
-                  <IconEye size={16} />
-                </ActionIcon>
+                <Group gap="xs">
+                  <ActionIcon 
+                    variant="light" 
+                    color="blue"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectAnalysis(analysis);
+                    }}
+                    aria-label="View Analysis"
+                  >
+                    <IconEye size={16} />
+                  </ActionIcon>
+                  <ActionIcon 
+                    variant="light" 
+                    color="green"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedRecording) {
+                        handleExportPDF(selectedRecording, analysis);
+                      }
+                    }}
+                    aria-label="Download PDF"
+                  >
+                    <IconDownload size={16} />
+                  </ActionIcon>
+                </Group>
               </Group>
             </Paper>
           ))}

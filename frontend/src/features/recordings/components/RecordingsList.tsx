@@ -40,6 +40,7 @@ import {
   IconChartBar,
   IconMicrophone,
   IconUpload,
+  IconDownload,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -51,6 +52,8 @@ import { schoolsService } from '@features/schools/services/schools.service';
 import { templatesService, type Template } from '@features/templates/services/templates.service';
 import { analysisService, type AnalysisResult } from '@features/analysis/services/analysis.service';
 import { AnalysisResults } from '@features/analysis/components/AnalysisResults';
+import { AnalysisReportPDF } from '@features/analysis/components/AnalysisReportPDF';
+import { pdf } from '@react-pdf/renderer';
 import { useNavigate } from 'react-router-dom';
 import { useSchoolContextStore } from '@store/school-context.store';
 
@@ -88,6 +91,32 @@ export function RecordingsList() {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [analysisSelectionModalOpened, setAnalysisSelectionModalOpened] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
+
+  const handleDownloadPDF = async (analysis: AnalysisResult) => {
+    try {
+      const doc = <AnalysisReportPDF analysis={analysis} />;
+      const asPdf = pdf(doc);
+      const blob = await asPdf.toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const date = new Date().toISOString().split('T')[0];
+      const className = (analysis.class_name || 'analysis').replace(/[^a-zA-Z0-9]/g, '_');
+      const templateName = (analysis.template_name || 'template').replace(/[^a-zA-Z0-9]/g, '_');
+      link.download = `ClassReflect_${className}_${templateName}_${date}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      notifications.show({
+        title: 'Download Failed',
+        message: 'Could not generate PDF report. Please try again.',
+        color: 'red',
+      });
+    }
+  };
 
   // Query for schools list (super admin only)
   const {
@@ -736,7 +765,26 @@ export function RecordingsList() {
       </Modal>
 
       {/* Analysis Results Modal */}
-      <Modal opened={resultsModalOpened} onClose={() => setResultsModalOpened(false)} size="lg" title="Analysis Results">
+      <Modal 
+        opened={resultsModalOpened} 
+        onClose={() => setResultsModalOpened(false)} 
+        size="lg" 
+        title={
+          <Group justify="space-between" w="100%">
+            <Text fw={600} size="lg">Analysis Results</Text>
+            {selectedAnalysis && (
+              <Button
+                variant="light"
+                leftSection={<IconDownload size={16} />}
+                size="sm"
+                onClick={() => handleDownloadPDF(selectedAnalysis)}
+              >
+                Export PDF
+              </Button>
+            )}
+          </Group>
+        }
+      >
         {selectedAnalysis ? (
           <Stack>
             <AnalysisResults analysis={selectedAnalysis} />
@@ -775,9 +823,30 @@ export function RecordingsList() {
                     <Text size="xs" c="dimmed">{analysis.template_description}</Text>
                   )}
                 </div>
-                <ActionIcon variant="light" color="blue">
-                  <IconEye size={16} />
-                </ActionIcon>
+                <Group gap="xs">
+                  <ActionIcon 
+                    variant="light" 
+                    color="blue"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectAnalysis(analysis);
+                    }}
+                    aria-label="View Analysis"
+                  >
+                    <IconEye size={16} />
+                  </ActionIcon>
+                  <ActionIcon 
+                    variant="light" 
+                    color="green"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownloadPDF(analysis);
+                    }}
+                    aria-label="Download PDF"
+                  >
+                    <IconDownload size={16} />
+                  </ActionIcon>
+                </Group>
               </Group>
             </Paper>
           ))}

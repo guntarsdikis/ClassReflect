@@ -133,11 +133,12 @@ export function TeacherReports() {
     status: '',
   });
 
-  // Fetch teacher's recordings
+  // Fetch teacher's recordings with auto-refresh
   const { data: recordings, isLoading, refetch } = useQuery({
     queryKey: ['teacher-recordings', user?.id],
     queryFn: () => jobsService.getTeacherJobs(user!.id.toString()),
     enabled: !!user?.id,
+    refetchInterval: 5000, // Refresh every 5 seconds to catch updates
   });
 
   // Backend returns { jobs: [...], count: N } structure
@@ -529,6 +530,14 @@ export function TeacherReports() {
             Upload File
           </Button>
           <Button
+            variant="subtle"
+            leftSection={<IconHistory size={16} />}
+            onClick={() => refetch()}
+            loading={isLoading}
+          >
+            Refresh
+          </Button>
+          <Button
             leftSection={<IconDownload size={16} />}
             onClick={handleExportCSV}
             disabled={filteredRecordings.length === 0}
@@ -559,7 +568,7 @@ export function TeacherReports() {
               <IconClock size={20} color="orange" />
               <div>
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                  Processing
+                  Processing {processingCount > 0 && '(Auto-refreshing)'}
                 </Text>
                 <Text fw={700} size="xl">{processingCount}</Text>
               </div>

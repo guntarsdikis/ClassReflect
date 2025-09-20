@@ -175,6 +175,16 @@ export function RecordingsList() {
     setTranscriptModalOpened(true);
   };
 
+  const retranscribe = async (recording: Recording) => {
+    try {
+      const resp = await RecordingsService.retranscribe(recording.id);
+      notifications.show({ title: 'Re-transcription Started', message: resp.message, color: 'green', icon: <IconCheck /> });
+      await refetch();
+    } catch (e: any) {
+      notifications.show({ title: 'Failed to Start', message: e?.response?.data?.error || e?.message || 'Could not start re-transcription', color: 'red' });
+    }
+  };
+
   const listenRecording = async (recording: Recording) => {
     try {
       const data = await RecordingsService.getPlaybackUrl(recording.id);
@@ -639,6 +649,15 @@ export function RecordingsList() {
                               <IconEye size={16} />
                             </ActionIcon>
                           )}
+                          {/* Re-transcribe action: available to teacher (own), manager (same school), super admin */}
+                          <ActionIcon
+                            variant="subtle"
+                            color="teal"
+                            onClick={() => retranscribe(recording)}
+                            title="Re-run transcription"
+                          >
+                            <IconRefresh size={16} />
+                          </ActionIcon>
                           {recording.has_transcript && (
                             <ActionIcon
                               variant="subtle"

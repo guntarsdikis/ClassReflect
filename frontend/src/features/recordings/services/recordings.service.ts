@@ -131,6 +131,15 @@ export class RecordingsService {
   }
 
   /**
+   * Re-run transcription for an existing recording
+   * Prefers S3 if available; otherwise uses stored AssemblyAI upload URL.
+   */
+  static async retranscribe(jobId: string): Promise<{ jobId: string; mode: 's3' | 'assemblyai_url'; status: string; message: string }> {
+    const response = await apiClient.post(`/jobs/${jobId}/retranscribe`, {});
+    return response.data;
+  }
+
+  /**
    * Helper function to get status color for UI
    */
   static getStatusColor(status: string): string {

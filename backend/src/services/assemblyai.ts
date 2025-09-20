@@ -103,8 +103,17 @@ class AssemblyAIService {
         (this.uploadMode === 'auto' && ((job.file_size || audioBuffer.length) > this.directMaxBytes));
 
       if (preferS3First) {
-        uploadUrl = await this.uploadToS3AndGetUrl(jobId, job, audioBuffer);
-      } else {
+        try {
+          uploadUrl = await this.uploadToS3AndGetUrl(jobId, job, audioBuffer);
+        } catch (s3Err: any) {
+          const msg = s3Err?.message || String(s3Err);
+          console.warn(`⚠️ S3 upload path failed for job ${jobId}: ${msg}`);
+          console.warn(`⚠️ Falling back to direct AssemblyAI upload for job ${jobId}`);
+          // Fall through to direct upload with retry
+        }
+      }
+
+      if (!uploadUrl) {
         console.log(`📤 Uploading audio buffer to AssemblyAI...`);
         const maxAttempts = 3;
         let attempt = 0;
@@ -129,12 +138,12 @@ class AssemblyAIService {
             }
           }
         }
-
+        // If direct upload failed and we were not strictly in 'direct' mode, try S3 as last resort
         if (!uploadUrl) {
           if (this.uploadMode === 'direct') {
             throw new Error('File upload failed via AssemblyAI (direct mode)');
           }
-          console.warn(`⚠️ Direct upload failed after ${maxAttempts} attempts. Falling back to S3 for job ${jobId}`);
+          console.warn(`⚠️ Direct upload failed after ${maxAttempts} attempts. Trying S3 (last resort) for job ${jobId}`);
           uploadUrl = await this.uploadToS3AndGetUrl(jobId, job, audioBuffer);
         }
       }

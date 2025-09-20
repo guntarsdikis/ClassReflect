@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Container,
   Stepper,
@@ -51,6 +52,7 @@ interface CriterionConfig {
 
 export function UploadWizard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const { selectedSchool } = useSchoolContextStore();
   const [active, setActive] = useState(0);
@@ -217,8 +219,8 @@ export function UploadWizard() {
         return;
       }
 
-      const { jobId, uploadUrl, uploadHost, uploadPath } = await presignRes.json();
-      console.log('🚀 Frontend Upload Debug - Presigned URL details:', { uploadHost, uploadPath, hasUrl: !!uploadUrl });
+      const { jobId, uploadUrl, uploadHost, uploadPath, sse, sseKmsKeyId, acl, signingAccessKeyId } = await presignRes.json();
+      console.log('🚀 Frontend Upload Debug - Presigned URL details:', { uploadHost, uploadPath, hasUrl: !!uploadUrl, sse, sseKmsKeyId, acl, signingAccessKeyId });
       if (!jobId || !uploadUrl) {
         throw new Error('Invalid presigned URL response');
       }
@@ -234,6 +236,7 @@ export function UploadWizard() {
 
       // 2) PUT to S3 with progress
       console.log('🚀 Frontend Upload Debug - Uploading to S3:', { jobId });
+      let usedDirectFallback = false;
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.upload.addEventListener('progress', (event) => {
@@ -246,18 +249,80 @@ export function UploadWizard() {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
-            reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
+            // Extract S3 XML error details if present
+            let s3ErrorCode: string | undefined;
+            let s3ErrorMessage: string | undefined;
+            const body = xhr.responseText || '';
+            try {
+              const matchCode = body.match(/<Code>([^<]+)<\/Code>/i);
+              const matchMsg = body.match(/<Message>([^<]+)<\/Message>/i);
+              s3ErrorCode = matchCode?.[1];
+              s3ErrorMessage = matchMsg?.[1];
+            } catch {}
+            console.error('❌ S3 Upload Error', {
+              status: xhr.status,
+              statusText: xhr.statusText,
+              url: uploadUrl,
+              responseText: body?.slice(0, 1000)
+            });
+            const errText = s3ErrorCode || s3ErrorMessage
+              ? `S3 upload failed: ${xhr.status} ${xhr.statusText} (${s3ErrorCode}: ${s3ErrorMessage})`
+              : `S3 upload failed: ${xhr.status} ${xhr.statusText}`;
+            // Optional fallback for 403s within size limits
+            if (xhr.status === 403 && audioFile.size <= 500 * 1024 * 1024) {
+              console.warn('⚠️ S3 PUT 403. Attempting direct upload fallback...');
+              usedDirectFallback = true;
+              directUploadViaBackend(token)
+                .then(() => resolve())
+                .catch((e) => reject(e));
+              return;
+            }
+            reject(new Error(errText));
           }
         });
-        xhr.addEventListener('error', () => reject(new Error('S3 upload network error')));
+        xhr.addEventListener('error', () => {
+          console.error('❌ S3 upload network error', { url: uploadUrl });
+          reject(new Error('S3 upload network error'));
+        });
         xhr.addEventListener('timeout', () => reject(new Error('S3 upload timeout')));
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', audioFile.type || 'application/octet-stream');
+        // If backend indicates SSE is required, include matching headers so the signature is valid.
+        if (sse === 'AES256') {
+          xhr.setRequestHeader('x-amz-server-side-encryption', 'AES256');
+        } else if (sse === 'aws:kms') {
+          xhr.setRequestHeader('x-amz-server-side-encryption', 'aws:kms');
+          if (sseKmsKeyId) {
+            xhr.setRequestHeader('x-amz-server-side-encryption-aws-kms-key-id', sseKmsKeyId);
+          }
+        }
+        if (acl) {
+          xhr.setRequestHeader('x-amz-acl', acl);
+        }
         xhr.timeout = 4 * 60 * 60 * 1000; // up to 4 hours for very large files
         xhr.send(audioFile);
       });
 
-      // 3) Notify backend to start processing from S3
+      // 3) If we fell back to direct upload, skip S3 completion and finish here
+      if (usedDirectFallback) {
+        console.log('ℹ️ Frontend Upload Debug - Skipping S3 /complete due to direct fallback');
+        setIsUploading(false);
+        notifications.show({
+          title: 'Upload Successful',
+          message: 'Recording uploaded. Processing started.',
+          color: 'green',
+          icon: <IconCheck />,
+        });
+        // Invalidate recordings cache to trigger refresh
+        queryClient.invalidateQueries({ queryKey: ['recordings'] });
+        queryClient.invalidateQueries({ queryKey: ['teacher-recordings'] });
+        // Redirect based on user role
+        const redirectPath = user?.role === 'teacher' ? '/reports' : '/recordings';
+        navigate(redirectPath);
+        return; // do not proceed to /complete
+      }
+
+      // Otherwise, notify backend to start processing from S3
       const completeUrl = `${baseUrl}/api/upload/complete`;
       const completeRes = await fetch(completeUrl, {
         method: 'POST',
@@ -279,8 +344,13 @@ export function UploadWizard() {
         color: 'green',
         icon: <IconCheck />,
       });
+      // Invalidate recordings cache to trigger refresh
+      queryClient.invalidateQueries({ queryKey: ['recordings'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-recordings'] });
       // After successful upload, return to one-pager recordings view
-      navigate('/reports');
+      // Redirect based on user role
+        const redirectPath = user?.role === 'teacher' ? '/reports' : '/recordings';
+        navigate(redirectPath);
 
     } catch (error: any) {
       console.error('❌ Frontend Upload Debug - Error occurred:', error);
@@ -336,8 +406,13 @@ export function UploadWizard() {
       color: 'green',
       icon: <IconCheck />,
     });
+    // Invalidate recordings cache to trigger refresh
+    queryClient.invalidateQueries({ queryKey: ['recordings'] });
+    queryClient.invalidateQueries({ queryKey: ['teacher-recordings'] });
     // After successful upload, return to one-pager recordings view
-    navigate('/reports');
+    // Redirect based on user role
+        const redirectPath = user?.role === 'teacher' ? '/reports' : '/recordings';
+        navigate(redirectPath);
   };
   
   const nextStep = () => {

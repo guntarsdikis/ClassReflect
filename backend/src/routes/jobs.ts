@@ -3,6 +3,8 @@ import pool from '../database';
 import { RowDataPacket } from 'mysql2';
 import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } from '../middleware/auth';
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { processingService } from '../services/processing';
+import { assemblyAIService } from '../services/assemblyai';
 
 const router = Router();
 
@@ -540,5 +542,64 @@ router.delete('/:jobId',
     });
   }
 });
+
+// Re-transcribe an existing job (from S3 if available, else via stored AssemblyAI upload URL)
+// Teachers: only their own jobs; Managers: jobs in their school; Super admins: any job
+router.post('/:jobId/retranscribe',
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+
+      // Load job with minimal fields for access + processing
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        'SELECT id, teacher_id, school_id, s3_key, assemblyai_upload_url FROM audio_jobs WHERE id = ? LIMIT 1',
+        [jobId]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Job not found' });
+      const job = rows[0];
+
+      // Access control
+      if (req.user!.role === 'teacher' && job.teacher_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user!.role === 'school_manager' && job.school_id !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Clean up existing transcripts and word timestamps to avoid duplicates
+      try {
+        await pool.execute('DELETE FROM transcripts WHERE job_id = ?', [jobId]);
+      } catch {}
+      try {
+        await pool.execute('DELETE FROM word_timestamps WHERE job_id = ?', [jobId]);
+      } catch {}
+
+      // Reset status to queued and clear error
+      await pool.execute(
+        'UPDATE audio_jobs SET status = ?, error_message = NULL, processing_started_at = NULL, processing_completed_at = NULL WHERE id = ?',
+        ['queued', jobId]
+      );
+
+      // Prefer S3-based processing if we have an s3_key
+      if (job.s3_key) {
+        await processingService.enqueueJobFromS3(jobId);
+        return res.json({ jobId, mode: 's3', status: 'queued', message: 'Re-transcription started from S3 object' });
+      }
+
+      // Otherwise, retry with stored AssemblyAI upload URL (if present)
+      if (job.assemblyai_upload_url) {
+        await assemblyAIService.retryTranscription(jobId);
+        return res.json({ jobId, mode: 'assemblyai_url', status: 'processing', message: 'Re-transcription retried via AssemblyAI upload URL' });
+      }
+
+      return res.status(400).json({ error: 'No source available to retranscribe (missing s3_key and upload URL)' });
+    } catch (err) {
+      console.error('Retranscribe error:', err);
+      return res.status(500).json({ error: 'Failed to start re-transcription' });
+    }
+  }
+);
 
 export default router;

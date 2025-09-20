@@ -10,6 +10,7 @@ import { config } from '../config/environment';
 import { authenticate, authorize } from '../middleware/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { RequestChecksumCalculation } from '@aws-sdk/middleware-flexible-checksums';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const router = Router();
@@ -72,7 +73,15 @@ router.post('/presigned-put',
       }
 
       // Use AWS SDK v3 for S3 operations
-      const s3Client = new S3Client({ region });
+      // Important: disable automatic request checksum calculation for presigned URLs.
+      // If enabled, the SDK injects x-amz-checksum-* into the signature which the browser upload
+      // cannot match, resulting in 403/Signature or checksum errors on PUT.
+      const s3Client = new S3Client({ 
+        region,
+        // Only calculate checksums when absolutely required by the API model,
+        // preventing x-amz-checksum-* from being added to the presigned URL.
+        requestChecksumCalculation: RequestChecksumCalculation.WHEN_REQUIRED
+      });
       const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
       const s3Key = `uploads/jobs/${jobId}/${safeName}`;
 
@@ -152,11 +161,26 @@ router.post('/presigned-put',
 
       // Generate presigned PUT URL using AWS SDK v3
       const putExpires = parseInt(process.env.S3_PRESIGNED_PUT_EXPIRES_SECONDS || '14400', 10);
-      const cmd = new PutObjectCommand({
+      // Optional server-side encryption support, controlled via env
+      const sseAlgorithm = (process.env.S3_SSE || '').trim(); // 'AES256' or 'aws:kms'
+      const sseKmsKeyId = (process.env.S3_SSE_KMS_KEY_ID || '').trim();
+      const putParams: any = {
         Bucket: bucket,
         Key: s3Key,
         ContentType: fileType || 'application/octet-stream'
-      });
+      };
+      // Optional ACL support if bucket policy requires it
+      const acl = (process.env.S3_PUT_ACL || '').trim(); // e.g., 'bucket-owner-full-control'
+      if (acl) {
+        putParams.ACL = acl as any;
+      }
+      if (sseAlgorithm === 'AES256') {
+        putParams.ServerSideEncryption = 'AES256';
+      } else if (sseAlgorithm === 'aws:kms') {
+        putParams.ServerSideEncryption = 'aws:kms';
+        if (sseKmsKeyId) putParams.SSEKMSKeyId = sseKmsKeyId;
+      }
+      const cmd = new PutObjectCommand(putParams);
       
       const uploadUrl = await getSignedUrl(s3Client, cmd, { 
         expiresIn: isNaN(putExpires) ? 3600 : putExpires 
@@ -164,7 +188,16 @@ router.post('/presigned-put',
       
       try {
         const u = new URL(uploadUrl);
+        const accessKeyId = (process.env.AWS_ACCESS_KEY_ID || '').toString();
+        const maskedKey = accessKeyId ? `${accessKeyId.slice(0,4)}...${accessKeyId.slice(-4)}` : 'N/A';
         console.log(`📝 Presigned PUT generated for ${bucket}/${s3Key} -> host=${u.host} path=${u.pathname} (exp=${isNaN(putExpires) ? 3600 : putExpires}s)`);
+        console.log('   Presign params:', {
+          contentType: putParams.ContentType,
+          sse: putParams.ServerSideEncryption || null,
+          sseKmsKeyId: putParams.SSEKMSKeyId || null,
+          acl: putParams.ACL || null,
+          signingAccessKeyId: maskedKey
+        });
       } catch (e) {
         console.error('Presign URL parse error:', e);
       }
@@ -177,7 +210,15 @@ router.post('/presigned-put',
         uploadHost = u.host;
         uploadPath = u.pathname;
       } catch {}
-      res.json({ jobId, uploadUrl, uploadHost, uploadPath, s3Key, bucket, region });
+      const accessKeyId = (process.env.AWS_ACCESS_KEY_ID || '').toString();
+      const maskedKey = accessKeyId ? `${accessKeyId.slice(0,4)}...${accessKeyId.slice(-4)}` : null;
+      res.json({ 
+        jobId, uploadUrl, uploadHost, uploadPath, s3Key, bucket, region,
+        sse: putParams.ServerSideEncryption || null,
+        sseKmsKeyId: putParams.SSEKMSKeyId || null,
+        acl: acl || null,
+        signingAccessKeyId: maskedKey
+      });
     } catch (error) {
       console.error('Presigned URL error:', error);
       res.status(500).json({ error: 'Failed to generate presigned URL' });
@@ -335,6 +376,20 @@ router.post('/complete',
 
       if (!job.s3_key) {
         return res.status(400).json({ error: 'No S3 key associated with job; cannot start processing' });
+      }
+
+      // Verify the object actually exists in S3 before enqueueing processing
+      try {
+        const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET;
+        const region = process.env.AWS_REGION || 'eu-west-2';
+        const s3 = new S3Client({ region });
+        const { HeadObjectCommand } = await import('@aws-sdk/client-s3');
+        await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: job.s3_key }));
+        console.log(`✅ S3 object exists for job ${jobId}: s3://${bucket}/${job.s3_key}`);
+      } catch (headErr: any) {
+        const code = headErr?.name || headErr?.$metadata?.httpStatusCode;
+        console.warn(`⚠️ S3 HEAD failed for job ${jobId}:`, code, headErr?.message || headErr);
+        return res.status(400).json({ error: 'S3 object not found for this job. Upload likely failed.' });
       }
 
       // Transition to queued, then enqueue processing from S3

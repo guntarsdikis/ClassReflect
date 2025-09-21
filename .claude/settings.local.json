@@ -121,7 +121,8 @@
       "mcp__context7__get-library-docs",
       "Bash(pandoc:*)",
       "Bash(open:*)",
-      "Bash(scripts/deployment/deploy.sh:*)"
+      "Bash(scripts/deployment/deploy.sh:*)",
+      "Read(//tmp/**)"
     ],
     "deny": [
       "Bash(npm start)",

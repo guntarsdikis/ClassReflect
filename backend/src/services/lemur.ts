@@ -64,16 +64,16 @@ ${criteriaDescriptions}
 
 Please analyze this classroom transcript and provide:
 
-1. OVERALL SCORE: A single numerical score (0-100) representing overall teaching effectiveness
-2. STRENGTHS: 3-5 specific strengths demonstrated in the lesson
-3. IMPROVEMENTS: 3-5 specific, actionable recommendations for improvement
-4. DETAILED FEEDBACK: For each criterion, provide:
-   - A score (0-100)
+1. STRENGTHS: 3-5 specific strengths demonstrated in the lesson
+2. IMPROVEMENTS: 3-5 specific, actionable recommendations for improvement
+3. DETAILED FEEDBACK: For each criterion listed above, provide:
+   - A score (0-100) for that specific criterion
    - Specific feedback with examples from the transcript
+
+IMPORTANT: Do NOT calculate an overall score. Only provide individual scores for each criterion.
 
 Format your response as valid JSON with this structure:
 {
-  "overall_score": number,
   "strengths": ["strength1", "strength2", ...],
   "improvements": ["improvement1", "improvement2", ...],
   "detailed_feedback": {
@@ -147,13 +147,21 @@ Base your analysis on evidence from the transcript. Be specific and constructive
         }
         
         const analysisResult = JSON.parse(jsonResponse);
+
+        // Calculate weighted average overall score
+        const overallScore = this.calculateWeightedScore(analysisResult.detailed_feedback, criterions);
+
+        // Add the calculated overall score to the result
+        analysisResult.overall_score = overallScore;
+
         console.log('✅ AssemblyAI LeMUR analysis completed:', {
           requestId: response.data.request_id,
           inputTokens: response.data.usage.input_tokens,
           outputTokens: response.data.usage.output_tokens,
-          overallScore: analysisResult.overall_score
+          overallScore: overallScore,
+          calculatedFromWeights: true
         });
-        
+
         return analysisResult;
       } catch (parseError) {
         console.error('❌ Failed to parse LeMUR response as JSON:', parseError);
@@ -175,11 +183,38 @@ Base your analysis on evidence from the transcript. Be specific and constructive
   }
 
   /**
+   * Calculate weighted average score from individual criterion scores
+   */
+  private calculateWeightedScore(
+    detailedFeedback: Record<string, { score: number; feedback: string }>,
+    criterions: TemplateCriterion[]
+  ): number {
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    criterions.forEach(criterion => {
+      const feedback = detailedFeedback[criterion.criteria_name];
+      if (feedback && typeof feedback.score === 'number') {
+        weightedSum += feedback.score * criterion.weight;
+        totalWeight += criterion.weight;
+      } else {
+        console.warn(`⚠️ Missing score for criterion: ${criterion.criteria_name}`);
+      }
+    });
+
+    // If total weight is not 100 (shouldn't happen but just in case), normalize
+    const overallScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+    // Round to 2 decimal places
+    return Math.round(overallScore * 100) / 100;
+  }
+
+  /**
    * Generate mock analysis data as fallback
    */
   private generateMockAnalysis(criterions: TemplateCriterion[]) {
     const mockAnalysis = {
-      overall_score: Math.round((Math.random() * 30 + 70) * 100) / 100, // 70-100 score
+      overall_score: 0, // Will be calculated from weighted average
       strengths: [
         "Clear explanation of concepts with good use of examples",
         "Effective questioning techniques to engage students",
@@ -203,6 +238,9 @@ Base your analysis on evidence from the transcript. Be specific and constructive
         feedback: `The teacher demonstrates ${score >= 80 ? 'strong' : score >= 70 ? 'adequate' : 'developing'} skills in ${criterion.criteria_name.toLowerCase()}. ${score >= 80 ? 'This is a clear strength that supports student learning effectively.' : score >= 70 ? 'There are good elements present with room for enhancement.' : 'This area would benefit from focused improvement strategies.'}`
       };
     });
+
+    // Calculate weighted average for overall score
+    mockAnalysis.overall_score = this.calculateWeightedScore(mockAnalysis.detailed_feedback, criterions);
 
     return mockAnalysis;
   }

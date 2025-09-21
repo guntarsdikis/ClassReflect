@@ -189,24 +189,64 @@ Base your analysis on evidence from the transcript. Be specific and constructive
     detailedFeedback: Record<string, { score: number; feedback: string }>,
     criterions: TemplateCriterion[]
   ): number {
+    // Normalize key helper to make name matching resilient to small variations
+    const normalize = (s: string) => s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+
+    // Build a normalized lookup from returned feedback
+    const feedbackMap: Record<string, { score: number; feedback: string } | undefined> = {};
+    Object.entries(detailedFeedback || {}).forEach(([key, value]) => {
+      const normKey = normalize(key);
+      feedbackMap[normKey] = value as any;
+    });
+
     let weightedSum = 0;
     let totalWeight = 0;
+    const collectedScores: number[] = [];
 
     criterions.forEach(criterion => {
-      const feedback = detailedFeedback[criterion.criteria_name];
-      if (feedback && typeof feedback.score === 'number') {
-        weightedSum += feedback.score * criterion.weight;
-        totalWeight += criterion.weight;
+      const normCrit = normalize(criterion.criteria_name);
+      const feedback = detailedFeedback[criterion.criteria_name] ?? feedbackMap[normCrit];
+      if (feedback && (feedback as any).score !== undefined) {
+        // Coerce score to number safely (handles strings like "85" or "85%")
+        const rawScore = (feedback as any).score;
+        const scoreNum = typeof rawScore === 'number'
+          ? rawScore
+          : Number(String(rawScore).replace(/%/g, '').trim());
+
+        // Coerce weight to number (mysql DECIMAL often returns strings)
+        const weightNum = typeof (criterion as any).weight === 'number'
+          ? (criterion as any).weight
+          : Number((criterion as any).weight);
+
+        if (!Number.isNaN(scoreNum) && !Number.isNaN(weightNum) && weightNum > 0) {
+          weightedSum += scoreNum * weightNum;
+          totalWeight += weightNum;
+          collectedScores.push(scoreNum);
+        } else {
+          console.warn(`⚠️ Invalid score/weight for criterion "${criterion.criteria_name}":`, { rawScore, weight: criterion.weight });
+        }
       } else {
         console.warn(`⚠️ Missing score for criterion: ${criterion.criteria_name}`);
       }
     });
 
-    // If total weight is not 100 (shouldn't happen but just in case), normalize
-    const overallScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+    // Primary: weighted average if we have valid weights
+    if (totalWeight > 0) {
+      const overallScore = weightedSum / totalWeight;
+      return Math.round(overallScore * 100) / 100;
+    }
 
-    // Round to 2 decimal places
-    return Math.round(overallScore * 100) / 100;
+    // Fallback: simple average if no weights resolved but we did collect numbers
+    if (collectedScores.length > 0) {
+      const avg = collectedScores.reduce((a, b) => a + b, 0) / collectedScores.length;
+      return Math.round(avg * 100) / 100;
+    }
+
+    // No usable scores
+    return 0;
   }
 
   /**

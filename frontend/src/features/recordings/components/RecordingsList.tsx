@@ -20,6 +20,8 @@ import {
   Grid,
   Paper,
   RangeSlider,
+  Switch,
+  Menu,
 } from '@mantine/core';
 import {
   IconSearch,
@@ -47,7 +49,7 @@ import { format } from 'date-fns';
 import { notifications } from '@mantine/notifications';
 import { DatePickerInput } from '@mantine/dates';
 import { useAuthStore } from '@store/auth.store';
-import { RecordingsService, type Recording, type RecordingsFilters } from '../services/recordings.service';
+import { RecordingsService, type Recording, type RecordingsFilters, type WordTimestamp } from '../services/recordings.service';
 import { schoolsService } from '@features/schools/services/schools.service';
 import { templatesService, type Template } from '@features/templates/services/templates.service';
 import { analysisService, type AnalysisResult } from '@features/analysis/services/analysis.service';
@@ -92,6 +94,34 @@ export function RecordingsList() {
   const [analysisSelectionModalOpened, setAnalysisSelectionModalOpened] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
   const [downloadingRecordingId, setDownloadingRecordingId] = useState<string | null>(null);
+  const [downloadingTranscriptId, setDownloadingTranscriptId] = useState<string | null>(null);
+  // Detailed transcript view state
+  const [detailedView, setDetailedView] = useState(false);
+  const [wordTimestamps, setWordTimestamps] = useState<WordTimestamp[]>([]);
+  const [loadingWords, setLoadingWords] = useState(false);
+
+  const formatTimestamp = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return '00:00.000';
+    const ms = Math.round((seconds % 1) * 1000);
+    const totalSeconds = Math.floor(seconds);
+    const s = totalSeconds % 60;
+    const m = Math.floor(totalSeconds / 60);
+    const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+    return `${pad(m)}:${pad(s)}.${pad(ms, 3)}`;
+  };
+
+  const loadWordTimestamps = async (jobId: string) => {
+    try {
+      setLoadingWords(true);
+      const words = await RecordingsService.getWordTimestamps(jobId);
+      setWordTimestamps(words);
+    } catch (e: any) {
+      notifications.show({ title: 'Failed to load details', message: e?.response?.data?.error || e?.message || 'Could not load word timestamps', color: 'red' });
+      setWordTimestamps([]);
+    } finally {
+      setLoadingWords(false);
+    }
+  };
 
   const handleDownloadPDF = async (analysis: AnalysisResult) => {
     try {
@@ -194,6 +224,25 @@ export function RecordingsList() {
       setPlaybackModalOpened(true);
     } catch (e: any) {
       notifications.show({ title: 'Playback Error', message: e?.message || 'Unable to get audio URL', color: 'red' });
+    }
+  };
+
+  const handleDownloadTranscript = async (recording: Recording, format: 'csv' | 'srt') => {
+    try {
+      setDownloadingTranscriptId(recording.id);
+      const { blob, filename } = await RecordingsService.downloadTimecodedTranscript(recording.id, format);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      notifications.show({ title: 'Download Failed', message: e?.response?.data?.error || e?.message || 'Could not download transcript', color: 'red' });
+    } finally {
+      setDownloadingTranscriptId(null);
     }
   };
 
@@ -749,6 +798,26 @@ export function RecordingsList() {
                             </ActionIcon>
                           )}
 
+                          {user?.role === 'super_admin' && (
+                            <Menu withArrow position="bottom-end" shadow="sm">
+                              <Menu.Target>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="blue"
+                                  title="Download timecoded transcript"
+                                  loading={downloadingTranscriptId === recording.id}
+                                >
+                                  <IconFileText size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Label>Transcript format</Menu.Label>
+                                <Menu.Item onClick={() => handleDownloadTranscript(recording, 'csv')}>CSV (word-level)</Menu.Item>
+                                <Menu.Item onClick={() => handleDownloadTranscript(recording, 'srt')}>SRT (subtitle)</Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          )}
+
                           {/* Only show delete button for school managers and super admins */}
                           {(['school_manager', 'super_admin'].includes(user?.role || '')) && (
                             <ActionIcon
@@ -812,13 +881,59 @@ export function RecordingsList() {
                   {Math.round(selectedRecording.confidence_score * 100)}% confidence
                 </Badge>
               )}
+              <Group ml="auto" gap="xs">
+                <Switch
+                  size="sm"
+                  label={<Text size="sm" c="dimmed">Detailed view</Text>}
+                  checked={detailedView}
+                  onChange={async (e) => {
+                    const on = e.currentTarget.checked;
+                    setDetailedView(on);
+                    if (on && wordTimestamps.length === 0) {
+                      await loadWordTimestamps(selectedRecording.id);
+                    }
+                  }}
+                />
+              </Group>
             </Group>
 
             {/* Transcript Text */}
-            <Card p="md" withBorder style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              <Text style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                {selectedRecording.transcript_text || 'No transcript text available.'}
-              </Text>
+            <Card p="md" withBorder style={{ maxHeight: '420px', overflowY: 'auto' }}>
+              {detailedView ? (
+                loadingWords ? (
+                  <Group justify="center"><Loader /></Group>
+                ) : wordTimestamps.length === 0 ? (
+                  <Text c="dimmed" size="sm">No detailed timestamps available.</Text>
+                ) : (
+                  <div style={{ lineHeight: 1.8 }}>
+                    {(() => {
+                      const threshold = 3.0; // seconds
+                      let lastEnd = wordTimestamps[0]?.start_time ?? 0;
+                      return wordTimestamps.map((w, idx) => {
+                        const gap = idx === 0 ? 0 : Math.max(0, w.start_time - lastEnd);
+                        lastEnd = Math.max(lastEnd, w.end_time);
+                        return (
+                          <span key={idx} style={{ marginRight: 8 }}>
+                            {gap >= threshold && (
+                              <Badge color="orange" variant="light" style={{ marginRight: 8 }}>
+                                Pause {gap.toFixed(2)}s
+                              </Badge>
+                            )}
+                            <Text span c="dimmed" style={{ marginRight: 6 }}>
+                              [{formatTimestamp(w.start_time)}]
+                            </Text>
+                            <Text span fw={500}>{w.word_text}</Text>
+                          </span>
+                        );
+                      });
+                    })()}
+                  </div>
+                )
+              ) : (
+                <Text style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  {selectedRecording.transcript_text || 'No transcript text available.'}
+                </Text>
+              )}
             </Card>
 
             {/* Actions */}

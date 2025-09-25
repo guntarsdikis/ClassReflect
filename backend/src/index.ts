@@ -17,6 +17,7 @@ import schoolsRoutes from './routes/schools';
 import teachersRoutes from './routes/teachers';
 import templatesRoutes from './routes/templates';
 import analysisRoutes, { initializeAnalysisRoutes } from './routes/analysis';
+import settingsRoutes, { initializeSettingsRoutes } from './routes/settings';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -72,6 +73,7 @@ const { authRoutes, usersRoutes } = initializeAuth(pool);
 
 // Initialize analysis routes
 initializeAnalysisRoutes(pool);
+initializeSettingsRoutes(pool);
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -83,6 +85,7 @@ app.use('/api/teachers', teachersRoutes);
 app.use('/api/templates', templatesRoutes);
 console.log('🔧 Mounting analysis routes at /api/analysis');
 app.use('/api/analysis', analysisRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

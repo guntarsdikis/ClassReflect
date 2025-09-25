@@ -2,7 +2,12 @@ import { Router, Request, Response } from 'express';
 import { Pool } from 'mysql2/promise';
 import { randomUUID } from 'crypto';
 import { authenticate, authorize } from '../middleware/auth';
+import { analyzeWithTemplateUsingProvider } from '../services/analysisProvider';
 import { lemurService } from '../services/lemur';
+import { savePromptMarkdown } from '../services/promptLogger';
+import { computePauseMetrics } from '../services/pauseMetrics';
+import { buildTimingContext } from '../services/timingContext';
+import { getAnalysisSettings } from '../services/systemSettings';
 
 const router = Router();
 let pool: Pool;
@@ -71,14 +76,47 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
     console.log(`📊 Processing analysis for transcript ${job.transcript_id} with template "${job.template_name}"`);
     console.log(`📝 Using ${criterions.length} criterions:`, criterions.map((c: any) => c.criteria_name));
 
+    const pauseMetrics = await computePauseMetrics(pool, job.job_id);
+    const timingContext = await buildTimingContext(pool, job.job_id);
+    if (pauseMetrics) {
+      console.log('⏱️  Pause metrics computed:', {
+        totalSilenceSeconds: pauseMetrics.totalSilenceSeconds,
+        averageSilenceSeconds: pauseMetrics.averageSilenceSeconds,
+        longSilenceCount: pauseMetrics.longSilenceCount,
+        longestSilenceSeconds: pauseMetrics.longestSilenceSeconds
+      });
+    } else {
+      console.log('⏱️  Pause metrics unavailable (insufficient data)');
+    }
+    if (timingContext) {
+      console.log('🕒 Timing context prepared (excerpt):', timingContext.slice(0, 200) + (timingContext.length > 200 ? '…' : ''));
+    } else {
+      console.log('🕒 Timing context unavailable (no word timestamps)');
+    }
+
     // Update progress
     await pool.execute(`
       UPDATE analysis_jobs SET progress_percent = 30 WHERE id = ?
     `, [analysisJobId]);
 
-    // Perform AI analysis using LeMUR with template criterions
-    const analysisResults = await lemurService.analyzeWithTemplate(
-      job.external_id, // AssemblyAI transcript ID
+    // Determine provider and optional model from system settings (DB), fall back to env defaults
+    const { provider, openai_model } = await getAnalysisSettings(pool);
+    const openaiModelToUse = openai_model || process.env.OPENAI_MODEL || 'gpt-4o';
+    const aiModelIdentifier = provider === 'openai'
+      ? `openai/${openaiModelToUse}`
+      : 'anthropic/claude-sonnet-4-20250514';
+
+    console.log('🤖 Analysis provider selected:', {
+      analysisJobId,
+      provider,
+      aiModel: aiModelIdentifier,
+      criterions: criterions.length,
+      transcriptId: job.external_id,
+      hasPauseMetrics: !!pauseMetrics
+    });
+
+    // Build the unified analysis prompt (instructions)
+    const instructions = lemurService.buildAnalysisPrompt(
       job.template_name,
       criterions,
       {
@@ -86,8 +124,99 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
         subject: job.subject || 'Subject',
         grade: job.grade || 'Grade',
         teacherName: `${job.first_name} ${job.last_name}`
-      }
+      },
+      { pauseMetrics, timingContext: timingContext || undefined }
     );
+
+    // Unified prompt payload for logging (same for both providers)
+    const unifiedPromptForLog = `${instructions}\n\nTRANSCRIPT (plain text):\n${job.transcript_text}`;
+
+    // Save prompt to markdown for auditing/debugging (best-effort)
+    await savePromptMarkdown({
+      analysisJobId,
+      provider,
+      model: aiModelIdentifier,
+      jobId: job.job_id,
+      transcriptId: job.external_id,
+      templateName: job.template_name,
+      criterions,
+      pauseMetrics,
+      timingContext,
+      promptContent: unifiedPromptForLog
+    });
+
+    // Perform AI analysis using selected provider
+    let analysisResults = await analyzeWithTemplateUsingProvider(provider, {
+      transcriptId: job.external_id, // For LeMUR
+      transcriptText: job.transcript_text, // For OpenAI
+      templateName: job.template_name,
+      criterions,
+      classInfo: {
+        className: job.class_name || 'Class',
+        subject: job.subject || 'Subject',
+        grade: job.grade || 'Grade',
+        teacherName: `${job.first_name} ${job.last_name}`
+      }
+    }, { openaiModel: openaiModelToUse, pauseMetrics, timingContext });
+
+    // Ensure every criterion has a score; fill missing per rubric (≤20 when no evidence)
+    try {
+      const normalize = (s: string) => (s || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+
+      const detailed = analysisResults?.detailed_feedback || {} as Record<string, any>;
+      const normMap: Record<string, string> = {};
+      Object.keys(detailed).forEach((k) => {
+        normMap[normalize(k)] = k;
+      });
+
+      let patched = false;
+      const completed: Record<string, any> = { ...detailed };
+      for (const crit of criterions) {
+        const exact = completed[crit.criteria_name];
+        const byNorm = completed[normMap[normalize(crit.criteria_name)]];
+        const entry = exact ?? byNorm;
+        if (!entry || typeof entry.score === 'undefined') {
+          patched = true;
+          completed[crit.criteria_name] = {
+            score: 55,
+            feedback: 'No transcript evidence available. Assigning motivational baseline per rubric (Baseline / Absent but improvable 55–65).',
+            evidence_excerpt: ['No transcript evidence available.'],
+            evidence_timestamp: [],
+            observed_vs_target: 'No observed data vs target.',
+            next_step_teacher_move: 'Add one concrete move aligned to this criterion next lesson (e.g., post the objective and reference it, count 3–5s of wait time, aim for 8–12 cold calls).',
+            vision_of_better_practice: 'With this move in place, you’ll increase student clarity and participation; more voices and clearer goals will make the learning feel livelier and more effective.',
+            exemplar: 'Model: “I’m going to give us 5 seconds of think time… (silently count to 5)… Okay, who can start us off?”',
+            look_fors: ['Teacher gives explicit think time', 'Multiple students respond'],
+            avoid: ['Rushing to answer without wait time']
+          };
+        }
+        // Clamp any present scores below the motivational floor up to 55
+        else if (typeof entry.score !== 'undefined') {
+          const s = Number(entry.score);
+          if (Number.isFinite(s) && s < 55) {
+            patched = true;
+            completed[crit.criteria_name] = {
+              ...entry,
+              score: 55,
+              feedback: (entry.feedback ? String(entry.feedback) + ' ' : '') + '(Adjusted to motivational floor ≥55.)'
+            };
+          }
+        }
+      }
+
+      if (patched) {
+        analysisResults = {
+          ...analysisResults,
+          detailed_feedback: completed,
+          overall_score: lemurService.calculateWeightedScore(completed, criterions, { silentMissing: true })
+        };
+      }
+    } catch (e) {
+      console.warn('⚠️ Post-processing to fill missing criterion scores failed:', (e as any)?.message || e);
+    }
 
     // Update progress
     await pool.execute(`
@@ -104,13 +233,15 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
         overall_score = ?,
         strengths = ?,
         improvements = ?,
-        detailed_feedback = ?
+        detailed_feedback = ?,
+        ai_model = ?
       WHERE id = ?
     `, [
       analysisResults.overall_score,
       JSON.stringify(analysisResults.strengths),
       JSON.stringify(analysisResults.improvements),
       JSON.stringify(analysisResults.detailed_feedback),
+      aiModelIdentifier,
       analysisJobId
     ]);
 
@@ -119,7 +250,7 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
       INSERT INTO analysis_results (
         transcript_id, job_id, teacher_id, school_id, template_id, applied_by,
         overall_score, strengths, improvements, detailed_feedback, ai_model
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'anthropic/claude-sonnet-4-20250514')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       job.transcript_id,
       job.job_id,
@@ -130,13 +261,16 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
       analysisResults.overall_score,
       JSON.stringify(analysisResults.strengths),
       JSON.stringify(analysisResults.improvements),
-      JSON.stringify(analysisResults.detailed_feedback)
+      JSON.stringify(analysisResults.detailed_feedback),
+      aiModelIdentifier
     ]);
 
     console.log(`✅ Analysis job ${analysisJobId} completed successfully`);
 
-  } catch (error) {
-    console.error(`❌ Analysis job ${analysisJobId} failed:`, error);
+  } catch (error: any) {
+    const nestedMsg = error?.response?.data?.error?.message || error?.response?.data?.message;
+    const fullMsg = nestedMsg ? `${error.message || String(error)} | ${nestedMsg}` : (error?.message || String(error));
+    console.error(`❌ Analysis job ${analysisJobId} failed:`, fullMsg);
     
     // Update job status to failed
     await pool.execute(`
@@ -147,7 +281,7 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
         error_message = ?
       WHERE id = ?
     `, [
-      error instanceof Error ? error.message : String(error),
+      fullMsg.substring(0, 500),
       analysisJobId
     ]);
     
@@ -312,7 +446,9 @@ router.post('/apply-template',
       
       // Allow multiple analyses - users can analyze the same recording with different templates
       // or re-analyze with the same template to compare results over time
+      const currentSettings = await getAnalysisSettings(pool);
       console.log(`📊 Proceeding with analysis - multiple analyses per recording are allowed`);
+      console.log(`🤖 Analysis provider (current): ${currentSettings.provider}`);
 
       // Create background analysis job instead of processing immediately
       console.log(`🔄 Creating background analysis job for transcript ${transcriptId} with template "${template.template_name}"`);

@@ -122,7 +122,10 @@
       "Bash(pandoc:*)",
       "Bash(open:*)",
       "Bash(scripts/deployment/deploy.sh:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Read(//Users/guntarsdikis/Desktop/**)",
+      "Bash(awk:*)",
+      "Bash(unset:*)"
     ],
     "deny": [
       "Bash(npm start)",

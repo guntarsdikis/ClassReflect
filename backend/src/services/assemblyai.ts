@@ -154,7 +154,8 @@ class AssemblyAIService {
           audio_url: uploadUrl,
           speech_model: 'best' as const,
           punctuate: true,
-          format_text: true
+          format_text: true,
+          word_timestamps: true
         };
         if (this.languageCode === 'auto') {
           params.language_detection = true;
@@ -247,7 +248,8 @@ class AssemblyAIService {
         audio_url: presignedUrl,
         speech_model: 'best' as const,
         punctuate: true,
-        format_text: true
+        format_text: true,
+        word_timestamps: true
       };
       if (this.languageCode === 'auto') {
         params.language_detection = true;

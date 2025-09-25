@@ -212,3 +212,26 @@ Comprehensive documentation is available in the `/docs` directory:
 ## Support
 
 For issues or questions, please check the [documentation](docs/README.md) or create an issue on GitHub.
+
+## Analysis Provider (LeMUR vs OpenAI)
+
+The platform supports two AI providers for criteria-based analysis:
+
+- LeMUR (AssemblyAI) using Claude (default)
+- OpenAI Chat Completions (e.g., gpt-4o, gpt-4o)
+
+Configure via `backend/.env`:
+
+- `ANALYSIS_PROVIDER=lemur` | `openai`
+- `ASSEMBLYAI_API_KEY=...` (required for `lemur`)
+- `OPENAI_API_KEY=...` (required for `openai`)
+- `OPENAI_MODEL=gpt-4o-mini` (or `gpt-4o`, etc.)
+
+Switching provider doesn’t change the rubric or weighting — only which model generates the per‑criterion scores. The backend calculates the weighted overall score consistently across providers.
+
+Super admins can change the active provider at runtime on `/settings` in the web app. Model keys remain in the backend `.env` for security.
+
+does assemblyai provides for analisys also pause and quiet time information? if provides does it include them for analysis prompt? can you check it?
+
+
+Detailed Analysis by Category explanation the text is quite short, maybe a little more could be added?

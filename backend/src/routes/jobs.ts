@@ -703,4 +703,221 @@ router.get('/:jobId/download',
   }
 });
 
+// Helper formatters for timecoded exports
+function formatSrtTime(seconds: number): string {
+  const msTotal = Math.max(0, Math.round(seconds * 1000));
+  const ms = msTotal % 1000;
+  const totalSeconds = Math.floor(msTotal / 1000);
+  const s = totalSeconds % 60;
+  const m = Math.floor((totalSeconds / 60) % 60);
+  const h = Math.floor(totalSeconds / 3600);
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)},${String(ms).padStart(3, '0')}`;
+}
+
+function formatVttTime(seconds: number): string {
+  const msTotal = Math.max(0, Math.round(seconds * 1000));
+  const ms = msTotal % 1000;
+  const totalSeconds = Math.floor(msTotal / 1000);
+  const s = totalSeconds % 60;
+  const m = Math.floor((totalSeconds / 60) % 60);
+  const h = Math.floor(totalSeconds / 3600);
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)}.${String(ms).padStart(3, '0')}`;
+}
+
+// Download timecoded transcript (super admin only)
+router.get('/:jobId/transcript/download',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+      const { format = 'csv' } = req.query as { format?: string };
+
+      // Validate job exists
+      const [jobRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT id, file_name, class_name FROM audio_jobs WHERE id = ? LIMIT 1',
+        [jobId]
+      );
+      if (!jobRows.length) return res.status(404).json({ error: 'Job not found' });
+      const job = jobRows[0] as any;
+
+      // Load word timestamps
+      let words: Array<{ word_index: number; word_text: string; start_time: number; end_time: number; confidence: number }>; 
+      try {
+        const [rows] = await pool.execute<RowDataPacket[]>(
+          `SELECT word_index, word_text, start_time, end_time, confidence
+           FROM word_timestamps
+           WHERE job_id = ?
+           ORDER BY word_index ASC`,
+          [jobId]
+        );
+        words = (rows as any[]).map(r => ({
+          word_index: Number(r.word_index),
+          word_text: r.word_text,
+          start_time: Number(r.start_time),
+          end_time: Number(r.end_time),
+          confidence: Number(r.confidence)
+        }));
+      } catch (err: any) {
+        if (err?.code === 'ER_NO_SUCH_TABLE') {
+          words = [];
+        } else {
+          throw err;
+        }
+      }
+
+      if (!words || words.length === 0) {
+        return res.status(400).json({ error: 'No word timestamps available for this recording' });
+      }
+
+      const baseName = (job.class_name || job.file_name || `recording_${jobId}`)
+        .toString()
+        .replace(/[^a-zA-Z0-9._-]/g, '_');
+
+      // Build content by format
+      const fmt = (format || 'csv').toString().toLowerCase();
+
+      if (fmt === 'csv') {
+        const header = 'word_index,start_time,end_time,word_text,confidence';
+        const rows = words.map(w => [
+          w.word_index,
+          w.start_time.toFixed(3),
+          w.end_time.toFixed(3),
+          '"' + (w.word_text || '').replace(/"/g, '""') + '"',
+          w.confidence.toFixed(4)
+        ].join(','));
+        const csv = [header, ...rows].join('\n');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${baseName}_timecoded.csv"`);
+        return res.send(csv);
+      }
+
+      if (fmt === 'json') {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${baseName}_timecoded.json"`);
+        return res.send(JSON.stringify({ jobId, words }, null, 2));
+      }
+
+      // Build segments for SRT/VTT/TXT
+      const gapThreshold = 1.5; // seconds between segments
+      const maxDuration = 10.0; // max segment length in seconds
+      type Segment = { start: number; end: number; text: string };
+      const segments: Segment[] = [];
+
+      let segStart = words[0].start_time;
+      let segEnd = words[0].end_time;
+      let buffer: string[] = [words[0].word_text];
+      for (let i = 1; i < words.length; i++) {
+        const w = words[i];
+        const gap = Math.max(0, w.start_time - segEnd);
+        const durationIfAdded = Math.max(segEnd, w.end_time) - segStart;
+        const shouldBreak = gap >= gapThreshold || durationIfAdded > maxDuration;
+        if (shouldBreak) {
+          segments.push({ start: segStart, end: segEnd, text: buffer.join(' ') });
+          segStart = w.start_time;
+          buffer = [w.word_text];
+        } else {
+          buffer.push(w.word_text);
+        }
+        segEnd = Math.max(segEnd, w.end_time);
+      }
+      if (buffer.length) {
+        segments.push({ start: segStart, end: segEnd, text: buffer.join(' ') });
+      }
+
+      if (fmt === 'srt') {
+        const srt = segments.map((s, idx) => `${idx + 1}\n${formatSrtTime(s.start)} --> ${formatSrtTime(s.end)}\n${s.text}\n`).join('\n');
+        res.setHeader('Content-Type', 'application/x-subrip; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${baseName}.srt"`);
+        return res.send(srt);
+      }
+
+      if (fmt === 'vtt') {
+        const body = segments.map((s) => `${formatVttTime(s.start)} --> ${formatVttTime(s.end)}\n${s.text}\n`).join('\n');
+        const vtt = `WEBVTT\n\n${body}`;
+        res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${baseName}.vtt"`);
+        return res.send(vtt);
+      }
+
+      if (fmt === 'txt') {
+        const lines = segments.map(s => `[${formatVttTime(s.start)} - ${formatVttTime(s.end)}] ${s.text}`);
+        const txt = lines.join('\n');
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${baseName}_timecoded.txt"`);
+        return res.send(txt);
+      }
+
+      return res.status(400).json({ error: 'Unsupported format. Use csv|json|srt|vtt|txt' });
+    } catch (error) {
+      console.error('❌ Transcript download failed:', error);
+      res.status(500).json({ error: 'Failed to generate transcript export' });
+    }
+  }
+);
+
+// Get word-level timestamps for a recording (detailed transcript)
+// Teachers: only their own jobs; Managers: jobs in their school; Super admins: any job
+router.get('/:jobId/word-timestamps',
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+
+      // First load minimal job info for access checks
+      const [jobRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT id, teacher_id, school_id FROM audio_jobs WHERE id = ? LIMIT 1',
+        [jobId]
+      );
+
+      if (!jobRows.length) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      const job = jobRows[0] as any;
+
+      // Access control mirrors /:jobId route
+      if (req.user!.role === 'teacher' && job.teacher_id !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user!.role === 'school_manager' && job.school_id !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      try {
+        const [rows] = await pool.execute<RowDataPacket[]>(
+          `SELECT word_index, word_text, start_time, end_time, confidence
+           FROM word_timestamps
+           WHERE job_id = ?
+           ORDER BY word_index ASC`,
+          [jobId]
+        );
+
+        // Shape response
+        const words = rows.map((r: any) => ({
+          word_index: r.word_index,
+          word_text: r.word_text,
+          start_time: Number(r.start_time),
+          end_time: Number(r.end_time),
+          confidence: typeof r.confidence === 'number' ? r.confidence : Number(r.confidence)
+        }));
+
+        return res.json({ jobId, count: words.length, words });
+      } catch (err: any) {
+        if (err?.code === 'ER_NO_SUCH_TABLE') {
+          return res.json({ jobId, count: 0, words: [] });
+        }
+        console.error('Error loading word timestamps:', err);
+        return res.status(500).json({ error: 'Failed to load word timestamps' });
+      }
+    } catch (error) {
+      console.error('Error in word-timestamps route:', error);
+      res.status(500).json({ error: 'Failed to fetch word timestamps' });
+    }
+  }
+);
+
 export default router;

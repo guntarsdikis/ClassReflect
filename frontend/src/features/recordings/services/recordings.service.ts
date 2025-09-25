@@ -36,6 +36,14 @@ export interface Recording {
   file_size_mb: string | null;
 }
 
+export interface WordTimestamp {
+  word_index: number;
+  word_text: string;
+  start_time: number; // seconds
+  end_time: number;   // seconds
+  confidence: number;
+}
+
 export interface RecordingsResponse {
   recordings: Recording[];
   count: number;
@@ -91,6 +99,14 @@ export class RecordingsService {
   static async getRecording(jobId: string): Promise<Recording> {
     const response = await apiClient.get<Recording>(`/jobs/${jobId}`);
     return response.data;
+  }
+
+  /**
+   * Get detailed word-level timestamps for a recording
+   */
+  static async getWordTimestamps(jobId: string): Promise<WordTimestamp[]> {
+    const response = await apiClient.get<{ jobId: string; count: number; words: WordTimestamp[] }>(`/jobs/${jobId}/word-timestamps`);
+    return response.data.words || [];
   }
 
   /**
@@ -157,6 +173,25 @@ export class RecordingsService {
   }> {
     const response = await apiClient.get(`/jobs/${jobId}/download`);
     return response.data;
+  }
+
+  /**
+   * Download timecoded transcript as a file (super admin only)
+   */
+  static async downloadTimecodedTranscript(
+    jobId: string,
+    format: 'csv' | 'srt' | 'vtt' | 'json' | 'txt' = 'csv'
+  ): Promise<{ blob: Blob; filename: string }> {
+    const response = await apiClient.get(`/jobs/${jobId}/transcript/download`, {
+      params: { format },
+      responseType: 'blob'
+    } as any);
+    // Try to parse filename from Content-Disposition
+    const disposition = (response.headers?.['content-disposition'] || '') as string;
+    const match = /filename="?([^";]+)"?/i.exec(disposition);
+    const fallback = `timecoded_transcript_${jobId}.${format}`;
+    const filename = match ? decodeURIComponent(match[1]) : fallback;
+    return { blob: response.data as Blob, filename };
   }
 
   /**

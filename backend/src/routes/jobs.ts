@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import pool from '../database';
 import { RowDataPacket } from 'mysql2';
 import { authenticate, authorize, requireTeacherAccess, requireSchoolAccess } from '../middleware/auth';
-import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { processingService } from '../services/processing';
 import { assemblyAIService } from '../services/assemblyai';
 
@@ -601,5 +602,105 @@ router.post('/:jobId/retranscribe',
     }
   }
 );
+
+// Download recording file (Super Admin only)
+router.get('/:jobId/download',
+  authenticate,
+  authorize('super_admin'),
+  async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+
+    // Get job details including S3 information
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT
+        aj.id,
+        aj.teacher_id,
+        aj.school_id,
+        aj.file_name,
+        aj.file_size,
+        aj.s3_key,
+        aj.status,
+        u.first_name,
+        u.last_name,
+        s.name as school_name
+      FROM audio_jobs aj
+      JOIN users u ON aj.teacher_id = u.id
+      JOIN schools s ON aj.school_id = s.id
+      WHERE aj.id = ?`,
+      [jobId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Recording not found' });
+    }
+
+    const job = rows[0] as any;
+
+    // Check if file exists in S3
+    if (!job.s3_key) {
+      return res.status(404).json({
+        error: 'No file available for download. This recording may have been processed without S3 storage.'
+      });
+    }
+
+    console.log(`📥 Super admin download request for job ${jobId}:`, {
+      file_name: job.file_name,
+      teacher: `${job.first_name} ${job.last_name}`,
+      school: job.school_name,
+      s3_key: job.s3_key,
+      requested_by: req.user?.email
+    });
+
+    // Generate presigned download URL for S3
+    const s3Client = new S3Client({
+      region: process.env.AWS_REGION || 'eu-west-2'
+    });
+
+    const getCommand = new GetObjectCommand({
+      Bucket: process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'classreflect-audio-files-573524060586',
+      Key: job.s3_key,
+      // Force download instead of inline viewing
+      ResponseContentDisposition: `attachment; filename="${job.file_name}"`
+    });
+
+    // Generate presigned URL valid for 1 hour
+    const downloadUrl = await getSignedUrl(s3Client, getCommand, {
+      expiresIn: 3600
+    });
+
+    // Log the download for audit purposes
+    console.log(`✅ Download URL generated for recording:`, {
+      jobId,
+      class_name: job.class_name,
+      teacher: `${job.first_name} ${job.last_name}`,
+      school: job.school_name,
+      file_name: job.file_name,
+      downloaded_by: req.user!.id,
+      downloaded_by_email: req.user!.email,
+      download_requested_at: new Date().toISOString()
+    });
+
+    res.json({
+      downloadUrl,
+      fileName: job.file_name,
+      fileSize: job.file_size,
+      expiresIn: 3600, // 1 hour
+      recording: {
+        jobId: job.id,
+        teacherName: `${job.first_name} ${job.last_name}`,
+        schoolName: job.school_name,
+        className: job.class_name || 'N/A'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Recording download failed:', error);
+    res.status(500).json({
+      error: 'Failed to generate download link',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
 
 export default router;

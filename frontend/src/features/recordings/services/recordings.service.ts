@@ -140,6 +140,26 @@ export class RecordingsService {
   }
 
   /**
+   * Download recording file (Super Admin only)
+   * Returns a presigned download URL
+   */
+  static async downloadRecording(jobId: string): Promise<{
+    downloadUrl: string;
+    fileName: string;
+    fileSize: number;
+    expiresIn: number;
+    recording: {
+      jobId: string;
+      teacherName: string;
+      schoolName: string;
+      className: string;
+    };
+  }> {
+    const response = await apiClient.get(`/jobs/${jobId}/download`);
+    return response.data;
+  }
+
+  /**
    * Helper function to get status color for UI
    */
   static getStatusColor(status: string): string {

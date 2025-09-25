@@ -91,6 +91,7 @@ export function RecordingsList() {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [analysisSelectionModalOpened, setAnalysisSelectionModalOpened] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
+  const [downloadingRecordingId, setDownloadingRecordingId] = useState<string | null>(null);
 
   const handleDownloadPDF = async (analysis: AnalysisResult) => {
     try {
@@ -284,6 +285,63 @@ export function RecordingsList() {
     }
     return true;
   });
+
+  // Handle recording download (Super Admin only)
+  const handleDownloadRecording = async (recording: Recording) => {
+    // Only allow super admin to download recordings
+    if (user?.role !== 'super_admin') {
+      notifications.show({
+        title: 'Access Denied',
+        message: 'Only super admin users can download recordings',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      setDownloadingRecordingId(recording.id);
+
+      const downloadData = await RecordingsService.downloadRecording(recording.id);
+
+      // Fetch the file as blob to force download instead of browser playback
+      const response = await fetch(downloadData.downloadUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch file');
+      }
+
+      const blob = await response.blob();
+
+      // Create blob URL and trigger download
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = downloadData.fileName;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+
+      notifications.show({
+        title: 'Download Complete',
+        message: `${downloadData.fileName} has been downloaded`,
+        color: 'green',
+        icon: <IconCheck />,
+      });
+    } catch (error: any) {
+      console.error('Download failed:', error);
+      notifications.show({
+        title: 'Download Failed',
+        message: error?.response?.data?.error || 'Failed to download file. The file may not be stored in S3.',
+        color: 'red',
+      });
+    } finally {
+      setDownloadingRecordingId(null);
+    }
+  };
 
   // Handle recording deletion
   const handleDeleteRecording = async (recording: Recording) => {
@@ -677,7 +735,20 @@ export function RecordingsList() {
                           >
                             <IconChartBar size={16} />
                           </ActionIcon>
-                          
+
+                          {/* Only show download button for super admin */}
+                          {user?.role === 'super_admin' && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="orange"
+                              onClick={() => handleDownloadRecording(recording)}
+                              loading={downloadingRecordingId === recording.id}
+                              title="Download recording file"
+                            >
+                              <IconDownload size={16} />
+                            </ActionIcon>
+                          )}
+
                           {/* Only show delete button for school managers and super admins */}
                           {(['school_manager', 'super_admin'].includes(user?.role || '')) && (
                             <ActionIcon

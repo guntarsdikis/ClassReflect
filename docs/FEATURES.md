@@ -1,186 +1,83 @@
-# ClassReflect Features Guide
+# ClassReflect Feature Overview (For Management)
 
-Last Updated: 2025-09-05
+Last Updated: 2025-09-25
 
-This document describes the features that are currently implemented in ClassReflect across the frontend and backend. It focuses on what works today in local development (JWT auth, AssemblyAI processing, MySQL), with notes where behavior differs in production.
+## What ClassReflect Does
+- Captures classroom audio (upload a file or record in the browser).
+- Transcribes the lesson into readable text.
+- Applies an evaluation template to generate strengths, areas to improve, and an overall score.
+- Helps leaders manage schools, users, subjects, and evaluation templates.
 
-## Product Overview
+## Who Uses ClassReflect
+- Teacher: Uploads/records lessons and reviews own feedback and transcripts.
+- School Manager: Oversees teachers, templates, and school-wide recordings and insights.
+- Super Admin: Manages multiple schools and users across the platform.
 
-ClassReflect helps teachers and school leaders analyze classroom audio:
-- Upload classroom recordings (no local file storage; processed in-memory)
-- Transcribe using AssemblyAI
-- Apply analysis templates to produce actionable feedback and scores
-- Manage schools, users, teachers, subjects, and templates
+## Core Capabilities
+- Upload & Record
+  - One-page upload wizard with class details (subject, grade, duration, notes).
+  - Built‑in browser recorder with level meter and simple guidance.
+  - Large files supported via a reliable upload flow.
+- Transcription
+  - High‑quality automatic transcription of lesson audio.
+  - Transcript available for quick reading and review.
+- Teaching Analysis
+  - Apply a template to a transcript to produce:
+    - Overall performance score.
+    - Key strengths (practical, specific).
+    - Targeted improvements (actionable next steps).
+- Templates & Frameworks
+  - Create your own evaluation templates with weighted criteria.
+  - Filter by category, subject, or grade level.
+  - Import “Teach Like a Champion” starter templates in one click.
+- Dashboards & Reporting
+  - Teacher Reports: simple personal view of recordings and results.
+  - School Manager overview: recent uploads, completion and scores at a glance.
+  - Export analysis reports to PDF for sharing.
+- Recordings & Playback
+  - Searchable list of recordings with status, teacher, class, and date.
+  - Short‑lived playback links for secure listening.
+  - View transcripts in a clean modal.
+- People & School Management
+  - Add and manage teachers and managers.
+  - Reset passwords, activate/deactivate accounts.
+  - Manage school subjects and template categories.
 
-## Roles & Access
+## Typical Workflows
+- Teacher
+  - Record or upload a lesson → see status update → review transcript → view feedback once analysis is applied.
+- School Manager
+  - Add teachers → import or create templates → upload or approve uploads → apply templates → review results and export PDFs.
+- Super Admin
+  - Create schools → assign school managers → monitor platform activity and usage.
 
-- Teacher: Upload and track own recordings; view own analyses and profile
-- School Manager: Manage teachers, subjects, templates; view school recordings and analyses
-- Super Admin: Platform-wide access; manage schools and users across all schools
-
-## Authentication & Authorization
-
-- Auth Method: JWT for local development
-  - POST `/api/auth/login` → returns JWT + user payload
-  - POST `/api/auth/logout` (stateless client-side logout)
-  - GET `/api/auth/profile` → current user
-  - POST `/api/auth/change-password`
-  - POST `/api/auth/forgot-password`, `/api/auth/reset-password` (stubs with basic flow)
-- Middleware: Role-based access enforced per route
-  - Roles: `teacher`, `school_manager`, `super_admin`
-- CORS: Allows configured `FRONTEND_URL` in `backend/.env`
-
-References:
-- `backend/src/middleware/auth.ts`
-- `backend/src/routes/auth.ts`
-- `backend/src/config/auth.config.ts`
-
-## Upload & Transcription Pipeline
-
-- Direct Upload: In-memory file upload (Multer memory storage)
-  - POST `/api/upload/direct` (multipart/form-data)
-    - Fields: `audio` (file), `teacherId` (int), `schoolId` (int)
-    - Allowed Mime Types: mp3, mpeg, wav, m4a, ogg, webm
-    - Max Size: 500 MB
-  - Creates an audio job (`audio_jobs`) with status `queued`
-  - Immediately enqueues processing via AssemblyAI using the file buffer
-  - Limit: keep under 500MB to avoid server memory pressure (use S3 flow for larger files)
-- Job Status
-  - GET `/api/upload/status/:jobId` → processing status and metadata
-  - Finalizes transcript into `transcripts` table
-- No S3 storage in local dev (AssemblyAI-only path)
-
-References:
-- `backend/src/routes/upload-new.ts`
-- `backend/src/services/processing.ts`
-- `backend/src/services/assemblyai.ts`
-
-## Recording Management (Jobs)
-
-- School/Platform View
-  - GET `/api/jobs/recordings` → paginated list with filters (status, school, search)
-  - GET `/api/jobs/:jobId` → job details, transcript linkage, errors
-  - DELETE `/api/jobs/:jobId` → soft-cleanup and optional S3 delete if present (prod path)
-- Teacher View
-  - GET `/api/jobs/teacher/:teacherId` → teacher’s jobs (auth-guarded)
-  - GET `/api/jobs/stats/:schoolId` → aggregate school stats (manager/admin)
-
-References:
-- `backend/src/routes/jobs.ts`
-
-## Analysis Templates & Results
-
+## Options & Customization
 - Templates
-  - Global and School-scoped templates
-  - Criteria with weight validation (total must equal 100%)
-  - Filters: category, subject, grade, school
-  - CRUD for templates and criteria; usage counts updated on apply
-- Analysis Execution
-  - GET `/api/analysis/recordings` → recordings (completed with transcripts) available for analysis
-  - POST `/api/analysis/apply-template` → creates background analysis job
-    - Body: `transcriptId`, `templateId`
-    - Produces entries in `analysis_jobs` and `analysis_results`
-  - GET `/api/analysis/job-status/:jobId` → background analysis job status
-  - GET `/api/analysis/results/:transcriptId` → all analysis results for a transcript
-  - GET `/api/analysis/school-summary` → high-level school summary
-- Result Fields include: `overall_score`, `strengths[]`, `improvements[]`, `detailed_feedback`
+  - Build multi‑criterion rubrics with weights that sum to 100%.
+  - Use categories (e.g., General Teaching, Classroom Management) and subjects/grades.
+  - Import prebuilt “Teach Like a Champion” templates to get started quickly.
+- Subjects & Grades
+  - Maintain a school‑specific subjects list and grade levels for consistent tagging.
 
-References:
-- `backend/src/routes/templates.ts`
-- `backend/src/routes/analysis.ts`
+## Security & Privacy (Plain English)
+- Role‑based access: teachers see their own work; managers see their school; super admins oversee the platform.
+- Short‑lived links for audio playback; transcripts and analyses stored securely.
+- Password reset and invitation emails supported.
 
-## Teacher & User Management
+## What’s Available Today
+- Ready now
+  - Uploads and in‑browser recording
+  - Transcription and transcript viewing
+  - Template‑based analysis with overall score, strengths, and improvements
+  - Teacher, Manager, and Super Admin flows
+  - PDF export of analysis reports
+  - School/teacher/template management
+- In progress / next
+  - Deeper school‑level analytics and trends
+  - Additional ready‑made templates and best‑practice libraries
 
-- Teachers (School Manager or Super Admin)
-  - GET `/api/users/teachers` → list teachers in school (or specified school for super admin)
-  - POST `/api/users/teachers` → create teacher with subjects/grades
-  - PUT `/api/users/teachers/:id` → update teacher metadata
-  - DELETE `/api/users/teachers/:id` → deactivate teacher
-  - POST `/api/users/teachers/:id/reset-password` → issue temporary password (dev displays temp password)
-- Users (Super Admin)
-  - POST `/api/users` → create user as `teacher` or `school_manager`
-  - GET `/api/users` → current user (non-admin) or all users (super admin)
-  - PUT `/api/users/:id/role` → change role between `teacher` and `school_manager`
-  - POST `/api/users/:id/reset-password`
-
-References:
-- `backend/src/routes/users.ts`
-
-## School Management (Super Admin)
-
-- Manage schools with quotas and status:
-  - Create, update, suspend/activate
-  - Fields include: `domain`, `contact_email`, `max_teachers`, `max_monthly_uploads`, `is_active`
-- Subject management per school
-
-References:
-- `backend/src/routes/schools.ts`
-
-## Frontend Features (React)
-
-- Auth
-  - Login form; logout; protected routes and role routes
-  - JWT token stored in state; axios interceptor attaches `Authorization` header
-- Uploads
-  - Multi-step Upload Wizard with class metadata (class, subject, grade, duration, notes)
-  - Client-side validation; progress and status polling
-  - Reliable processing: direct AssemblyAI upload with retry; S3 fallback (presigned URL) when network issues occur
-  - Upload strategy controls:
-    - `ASSEMBLYAI_UPLOAD_MODE=auto|direct|s3` (default `auto`)
-      - `auto`: direct upload for small files, S3 for larger or on failure
-      - `direct`: only direct upload to AssemblyAI (no S3)
-      - `s3`: always upload to S3 and pass a presigned URL to AssemblyAI
-    - `ASSEMBLYAI_DIRECT_MAX_MB` (default `25`) threshold used in `auto` mode
-    - Large files: S3 direct uploads support up to 1GB+; default presigned PUT expiry is 4h (configurable via `S3_PRESIGNED_PUT_EXPIRES_SECONDS`).
-    - Requires `AWS_REGION` and `S3_BUCKET_NAME` (or `S3_BUCKET`) when using S3 path
-- Dashboards
-  - Teacher Dashboard: recent jobs, statuses, quick actions
-  - Manager Dashboard: school-level overview (scaffolding in progress)
-- Templates
-  - Template management UI: create/edit templates; manage criteria and weights; filter by subject/grade/category
-- Analysis
-  - Pick transcript/recording, apply template, view results with scorecards and feedback
-- Users & Schools
-  - User management (create, edit, deactivate, reset passwords)
-  - School management (create/edit/suspend; subject management)
-  - Creating a new school with a manager: First create the school under Admin > Schools, then use User Management "Create User" with role "School Manager" to add the manager.
-- Profile
-  - View profile (name/email/role/school). Edit UI is present but server-side update endpoint is not implemented yet (see gaps below).
-
-References:
-- `frontend/src/shared/services/api.client.ts`
-- `frontend/src/features/*` (auth, uploads, analysis, templates, users, schools, dashboard, profile)
-
-## API Base URLs (Local)
-
-- Frontend Dev: `http://localhost:3002`
-- Backend API: `http://localhost:3001/api`
-  - Configure in `frontend/.env.local` via `VITE_API_URL`
-  - Backend CORS allows origin in `backend/.env` via `FRONTEND_URL`
-
-## Data & Storage Notes
-
-- Audio Files: Not stored locally; uploaded buffers are sent to AssemblyAI directly
-- Database: MySQL/Aurora-compatible, tables include `users`, `schools`, `audio_jobs`, `transcripts`, `templates`, `template_criteria`, `analysis_jobs`, `analysis_results`
-- Secrets: Use `.env` files in local; production should use managed secrets
-
-## Limitations & In-Progress
-
-- Local dev uses JWT-only; Cognito is not active in local
-- Email flows (invites, notifications) are placeholders
-- WebSocket references exist but not required for current flows
-- Some manager dashboard analytics are scaffolded but not fully implemented
-- CategoriesManagement UI points to `/api/schools/:id/criteria` which isn't implemented; backend provides `/api/schools/:id/template-categories` instead
-
-## Quick Start (Local)
-
-1) Backend
-- `cd backend && npm run dev`
-- Ensure `backend/.env` has `PORT=3001`, `FRONTEND_URL=http://localhost:3002`
-
-2) Frontend
-- `cd frontend && npm run dev`
-- Ensure `frontend/.env.local` has `VITE_APP_URL=http://localhost:3002`, `VITE_API_URL=http://localhost:3001`
-
-3) Login
-- Use test users from the docs and go to `http://localhost:3002/login`
+## Getting Started
+- Sign in with your role (teacher, manager, or super admin).
+- For managers: add teachers and import a template.
+- Upload a recording (or record directly), then apply a template.
+- Review the feedback and optionally export the report to PDF.

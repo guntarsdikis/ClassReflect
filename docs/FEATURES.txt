@@ -1,0 +1,65 @@
+ClassReflect Feature Overview (For Management)
+Last Updated: 2025-09-25
+
+What ClassReflect Does
+- Captures classroom audio (upload a file or record in the browser)
+- Transcribes the lesson into readable text
+- Applies an evaluation template to generate strengths, improvements, and an overall score
+- Helps leaders manage schools, users, subjects, templates, and analyses
+
+Who Uses ClassReflect
+- Teacher: Uploads/records lessons and reviews own feedback and transcripts
+- School Manager: Oversees teachers, templates, and school recordings and insights
+- Super Admin: Manages multiple schools and users across the platform
+
+Core Capabilities
+- Upload & Record
+  - One-page upload wizard with class details (subject, grade, duration, notes)
+  - Built-in browser recorder with level meter and simple guidance
+  - Large files supported via a reliable upload flow
+- Transcription
+  - High-quality automatic transcription of lesson audio
+  - Transcript available for quick reading and review
+- Teaching Analysis
+  - Apply a template to a transcript to produce: overall score, key strengths, targeted improvements
+- Templates & Frameworks
+  - Create custom evaluation templates with weighted criteria (must total 100%)
+  - Filter by category, subject, and grade
+  - One-click import of “Teach Like a Champion” starter templates
+- Dashboards & Reporting
+  - Teacher Reports: simple personal view of recordings and results
+  - School Manager overview: recent uploads, completion and scores at a glance
+  - Export analysis reports to PDF for sharing
+- Recordings & Playback
+  - Searchable list with status, teacher, class, and date
+  - Short-lived playback links for secure listening
+  - View transcripts in a clean modal
+- People & School Management
+  - Add and manage teachers and managers
+  - Reset passwords, activate or deactivate accounts
+  - Manage school subjects and template categories
+
+Typical Workflows
+- Teacher: Record or upload → monitor status → review transcript → view feedback after analysis
+- School Manager: Add teachers → import/create templates → upload or approve uploads → apply templates → review results and export PDFs
+- Super Admin: Create schools → assign school managers → monitor platform activity and usage
+
+Options & Customization
+- Templates: Build multi-criterion rubrics with weights, organize by category/subject/grade, import TLC templates
+- Subjects & Grades: Maintain a school-specific subjects list and consistent grade tagging
+
+Security & Privacy (Plain English)
+- Role-based access: teachers see their own items; managers see their school; super admins oversee the platform
+- Short-lived links for audio playback; transcripts and analyses stored securely
+- Password reset and invitation emails supported
+
+What’s Available Today
+- Ready now: uploads and recording, transcription, template-based analysis, role-based flows, PDF export, user/school/template management
+- In progress / next: deeper school analytics and trends; more ready-made templates
+
+Getting Started
+- Sign in with your role (teacher, manager, super admin)
+- Managers: add teachers and import a template
+- Upload a recording (or record directly), then apply a template
+- Review the feedback and export the report to PDF if needed
+

@@ -17,6 +17,14 @@ export interface PromptLogOptions {
 
 export async function savePromptMarkdown(opts: PromptLogOptions): Promise<string | null> {
   try {
+    // Allow disabling prompt logging via env var.
+    // Any of: '0', 'false', 'no', 'off' (case-insensitive) disables logging. Missing/other values enable it.
+    const rawEnabled = process.env.PROMPT_LOG_ENABLED;
+    const isDisabled = rawEnabled ? /^(0|false|no|off)$/i.test(rawEnabled.trim()) : false;
+    if (isDisabled) {
+      return null;
+    }
+
     const baseDir = process.env.PROMPT_LOG_DIR
       ? path.resolve(process.env.PROMPT_LOG_DIR)
       : path.resolve(process.cwd(), 'storage', 'prompts');
@@ -68,4 +76,3 @@ export async function savePromptMarkdown(opts: PromptLogOptions): Promise<string
     return null;
   }
 }
-

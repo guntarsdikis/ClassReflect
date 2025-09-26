@@ -135,10 +135,7 @@ export function UserManagement() {
     try {
       setLoading(true);
       
-      console.log('User Management - Current User:', { 
-        role: currentUser.role, 
-        schoolId: currentUserSchoolId 
-      });
+      // Removed verbose console logs
       
       if (isSuperAdmin) {
         // Load schools data for super admin
@@ -147,18 +144,13 @@ export function UserManagement() {
         
         if (currentUserSchoolId) {
           // Super admin with selected school - load users for that school (server-side filter)
-          console.log('Super Admin - Loading users for selected school:', currentUserSchoolId);
           const usersData = await usersService.getAllUsers(currentUserSchoolId);
-          console.log('Super Admin - Loaded school users:', { usersCount: usersData.length, schoolId: currentUserSchoolId });
           setUsers(usersData);
           setFilterSchool(currentUserSchoolId.toString());
           await loadSchoolSubjects(currentUserSchoolId);
         } else {
           // Super admin without selected school - load all users
           const usersData = await usersService.getAllUsers();
-          console.log('Super Admin - Loaded all users:', { 
-            usersCount: usersData.length 
-          });
           setUsers(usersData);
           setFilterSchool('all');
           
@@ -169,16 +161,10 @@ export function UserManagement() {
         }
       } else if (isSchoolManager) {
         // School manager can only see teachers from their school
-        console.log('School Manager - Loading data for school:', currentUserSchoolId);
-        
         const [teachersData, schoolData] = await Promise.all([
           usersService.getTeachers(), // Use teachers endpoint which supports school managers
           schoolsService.getSchool(currentUserSchoolId),
         ]);
-        
-        console.log('School Manager - Teachers data:', teachersData);
-        console.log('School Manager - First teacher object:', teachersData[0]);
-        console.log('School Manager - School data:', schoolData);
         
         setUsers(teachersData);
         setSchools([schoolData]);
@@ -417,9 +403,7 @@ export function UserManagement() {
         color: result.failed > 0 ? 'yellow' : 'green',
       });
 
-      if (result.errors.length > 0) {
-        console.log('Import errors:', result.errors);
-      }
+      // Suppress verbose import error logging in console
       
       await loadData();
       closeBulkModal();
@@ -450,7 +434,7 @@ export function UserManagement() {
 
   const confirmResetPassword = async (userId: number) => {
     try {
-      console.log('🔐 Calling password reset for userId:', userId);
+      // Removed debug logs
       
       // Use appropriate reset method based on user role
       let result;
@@ -467,13 +451,8 @@ export function UserManagement() {
         result = await usersService.resetTeacherPassword(userId);
       }
       
-      console.log('🔐 Password reset API response:', result);
-      
       // Show password in a modal with copy functionality
-      console.log('🔐 Opening success modal with data:', { 
-        teacherName: result.teacherName, 
-        temporaryPassword: result.temporaryPassword 
-      });
+      
       
       modals.open({
         title: 'Password Reset Successful',
@@ -575,23 +554,11 @@ export function UserManagement() {
     
     const matchesRole = filterRole === 'all' || user.role === filterRole;
     const matchesSchool = filterSchool === 'all' || user.schoolId?.toString() === filterSchool;
-    
-    console.log('🔍 Filter Debug - User:', user.firstName, user.lastName, {
-      matchesSearch,
-      matchesRole,
-      matchesSchool,
-      searchQuery,
-      filterRole,
-      filterSchool,
-      userRole: user.role,
-      userSchoolId: user.schoolId?.toString(),
-      finalResult: matchesSearch && matchesRole && matchesSchool
-    });
-    
+    // Removed filter debug logs
     return matchesSearch && matchesRole && matchesSchool;
   });
   
-  console.log('🔍 Filter Debug - Total users:', users.length, 'Filtered users:', filteredUsers.length);
+  // Removed filter summary logs
 
   const getRoleColor = (role: string) => {
     switch (role) {

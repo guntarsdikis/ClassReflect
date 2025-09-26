@@ -61,7 +61,7 @@ class AssemblyAIService {
     
     try {
       const u = new URL(url);
-      console.log(`🔗 Presigned GET URL: host=${u.host} path=${u.pathname}`);
+      console.log(`🔗 Presigned GET URL: protocol=${u.protocol} host=${u.host} path=${u.pathname}`);
     } catch (e) {
       console.warn('⚠️ Presigned GET URL parse issue:', (e as any)?.message || e);
     }
@@ -154,8 +154,7 @@ class AssemblyAIService {
           audio_url: uploadUrl,
           speech_model: 'best' as const,
           punctuate: true,
-          format_text: true,
-          word_timestamps: true
+          format_text: true
         };
         if (this.languageCode === 'auto') {
           params.language_detection = true;
@@ -248,8 +247,7 @@ class AssemblyAIService {
         audio_url: presignedUrl,
         speech_model: 'best' as const,
         punctuate: true,
-        format_text: true,
-        word_timestamps: true
+        format_text: true
       };
       if (this.languageCode === 'auto') {
         params.language_detection = true;
@@ -258,7 +256,60 @@ class AssemblyAIService {
       }
 
       console.log(`📝 Submitting transcription request to AssemblyAI (S3)...`);
-      const transcript = await this.client.transcripts.transcribe(params);
+      let transcript: any;
+      try {
+        transcript = await this.client.transcripts.transcribe(params);
+      } catch (submitErr: any) {
+        const msg = submitErr?.message || String(submitErr);
+        // AssemblyAI returns this when audio_url has an unsupported scheme (e.g., file://) or malformed URL
+        const isEndpointSchemaError = /invalid\s+endpoint\s+schema/i.test(msg);
+        if (isEndpointSchemaError) {
+          console.warn(`⚠️ AssemblyAI rejected S3 URL (invalid endpoint schema). Falling back to direct upload for job ${jobId}`);
+
+          // Fallback: download object from S3 and upload bytes directly to AssemblyAI
+          const bucket = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'classreflect-audio-files-573524060586';
+          const region = process.env.AWS_REGION || 'eu-west-2';
+          const s3Client = new S3Client({ region });
+
+          const getCmd = new GetObjectCommand({ Bucket: bucket, Key: s3Key });
+          const getResp: any = await s3Client.send(getCmd);
+          const bodyStream = getResp.Body as NodeJS.ReadableStream;
+
+          const buffer: Buffer = await new Promise((resolve, reject) => {
+            const chunks: Buffer[] = [];
+            bodyStream.on('data', (c: Buffer) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+            bodyStream.on('error', reject);
+            bodyStream.on('end', () => resolve(Buffer.concat(chunks)));
+          });
+
+          console.log(`📥 Downloaded ${buffer.length} bytes from S3. Uploading to AssemblyAI...`);
+          const uploadUrl = await this.client.files.upload(buffer);
+
+          // Persist upload URL for future retries
+          await pool.execute(
+            'UPDATE audio_jobs SET assemblyai_upload_url = ? WHERE id = ?',
+            [uploadUrl, jobId]
+          );
+          console.log('💾 Stored AssemblyAI upload URL from fallback path');
+
+          const retryParams: any = {
+            audio_url: uploadUrl,
+            speech_model: 'best' as const,
+            punctuate: true,
+            format_text: true
+          };
+          if (this.languageCode === 'auto') {
+            retryParams.language_detection = true;
+          } else {
+            retryParams.language_code = this.languageCode;
+          }
+
+          console.log('📝 Retrying transcription request using AssemblyAI upload URL...');
+          transcript = await this.client.transcripts.transcribe(retryParams);
+        } else {
+          throw submitErr;
+        }
+      }
 
       if (transcript.status === 'error') {
         throw new Error(`Transcription failed: ${transcript.error}`);
@@ -399,6 +450,25 @@ class AssemblyAIService {
 
       console.log(`📤 Using stored AssemblyAI URL: ${job.assemblyai_upload_url}`);
 
+      // Validate stored URL schema; fall back to S3 if invalid
+      try {
+        const u = new URL(job.assemblyai_upload_url);
+        if (u.protocol !== 'https:') {
+          throw new Error(`Unsupported URL protocol: ${u.protocol}`);
+        }
+      } catch (urlErr) {
+        console.warn(`⚠️ Stored upload URL invalid for retry (${(urlErr as any)?.message || urlErr}). Attempting S3 fallback if available...`);
+        const [s3Rows] = await pool.execute<RowDataPacket[]>(
+          'SELECT s3_key FROM audio_jobs WHERE id = ? LIMIT 1',
+          [jobId]
+        );
+        const s3Key = (s3Rows as any[])[0]?.s3_key;
+        if (s3Key) {
+          return await this.transcribeFromS3Key(jobId, s3Key);
+        }
+        throw new Error('No valid upload URL and no S3 key available for retry');
+      }
+
       // Reset job status
       await pool.execute(
         'UPDATE audio_jobs SET status = ?, error_message = NULL, processing_started_at = NOW() WHERE id = ?',
@@ -411,15 +481,43 @@ class AssemblyAIService {
         speech_model: 'best' as const,
         language_detection: true,
         punctuate: true,
-        format_text: true,
-        word_timestamps: true
+        format_text: true
       };
 
       // Submit transcription request
       console.log(`📝 Retrying transcription request to AssemblyAI...`);
-      const transcript = await this.client.transcripts.transcribe(params);
+      let transcript: any;
+      try {
+        transcript = await this.client.transcripts.transcribe(params);
+      } catch (submitErr: any) {
+        const msg = (submitErr?.message || String(submitErr)).toLowerCase();
+        const isEndpointSchemaError = /invalid\s+endpoint\s+schema/.test(msg);
+        const isDownloadError = /download\s+error|unable\s+to\s+download/.test(msg);
+        if (!(isEndpointSchemaError || isDownloadError)) throw submitErr;
+        console.warn(`⚠️ AssemblyAI rejected stored upload URL (${isEndpointSchemaError ? 'invalid endpoint schema' : 'download error'}). Attempting S3 fallback if available...`);
+        const [s3Rows] = await pool.execute<RowDataPacket[]>(
+          'SELECT s3_key FROM audio_jobs WHERE id = ? LIMIT 1',
+          [jobId]
+        );
+        const s3Key = (s3Rows as any[])[0]?.s3_key;
+        if (!s3Key) throw submitErr;
+        return await this.transcribeFromS3Key(jobId, s3Key);
+      }
 
       if (transcript.status === 'error') {
+        // If the error is a download error (likely expired S3 URL stored previously), try S3 fallback
+        const errMsg = (transcript.error || '').toLowerCase();
+        if (/download\s+error|unable\s+to\s+download/.test(errMsg)) {
+          console.warn('⚠️ Stored upload URL produced download error during polling. Attempting S3 fallback if available...');
+          const [s3Rows] = await pool.execute<RowDataPacket[]>(
+            'SELECT s3_key FROM audio_jobs WHERE id = ? LIMIT 1',
+            [jobId]
+          );
+          const s3Key = (s3Rows as any[])[0]?.s3_key;
+          if (s3Key) {
+            return await this.transcribeFromS3Key(jobId, s3Key);
+          }
+        }
         throw new Error(`Transcription failed: ${transcript.error}`);
       }
 

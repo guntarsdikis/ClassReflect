@@ -9,6 +9,7 @@ import {
   Stack,
   Button,
   Table,
+  ScrollArea,
   ActionIcon,
   Modal,
   TextInput,
@@ -271,6 +272,7 @@ export function TemplateCategoryManagement() {
               </Stack>
             </Group>
           ) : (
+            <ScrollArea>
             <Table>
               <Table.Thead>
                 <Table.Tr>
@@ -347,6 +349,7 @@ export function TemplateCategoryManagement() {
                 ))}
               </Table.Tbody>
             </Table>
+            </ScrollArea>
           )}
         </Card>
       </Stack>

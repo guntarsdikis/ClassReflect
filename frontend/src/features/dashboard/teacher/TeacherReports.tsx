@@ -760,8 +760,8 @@ export function TeacherReports() {
                     </Table.Td>
                   </Table.Tr>
                 ) : filteredRecordings.length > 0 ? (
-                  filteredRecordings.map((recording: TeacherRecording) => (
-                    <Table.Tr key={recording.id}>
+                  filteredRecordings.map((recording: TeacherRecording, idx: number) => (
+                    <Table.Tr key={`teacher-rec-${recording.id}-${idx}`}>
                       <Table.Td>
                         <Checkbox
                           checked={selectedRecordings.has(recording.id)}
@@ -869,32 +869,32 @@ export function TeacherReports() {
         {selectedRecording && (
           <Stack>
             <Grid>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Text size="sm" c="dimmed">Class Name</Text>
                 <Text fw={500}>{selectedRecording.class_name || 'Untitled Class'}</Text>
               </Grid.Col>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Text size="sm" c="dimmed">Subject & Grade</Text>
                 <Text fw={500}>
                   {(selectedRecording.subject || 'No Subject')} - {selectedRecording.grade ? `Grade ${selectedRecording.grade}` : 'No Grade'}
                 </Text>
               </Grid.Col>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Text size="sm" c="dimmed">Upload Date</Text>
                 <Text fw={500}>{format(new Date(selectedRecording.created_at), 'MMM dd, yyyy h:mm a')}</Text>
               </Grid.Col>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Text size="sm" c="dimmed">Status</Text>
                 {getStatusBadge(selectedRecording.status)}
               </Grid.Col>
               {selectedRecording.duration_minutes && (
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Duration</Text>
                   <Text fw={500}>{selectedRecording.duration_minutes} minutes</Text>
                 </Grid.Col>
               )}
               {selectedRecording.analysis_score && (
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Analysis Score</Text>
                   <Text fw={500} c="teal">{selectedRecording.analysis_score}%</Text>
                 </Grid.Col>

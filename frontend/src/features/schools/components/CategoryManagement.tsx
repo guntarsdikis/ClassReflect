@@ -9,6 +9,7 @@ import {
   Stack,
   Button,
   Table,
+  ScrollArea,
   ActionIcon,
   Modal,
   TextInput,
@@ -209,7 +210,7 @@ export function CategoryManagement() {
   return (
     <Container size="lg" py="xl">
       <Stack>
-        <Group justify="space-between">
+        <Group justify="space-between" wrap="wrap" gap="sm">
           <div>
             <Title order={2}>Category Management</Title>
             <Text c="dimmed" size="sm">
@@ -244,6 +245,7 @@ export function CategoryManagement() {
               </Stack>
             </Group>
           ) : (
+            <ScrollArea>
             <Table>
               <Table.Thead>
                 <Table.Tr>
@@ -320,6 +322,7 @@ export function CategoryManagement() {
                 ))}
               </Table.Tbody>
             </Table>
+            </ScrollArea>
           )}
         </Card>
       </Stack>

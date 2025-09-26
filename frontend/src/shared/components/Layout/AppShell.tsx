@@ -108,7 +108,7 @@ export function AppShell() {
             )}
           </Group>
           
-          <Group gap="lg">
+          <Group gap="sm" wrap="wrap">
             <SchoolSwitcher />
             
             <Menu shadow="md" width={200}>
@@ -122,7 +122,7 @@ export function AppShell() {
                   >
                     {user.firstName[0]}{user.lastName[0]}
                   </Avatar>
-                  <Text fw={500} size="sm" mr={3}>
+                  <Text fw={500} size="sm" mr={3} hiddenFrom="sm">
                     {user.firstName} {user.lastName}
                   </Text>
                   <IconChevronDown size={12} stroke={1.5} />

@@ -9,6 +9,7 @@ import {
   Stack,
   Button,
   Table,
+  ScrollArea,
   ActionIcon,
   Modal,
   TextInput,
@@ -623,7 +624,7 @@ export function UserManagement() {
 
   return (
     <Container size="xl">
-      <Group justify="space-between" mb="xl">
+      <Group justify="space-between" mb="xl" wrap="wrap" gap="sm">
         <div>
           <Title order={1}>{isSchoolManager ? 'Teacher Management' : 'User Management'}</Title>
           <Text c="dimmed">
@@ -738,6 +739,7 @@ export function UserManagement() {
             <Text c="dimmed">Loading users...</Text>
           </div>
         ) : (
+          <ScrollArea>
           <Table>
             <Table.Thead>
               <Table.Tr>
@@ -884,6 +886,7 @@ export function UserManagement() {
               )}
             </Table.Tbody>
           </Table>
+          </ScrollArea>
         )}
       </Card>
 

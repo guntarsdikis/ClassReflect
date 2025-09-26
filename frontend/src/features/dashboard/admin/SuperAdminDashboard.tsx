@@ -122,7 +122,7 @@ export function SuperAdminDashboard() {
 
   return (
     <Container size="xl">
-      <Group justify="space-between" mb="xl">
+      <Group justify="space-between" mb="xl" wrap="wrap" gap="sm">
         <div>
           <Title order={1}>Super Admin Dashboard</Title>
           <Text c="dimmed">Platform Management & Analytics</Text>
@@ -234,6 +234,7 @@ export function SuperAdminDashboard() {
             <Text c="dimmed">Loading schools...</Text>
           </div>
         ) : schools && schools.length > 0 ? (
+          <ScrollArea>
           <Table>
             <Table.Thead>
               <Table.Tr>
@@ -245,10 +246,10 @@ export function SuperAdminDashboard() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {schools.map((school) => {
+              {schools.map((school, idx) => {
                 const schoolTeachers = allTeachers?.filter(t => t.schoolId === school.id) || [];
                 return (
-                  <Table.Tr key={school.id}>
+                  <Table.Tr key={`school-${school.id}-${idx}`}>
                     <Table.Td>
                       <div>
                         <Text size="sm" fw={500}>{school.name}</Text>
@@ -285,6 +286,7 @@ export function SuperAdminDashboard() {
               })}
             </Table.Tbody>
           </Table>
+          </ScrollArea>
         ) : (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <Text c="dimmed">No schools available</Text>
@@ -328,8 +330,8 @@ export function SuperAdminDashboard() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {recordingsData.recordings.map((recording) => (
-                  <Table.Tr key={recording.id}>
+                {recordingsData.recordings.map((recording, idx) => (
+                  <Table.Tr key={`rec-${recording.id}-${idx}`}>
                     <Table.Td>
                       <div>
                         <Text size="sm" fw={500}>{recording.file_name}</Text>

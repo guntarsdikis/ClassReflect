@@ -9,6 +9,7 @@ import {
   Stack,
   Button,
   Table,
+  ScrollArea,
   ActionIcon,
   Modal,
   TextInput,
@@ -679,6 +680,7 @@ export function TemplateManagement() {
             <Text c="dimmed">Loading templates...</Text>
           </div>
         ) : (
+          <ScrollArea>
           <Table>
             <Table.Thead>
               <Table.Tr>
@@ -793,6 +795,7 @@ export function TemplateManagement() {
               )}
             </Table.Tbody>
           </Table>
+          </ScrollArea>
         )}
       </Card>
 

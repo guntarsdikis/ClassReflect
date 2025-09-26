@@ -77,7 +77,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
         </Title>
         
         <Grid>
-          <Grid.Col span={6}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <Stack gap="md">
               <div>
                 <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb="xs">Teacher</Text>
@@ -117,7 +117,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
             </Stack>
           </Grid.Col>
           
-          <Grid.Col span={6}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <Stack gap="md">
               <div>
                 <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb="xs">Recording Details</Text>
@@ -229,7 +229,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
 
       <Grid>
         {/* Strengths */}
-        <Grid.Col span={6}>
+        <Grid.Col span={{ base: 12, md: 6 }}>
           <Card withBorder h="100%">
             <Group mb="md">
               <ThemeIcon color="green" variant="light" radius="xl">
@@ -261,7 +261,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
         </Grid.Col>
 
         {/* Areas for Improvement */}
-        <Grid.Col span={6}>
+        <Grid.Col span={{ base: 12, md: 6 }}>
           <Card withBorder h="100%">
             <Group mb="md">
               <ThemeIcon color="orange" variant="light" radius="xl">
@@ -408,7 +408,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
         </Group>
         
         <Grid>
-          <Grid.Col span={6}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <Stack gap="xs">
               <Text size="xs" c="dimmed" tt="uppercase" fw={600}>AI Model</Text>
               <Text size="sm" fw={500}>
@@ -431,7 +431,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
             </Stack>
           </Grid.Col>
           
-          <Grid.Col span={6}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <Stack gap="xs">
               <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Analysis Date</Text>
               <Text size="sm" fw={500}>

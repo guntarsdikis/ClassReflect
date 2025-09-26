@@ -527,7 +527,7 @@ export function RecordingsList() {
   return (
     <Container size="xl">
       {/* Header */}
-      <Group justify="space-between" mb="xl">
+      <Group justify="space-between" mb="xl" wrap="wrap">
         <div>
           <Title order={1}>
             {user?.role === 'super_admin' ? 'All Recordings' : 'School Recordings'}
@@ -541,7 +541,7 @@ export function RecordingsList() {
             }
           </Text>
         </div>
-        <Group>
+        <Group wrap="wrap" gap="sm">
           <Button leftSection={<IconMicrophone size={16} />} onClick={() => navigate('/upload?mode=record')}>Record Class</Button>
           <Button variant="subtle" leftSection={<IconUpload size={16} />} onClick={() => navigate('/upload?mode=upload')}>Upload File</Button>
           <Button leftSection={<IconRefresh size={16} />} variant="light" onClick={() => refetch()} loading={isLoading}>Refresh</Button>
@@ -666,7 +666,7 @@ export function RecordingsList() {
           )}
           <Grid.Col span={{ base: 12, md: user?.role === 'teacher' ? 12 : 6 }}>
             <Text size="sm" mb={5}>Date Range</Text>
-            <Group>
+            <Group wrap="wrap" gap="sm">
               <DatePickerInput placeholder="From" value={extraFilters.dateFrom} onChange={(v) => setExtraFilters((p) => ({ ...p, dateFrom: v }))} size="sm" />
               <DatePickerInput placeholder="To" value={extraFilters.dateTo} onChange={(v) => setExtraFilters((p) => ({ ...p, dateTo: v }))} size="sm" />
             </Group>
@@ -701,8 +701,8 @@ export function RecordingsList() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {filteredRecords.map((recording) => (
-                    <Table.Tr key={recording.id}>
+                  {filteredRecords.map((recording, idx) => (
+                    <Table.Tr key={`rec-${recording.id}-${idx}`}>
                       <Table.Td>
                         <div>
                           <Text size="sm" fw={500} mb={2}>

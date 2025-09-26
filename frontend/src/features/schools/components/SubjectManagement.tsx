@@ -9,6 +9,7 @@ import {
   Stack,
   Button,
   Table,
+  ScrollArea,
   ActionIcon,
   Modal,
   TextInput,
@@ -266,7 +267,7 @@ export function SubjectManagement() {
   return (
     <Container size="lg" py="xl">
       <Stack>
-        <Group justify="space-between">
+        <Group justify="space-between" wrap="wrap" gap="sm">
           <div>
             <Title order={2}>Subject Management</Title>
             <Text c="dimmed" size="sm">
@@ -312,6 +313,7 @@ export function SubjectManagement() {
               </Stack>
             </Group>
           ) : (
+            <ScrollArea>
             <Table>
               <Table.Thead>
                 <Table.Tr>
@@ -369,6 +371,7 @@ export function SubjectManagement() {
                 ))}
               </Table.Tbody>
             </Table>
+            </ScrollArea>
           )}
         </Card>
       </Stack>

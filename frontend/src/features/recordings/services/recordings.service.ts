@@ -147,6 +147,18 @@ export class RecordingsService {
   }
 
   /**
+   * Update recording info (subject, grade, optionally class_name)
+   * Allowed for: school_manager (own school) and super_admin
+   */
+  static async updateRecordingInfo(
+    jobId: string,
+    payload: { subject?: string; grade?: string; class_name?: string }
+  ): Promise<{ message: string; updated: { id: string; subject?: string; grade?: string; class_name?: string } }> {
+    const response = await apiClient.patch(`/jobs/${jobId}/info`, payload);
+    return response.data;
+  }
+
+  /**
    * Re-run transcription for an existing recording
    * Prefers S3 if available; otherwise uses stored AssemblyAI upload URL.
    */

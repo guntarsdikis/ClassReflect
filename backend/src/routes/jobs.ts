@@ -345,6 +345,64 @@ router.patch('/:jobId/status',
   }
 });
 
+// Update recording info (subject, grade, and optionally class_name)
+// Allowed roles: school_manager (only within their school) and super_admin (any)
+router.patch('/:jobId/info',
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+      const { subject, grade, class_name } = req.body || {};
+
+      // Validate at least one field
+      const fieldsToUpdate: Record<string, any> = {};
+      if (typeof subject !== 'undefined') fieldsToUpdate.subject = subject;
+      if (typeof grade !== 'undefined') fieldsToUpdate.grade = grade;
+      if (typeof class_name !== 'undefined') fieldsToUpdate.class_name = class_name;
+
+      if (Object.keys(fieldsToUpdate).length === 0) {
+        return res.status(400).json({ error: 'No fields provided to update' });
+      }
+
+      // Load job for access control and existence check
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        'SELECT id, school_id FROM audio_jobs WHERE id = ? LIMIT 1',
+        [jobId]
+      );
+      if (!rows.length) {
+        return res.status(404).json({ error: 'Recording not found' });
+      }
+      const job = rows[0] as any;
+
+      // Managers can only edit recordings in their school
+      if (req.user!.role === 'school_manager' && job.school_id !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied - recording not in your school' });
+      }
+
+      // Build dynamic SQL
+      const setClauses: string[] = [];
+      const params: any[] = [];
+      for (const [key, value] of Object.entries(fieldsToUpdate)) {
+        setClauses.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(jobId);
+
+      const sql = `UPDATE audio_jobs SET ${setClauses.join(', ')} WHERE id = ?`;
+      await pool.execute(sql, params);
+
+      return res.json({
+        message: 'Recording info updated successfully',
+        updated: { id: jobId, ...fieldsToUpdate }
+      });
+    } catch (error) {
+      console.error('Error updating recording info:', error);
+      return res.status(500).json({ error: 'Failed to update recording info' });
+    }
+  }
+);
+
 // Get job statistics
 // Get school statistics 
 // Only managers and super admins can see school stats

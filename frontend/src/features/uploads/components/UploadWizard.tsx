@@ -39,6 +39,7 @@ import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '@store/auth.store';
 import { useSchoolContextStore } from '@store/school-context.store';
 import { templatesService, Template } from '@features/templates/services/templates.service';
+import { subjectsService, type SchoolSubject } from '@features/schools/services/subjects.service';
 import { usersService, User } from '@features/users/services/users.service';
 import { RecordingPanel } from './RecordingPanel';
 
@@ -62,6 +63,8 @@ export function UploadWizard() {
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
+  const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubject[]>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
   
   // Form state
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
@@ -98,6 +101,10 @@ export function UploadWizard() {
     // Only load teachers list for school managers/admins
     else if (currentSchoolId && !isTeacher) {
       loadTeachers();
+    }
+    // Load subjects for the selected school
+    if (currentSchoolId) {
+      loadSubjects();
     }
   }, [currentSchoolId, selectedSchool, isTeacher, user?.id]);
 
@@ -145,6 +152,32 @@ export function UploadWizard() {
       message: `Captured ${file.name}. You can proceed to the next step.`,
       color: 'green',
     });
+  };
+  
+  const loadSubjects = async () => {
+    if (!currentSchoolId) return;
+    try {
+      setLoadingSubjects(true);
+      const subjects = await subjectsService.getSchoolSubjects(currentSchoolId);
+      setSchoolSubjects(subjects);
+      // Keep existing selection if still valid; otherwise clear
+      if (subject && !subjects.some(s => s.subject_name === subject)) {
+        setSubject('');
+      }
+    } catch (error) {
+      console.error('Failed to load subjects:', error);
+      // Fallback to defaults so the user can still proceed
+      const defaults = subjectsService.getDefaultSubjects();
+      setSchoolSubjects(defaults.map((name, idx) => ({
+        id: idx + 1,
+        subject_name: name,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })) as unknown as SchoolSubject[]);
+    } finally {
+      setLoadingSubjects(false);
+    }
   };
   
   const handleSubmit = async () => {
@@ -567,11 +600,13 @@ export function UploadWizard() {
               
               <Select
                 label="Subject"
-                placeholder="Select subject"
-                data={['Mathematics', 'Science', 'English', 'History', 'Art', 'Music', 'Physical Education', 'Other']}
+                placeholder={loadingSubjects ? 'Loading subjects...' : 'Select subject'}
+                data={schoolSubjects.map(s => s.subject_name)}
                 value={subject}
                 onChange={(value) => setSubject(value || '')}
                 required
+                searchable
+                nothingFoundMessage={loadingSubjects ? 'Loading...' : 'No subjects found'}
               />
               
               <Select

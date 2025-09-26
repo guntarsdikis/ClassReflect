@@ -43,6 +43,7 @@ import {
   IconMicrophone,
   IconUpload,
   IconDownload,
+  IconEdit,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -51,6 +52,7 @@ import { DatePickerInput } from '@mantine/dates';
 import { useAuthStore } from '@store/auth.store';
 import { RecordingsService, type Recording, type RecordingsFilters, type WordTimestamp } from '../services/recordings.service';
 import { schoolsService } from '@features/schools/services/schools.service';
+import { subjectsService, type SchoolSubject } from '@features/schools/services/subjects.service';
 import { templatesService, type Template } from '@features/templates/services/templates.service';
 import { analysisService, type AnalysisResult } from '@features/analysis/services/analysis.service';
 import { AnalysisResults } from '@features/analysis/components/AnalysisResults';
@@ -99,6 +101,15 @@ export function RecordingsList() {
   const [detailedView, setDetailedView] = useState(false);
   const [wordTimestamps, setWordTimestamps] = useState<WordTimestamp[]>([]);
   const [loadingWords, setLoadingWords] = useState(false);
+
+  // Edit info modal state
+  const [editModalOpened, setEditModalOpened] = useState(false);
+  const [editSubject, setEditSubject] = useState('');
+  const [editGrade, setEditGrade] = useState('');
+  const [editClassName, setEditClassName] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubject[]>([]);
+  const [gradeOptions, setGradeOptions] = useState<string[]>([]);
 
   const formatTimestamp = (seconds: number) => {
     if (!Number.isFinite(seconds) || seconds < 0) return '00:00.000';
@@ -308,6 +319,53 @@ export function RecordingsList() {
     setSelectedTemplateId('');
     await loadTemplates();
     setApplyModalOpened(true);
+  };
+
+  const openEditInfo = (recording: Recording) => {
+    setSelectedRecording(recording);
+    setEditSubject(recording.subject || '');
+    setEditGrade(recording.grade || '');
+    setEditClassName(recording.class_name || '');
+    // Load dropdown data for current school
+    void loadEditDropdownData();
+    setEditModalOpened(true);
+  };
+
+  const loadEditDropdownData = async () => {
+    const schoolId = getEffectiveSchoolId();
+    if (!schoolId) return;
+    try {
+      // Subjects from DB
+      const subjects = await subjectsService.getSchoolSubjects(schoolId);
+      setSchoolSubjects(subjects);
+    } catch (e) {
+      setSchoolSubjects([]);
+    }
+    // Grades: use consistent K,1..12 list (same as upload)
+    try {
+      setGradeOptions(templatesService.getGradeLevels());
+    } catch (e) {
+      setGradeOptions(['K','1','2','3','4','5','6','7','8','9','10','11','12']);
+    }
+  };
+
+  const saveEditInfo = async () => {
+    if (!selectedRecording) return;
+    try {
+      setSavingEdit(true);
+      await RecordingsService.updateRecordingInfo(selectedRecording.id, {
+        subject: editSubject || undefined,
+        grade: editGrade || undefined,
+        class_name: editClassName || undefined,
+      });
+      notifications.show({ title: 'Updated', message: 'Recording info updated', color: 'green', icon: <IconCheck /> });
+      setEditModalOpened(false);
+      await refetch();
+    } catch (e: any) {
+      notifications.show({ title: 'Update failed', message: e?.response?.data?.error || e?.message || 'Could not update recording info', color: 'red' });
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const applyTemplate = async () => {
@@ -788,6 +846,16 @@ export function RecordingsList() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs">
+                          {(['school_manager', 'super_admin'].includes(user?.role || '')) && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="blue"
+                              onClick={() => openEditInfo(recording)}
+                              title="Edit info"
+                            >
+                              <IconEdit size={16} />
+                            </ActionIcon>
+                          )}
                           <ActionIcon
                             variant="subtle"
                             color="teal"
@@ -1164,6 +1232,57 @@ export function RecordingsList() {
         ) : (
           <Loader />
         )}
+      </Modal>
+
+      {/* Edit Info Modal */}
+      <Modal
+        opened={editModalOpened}
+        onClose={() => setEditModalOpened(false)}
+        title="Edit Recording Info"
+        size="md"
+      >
+        <Stack>
+          <TextInput
+            label="Class Name"
+            placeholder="e.g., Algebra I - Period 2"
+            value={editClassName}
+            onChange={(e) => setEditClassName(e.currentTarget.value)}
+          />
+          <Select
+            label="Subject"
+            placeholder={schoolSubjects.length ? 'Select subject' : 'No subjects found'}
+            data={(() => {
+              const list = schoolSubjects.map(s => s.subject_name);
+              const cur = editSubject?.trim();
+              if (cur && !list.includes(cur)) list.unshift(cur);
+              return list;
+            })()}
+            value={editSubject}
+            onChange={(v) => setEditSubject(v || '')}
+            searchable
+            clearable
+            nothingFoundMessage="No subjects"
+          />
+          <Select
+            label="Grade"
+            placeholder={gradeOptions.length ? 'Select grade' : 'No grades found'}
+            data={(function() {
+              const list = [...gradeOptions];
+              const cur = editGrade?.trim();
+              if (cur && !list.includes(cur)) list.unshift(cur);
+              return list;
+            })()}
+            value={editGrade}
+            onChange={(v) => setEditGrade(v || '')}
+            searchable
+            clearable
+            nothingFoundMessage="No grades"
+          />
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={() => setEditModalOpened(false)}>Cancel</Button>
+            <Button loading={savingEdit} onClick={saveEditInfo}>Save</Button>
+          </Group>
+        </Stack>
       </Modal>
     </Container>
   );

@@ -505,9 +505,9 @@ class AssemblyAIService {
       }
 
       if (transcript.status === 'error') {
-        // If the error is a download error (likely expired S3 URL stored previously), try S3 fallback
+        // If the error is a download error or file not found (expired or GC'd), try S3 fallback
         const errMsg = (transcript.error || '').toLowerCase();
-        if (/download\s+error|unable\s+to\s+download/.test(errMsg)) {
+        if (/download\s+error|unable\s+to\s+download|file\s+not\s+found/.test(errMsg)) {
           console.warn('⚠️ Stored upload URL produced download error during polling. Attempting S3 fallback if available...');
           const [s3Rows] = await pool.execute<RowDataPacket[]>(
             'SELECT s3_key FROM audio_jobs WHERE id = ? LIMIT 1',

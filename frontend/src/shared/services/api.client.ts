@@ -33,6 +33,12 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<{ message?: string; error?: string }>) => {
+    // Allow callers to suppress global error toasts for background/polling requests
+    const cfg: any = error.config || {};
+    const isSilent = cfg.headers?.['X-Silent'] === '1' || cfg.params?.silent === 1 || cfg.params?.silent === '1';
+    if (isSilent) {
+      return Promise.reject(error);
+    }
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
       useAuthStore.getState().logout();

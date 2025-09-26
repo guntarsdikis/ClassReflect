@@ -80,8 +80,8 @@ export class RecordingsService {
 
     const queryString = params.toString();
     const url = `/jobs/recordings${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await apiClient.get<RecordingsResponse>(url);
+    // Mark as silent to avoid global error toasts during background polling
+    const response = await apiClient.get<RecordingsResponse>(url, { headers: { 'X-Silent': '1' } });
     return response.data;
   }
 

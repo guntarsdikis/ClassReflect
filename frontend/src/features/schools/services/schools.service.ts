@@ -1,4 +1,4 @@
-import { ApiClient } from '@shared/services/api.client';
+import apiClient, { ApiClient } from '@shared/services/api.client';
 
 export interface School {
   id: number;
@@ -93,7 +93,9 @@ export class SchoolsService {
    * Get all schools (SuperAdmin only)
    */
   async getAllSchools(): Promise<School[]> {
-    return this.api.get<School[]>('/schools');
+    // Send a silent header for background refreshes
+    const res = await apiClient.get('/schools', { headers: { 'X-Silent': '1' } });
+    return res.data as School[];
   }
 
   /**

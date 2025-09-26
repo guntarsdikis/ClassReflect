@@ -582,16 +582,20 @@ router.post('/:jobId/retranscribe',
         ['queued', jobId]
       );
 
-      // Prefer retrying with stored AssemblyAI upload URL (stable CDN) when available
+      // Prefer retrying with stored AssemblyAI upload URL (stable CDN) when available.
+      // Run asynchronously to avoid client timeouts; return immediately.
       if (job.assemblyai_upload_url) {
-        await assemblyAIService.retryTranscription(jobId);
-        return res.json({ jobId, mode: 'assemblyai_url', status: 'processing', message: 'Re-transcription retried via AssemblyAI upload URL' });
+        Promise.resolve()
+          .then(() => assemblyAIService.retryTranscription(jobId))
+          .catch(err => console.error(`Async retryTranscription failed for job ${jobId}:`, err));
+        return res.status(202).json({ jobId, mode: 'assemblyai_url', status: 'processing', message: 'Re-transcription started (using stored AssemblyAI URL)' });
       }
 
       // Otherwise, fall back to S3-based processing if we have an s3_key
       if (job.s3_key) {
+        // This already runs async internally
         await processingService.enqueueJobFromS3(jobId);
-        return res.json({ jobId, mode: 's3', status: 'queued', message: 'Re-transcription started from S3 object' });
+        return res.status(202).json({ jobId, mode: 's3', status: 'queued', message: 'Re-transcription started from S3 object' });
       }
 
       return res.status(400).json({ error: 'No source available to retranscribe (missing s3_key and upload URL)' });

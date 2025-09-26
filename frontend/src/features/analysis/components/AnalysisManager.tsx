@@ -308,7 +308,13 @@ export function AnalysisManager() {
   const handleDownloadPDF = async (analysis: AnalysisResult) => {
     try {
       // Generate PDF blob
-      const doc = <AnalysisReportPDF analysis={analysis} />;
+      const isTeacher = user?.role === 'teacher';
+      const doc = (
+        <AnalysisReportPDF 
+          analysis={analysis} 
+          hideScores={isTeacher}
+        />
+      );
       const asPdf = pdf(doc);
       const blob = await asPdf.toBlob();
       
@@ -852,6 +858,16 @@ export function AnalysisManager() {
                     <Badge size="sm" variant="filled" color="green">
                       Template ID: {analysis.template_id}
                     </Badge>
+                    {user?.role === 'super_admin' && analysis.ai_model && (
+                      <Badge
+                        size="sm"
+                        variant="outline"
+                        color="violet"
+                        title={`AI model used: ${analysis.ai_model}`}
+                      >
+                        AI: {analysis.ai_model}
+                      </Badge>
+                    )}
                   </Group>
                   {analysis.template_description && (
                     <Text size="xs" c="dimmed" mt="xs">

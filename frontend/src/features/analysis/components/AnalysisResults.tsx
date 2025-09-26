@@ -11,7 +11,8 @@ import {
   List,
   Divider,
   ThemeIcon,
-  Timeline
+  Timeline,
+  Alert
 } from '@mantine/core';
 import {
   IconTrendingUp,
@@ -25,12 +26,16 @@ import {
   IconFileText
 } from '@tabler/icons-react';
 import { type AnalysisResult } from '../services/analysis.service';
+import { useAuthStore } from '@store/auth.store';
 
 interface AnalysisResultsProps {
   analysis: AnalysisResult;
 }
 
 export function AnalysisResults({ analysis }: AnalysisResultsProps) {
+  const user = useAuthStore((state) => state.user);
+  const isTeacher = user?.role === 'teacher';
+
   // Debug logging to see what data we're receiving
   console.log('🔍 AnalysisResults - Full analysis data:', analysis);
   console.log('🔍 AnalysisResults - Detailed feedback:', analysis.detailed_feedback);
@@ -153,72 +158,74 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
         </Grid>
       </Paper>
 
-      {/* Overall Score */}
-      <Paper p="xl" withBorder radius="md" style={{ 
-        background: `linear-gradient(135deg, 
-          ${getScoreColor(analysis.overall_score) === 'green' ? '#e8f5e8' : 
-            getScoreColor(analysis.overall_score) === 'yellow' ? '#fff9e6' : '#ffeaea'} 0%, 
-          #ffffff 100%)`
-      }}>
-        <Stack align="center" gap="md">
-          <Group gap="lg" align="center">
-            <ThemeIcon 
-              size={64} 
-              radius="xl" 
-              color={getScoreColor(analysis.overall_score)}
-              variant="filled"
-            >
-              <IconChartBar size={32} />
-            </ThemeIcon>
-            <div style={{ textAlign: 'center' }}>
-              <Title order={1} c={getScoreColor(analysis.overall_score)} size="3rem">
-                {Math.round(analysis.overall_score)}%
-              </Title>
-              <Text size="lg" fw={500} c="dimmed">
-                Overall Teaching Performance
-              </Text>
-            </div>
-          </Group>
-          
-          <div style={{ width: '100%', maxWidth: '400px' }}>
-            <Progress 
-              value={analysis.overall_score} 
-              color={getScoreColor(analysis.overall_score)}
-              size="xl" 
-              radius="xl"
-              mb="sm"
-              styles={{
-                bar: { borderRadius: '12px' }
-              }}
-            />
-            <Group justify="space-between">
-              <Text size="xs" c="dimmed">Needs Work</Text>
-              <Text size="xs" c="dimmed">Excellent</Text>
+      {/* Overall Score - Hidden for Teachers */}
+      {!isTeacher && (
+        <Paper p="xl" withBorder radius="md" style={{
+          background: `linear-gradient(135deg,
+            ${getScoreColor(analysis.overall_score) === 'green' ? '#e8f5e8' :
+              getScoreColor(analysis.overall_score) === 'yellow' ? '#fff9e6' : '#ffeaea'} 0%,
+            #ffffff 100%)`
+        }}>
+          <Stack align="center" gap="md">
+            <Group gap="lg" align="center">
+              <ThemeIcon
+                size={64}
+                radius="xl"
+                color={getScoreColor(analysis.overall_score)}
+                variant="filled"
+              >
+                <IconChartBar size={32} />
+              </ThemeIcon>
+              <div style={{ textAlign: 'center' }}>
+                <Title order={1} c={getScoreColor(analysis.overall_score)} size="3rem">
+                  {Math.round(analysis.overall_score)}
+                </Title>
+                <Text size="lg" fw={500} c="dimmed">
+                  Overall Teaching Performance
+                </Text>
+              </div>
             </Group>
-          </div>
-          
-          <Group gap="md">
-            <Badge 
-              size="xl" 
-              color={getScoreColor(analysis.overall_score)}
-              variant="filled"
-              radius="md"
-            >
-              {getScoreLabel(analysis.overall_score)}
-            </Badge>
-            {analysis.detailed_feedback && (
-              <Badge 
-                size="lg" 
-                color="blue" 
-                variant="light"
+
+            <div style={{ width: '100%', maxWidth: '400px' }}>
+              <Progress
+                value={analysis.overall_score}
+                color={getScoreColor(analysis.overall_score)}
+                size="xl"
+                radius="xl"
+                mb="sm"
+                styles={{
+                  bar: { borderRadius: '12px' }
+                }}
+              />
+              <Group justify="space-between">
+                <Text size="xs" c="dimmed">Needs Work</Text>
+                <Text size="xs" c="dimmed">Excellent</Text>
+              </Group>
+            </div>
+
+            <Group gap="md">
+              <Badge
+                size="xl"
+                color={getScoreColor(analysis.overall_score)}
+                variant="filled"
                 radius="md"
               >
-                {Object.keys(analysis.detailed_feedback).length} Criteria Evaluated
+                {getScoreLabel(analysis.overall_score)}
               </Badge>
-            )}
-          </Group>
-        </Stack>
-      </Paper>
+              {analysis.detailed_feedback && (
+                <Badge
+                  size="lg"
+                  color="blue"
+                  variant="light"
+                  radius="md"
+                >
+                  {Object.keys(analysis.detailed_feedback).length} Criteria Evaluated
+                </Badge>
+              )}
+            </Group>
+          </Stack>
+        </Paper>
+      )}
 
       <Grid>
         {/* Strengths */}
@@ -305,59 +312,67 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
                     <Text size="lg" fw={600}>
                       {category}
                     </Text>
-                    <Badge 
-                      size="lg" 
-                      color={getScoreColor(feedback.score)} 
-                      variant="filled"
-                      radius="md"
-                    >
-                      {Math.round(feedback.score)}%
-                    </Badge>
-                    <Badge 
-                      size="sm" 
-                      color={getScoreColor(feedback.score)} 
-                      variant="light"
-                    >
-                      {getScoreLabel(feedback.score)}
-                    </Badge>
+                    {!isTeacher && (
+                      <>
+                        <Badge
+                          size="lg"
+                          color={getScoreColor(feedback.score)}
+                          variant="filled"
+                          radius="md"
+                        >
+                          {Math.round(feedback.score)}
+                        </Badge>
+                        <Badge
+                          size="sm"
+                          color={getScoreColor(feedback.score)}
+                          variant="light"
+                        >
+                          {getScoreLabel(feedback.score)}
+                        </Badge>
+                      </>
+                    )}
                   </Group>
                 }
                 bullet={
-                  <ThemeIcon 
-                    size={32} 
-                    color={getScoreColor(feedback.score)} 
+                  <ThemeIcon
+                    size={32}
+                    color={isTeacher ? 'blue' : getScoreColor(feedback.score)}
                     radius="xl"
                   >
                     <Text size="sm" fw={700} c="white">
-                      {Math.round(feedback.score)}
+                      {isTeacher ? category.charAt(0) : Math.round(feedback.score)}
                     </Text>
                   </ThemeIcon>
                 }
               >
                 <Paper p="lg" bg="gray.0" mt="xs" radius="md" withBorder>
                   <Stack gap="md">
-                    <div>
-                      <Text size="sm" c="dimmed" mb="xs">Performance Score</Text>
-                      <Progress 
-                        value={feedback.score} 
-                        color={getScoreColor(feedback.score)}
-                        size="lg" 
-                        radius="xl"
-                        mb="xs"
-                        styles={{
-                          bar: { borderRadius: '8px' }
-                        }}
-                      />
-                      <Group justify="space-between">
-                        <Text size="xs" c="dimmed">0%</Text>
-                        <Text size="sm" fw={600} c={getScoreColor(feedback.score)}>
-                          {Math.round(feedback.score)}%
-                        </Text>
-                        <Text size="xs" c="dimmed">100%</Text>
-                      </Group>
-                    </div>
-                    
-                    <Divider />
+                    {!isTeacher && (
+                      <>
+                        <div>
+                          <Text size="sm" c="dimmed" mb="xs">Performance Score</Text>
+                          <Progress
+                            value={feedback.score}
+                            color={getScoreColor(feedback.score)}
+                            size="lg"
+                            radius="xl"
+                            mb="xs"
+                            styles={{
+                              bar: { borderRadius: '8px' }
+                            }}
+                          />
+                          <Group justify="space-between">
+                            <Text size="xs" c="dimmed">0</Text>
+                            <Text size="sm" fw={600} c={getScoreColor(feedback.score)}>
+                              {Math.round(feedback.score)}
+                            </Text>
+                            <Text size="xs" c="dimmed">100</Text>
+                          </Group>
+                        </div>
+
+                        <Divider />
+                      </>
+                    )}
                     
                     <div>
                       <Text size="sm" fw={500} mb="xs" c="dark">

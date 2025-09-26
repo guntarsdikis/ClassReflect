@@ -164,9 +164,11 @@ const styles = StyleSheet.create({
 
 interface AnalysisReportPDFProps {
   analysis: AnalysisResult;
+  // When true, hide numeric scores/percentages from the report
+  hideScores?: boolean;
 }
 
-export function AnalysisReportPDF({ analysis }: AnalysisReportPDFProps) {
+export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisReportPDFProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -239,16 +241,18 @@ export function AnalysisReportPDF({ analysis }: AnalysisReportPDFProps) {
           </View>
         </View>
 
-        {/* Overall Score */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Overall Performance</Text>
-          <View style={styles.scoreContainer}>
-            <Text style={styles.scoreText}>{Math.round(analysis.overall_score)}%</Text>
-            <Text style={styles.scoreLabel}>
-              {getScoreLabel(analysis.overall_score)} Performance
-            </Text>
+        {/* Overall Score (hidden when hideScores) */}
+        {!hideScores && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Overall Performance</Text>
+            <View style={styles.scoreContainer}>
+              <Text style={styles.scoreText}>{Math.round(analysis.overall_score)}%</Text>
+              <Text style={styles.scoreLabel}>
+                {getScoreLabel(analysis.overall_score)} Performance
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Strengths */}
         {analysis.strengths && analysis.strengths.length > 0 && (
@@ -290,7 +294,9 @@ export function AnalysisReportPDF({ analysis }: AnalysisReportPDFProps) {
               <View key={category} style={styles.categoryContainer}>
                 <View style={styles.categoryHeader}>
                   <Text style={styles.categoryName}>{category}</Text>
-                  <Text style={styles.categoryScore}>{Math.round(feedback.score)}%</Text>
+                  {!hideScores && (
+                    <Text style={styles.categoryScore}>{Math.round(feedback.score)}%</Text>
+                  )}
                 </View>
                 <Text style={styles.feedbackText}>{feedback.feedback}</Text>
               </View>

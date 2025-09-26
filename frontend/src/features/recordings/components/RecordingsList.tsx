@@ -125,7 +125,13 @@ export function RecordingsList() {
 
   const handleDownloadPDF = async (analysis: AnalysisResult) => {
     try {
-      const doc = <AnalysisReportPDF analysis={analysis} />;
+      const isTeacher = user?.role === 'teacher';
+      const doc = (
+        <AnalysisReportPDF 
+          analysis={analysis} 
+          hideScores={isTeacher}
+        />
+      );
       const asPdf = pdf(doc);
       const blob = await asPdf.toBlob();
 
@@ -604,17 +610,19 @@ export function RecordingsList() {
         </Grid>
 
         <Grid mt="md">
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Text size="sm" mb={5}>Score Range: {extraFilters.scoreRange[0]}% - {extraFilters.scoreRange[1]}%</Text>
-            <RangeSlider
-              value={extraFilters.scoreRange}
-              onChange={(val) => setExtraFilters((p) => ({ ...p, scoreRange: val as [number, number] }))}
-              min={0}
-              max={100}
-              step={5}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
+          {user?.role !== 'teacher' && (
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Text size="sm" mb={5}>Score Range: {extraFilters.scoreRange[0]}% - {extraFilters.scoreRange[1]}%</Text>
+              <RangeSlider
+                value={extraFilters.scoreRange}
+                onChange={(val) => setExtraFilters((p) => ({ ...p, scoreRange: val as [number, number] }))}
+                min={0}
+                max={100}
+                step={5}
+              />
+            </Grid.Col>
+          )}
+          <Grid.Col span={{ base: 12, md: user?.role === 'teacher' ? 12 : 6 }}>
             <Text size="sm" mb={5}>Date Range</Text>
             <Group>
               <DatePickerInput placeholder="From" value={extraFilters.dateFrom} onChange={(v) => setExtraFilters((p) => ({ ...p, dateFrom: v }))} size="sm" />
@@ -1021,8 +1029,25 @@ export function RecordingsList() {
                 <div>
                   <Text fw={500} mb="xs">{analysis.template_name || 'Template'}</Text>
                   <Group gap="xs" mb="xs">
-                    <Badge size="sm" variant="light" color="blue">Score: {analysis.overall_score}</Badge>
+                    {user?.role !== 'teacher' && (
+                      <Badge size="sm" variant="light" color="blue">Score: {analysis.overall_score}</Badge>
+                    )}
                     <Badge size="sm" variant="outline" color="gray">{new Date(analysis.created_at).toLocaleString()}</Badge>
+                    {typeof analysis.template_id !== 'undefined' && (
+                      <Badge size="sm" variant="filled" color="green">
+                        Template ID: {analysis.template_id}
+                      </Badge>
+                    )}
+                    {user?.role === 'super_admin' && analysis.ai_model && (
+                      <Badge
+                        size="sm"
+                        variant="outline"
+                        color="violet"
+                        title={`AI model used: ${analysis.ai_model}`}
+                      >
+                        AI: {analysis.ai_model}
+                      </Badge>
+                    )}
                   </Group>
                   {analysis.template_description && (
                     <Text size="xs" c="dimmed">{analysis.template_description}</Text>

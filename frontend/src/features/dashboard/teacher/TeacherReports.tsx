@@ -309,8 +309,13 @@ export function TeacherReports() {
 
       console.log('📝 Generating PDF for analysis:', analysis.id);
 
-      // Generate PDF blob
-      const doc = <AnalysisReportPDF analysis={analysis} />;
+      // Generate PDF blob (hide scores and evaluations for teachers)
+      const doc = (
+        <AnalysisReportPDF 
+          analysis={analysis} 
+          hideScores
+        />
+      );
       const asPdf = pdf(doc);
       console.log('🔄 Converting to blob...');
       const blob = await asPdf.toBlob();
@@ -997,15 +1002,22 @@ export function TeacherReports() {
                     {analysis.template_name || 'Unknown Template'}
                   </Text>
                   <Group gap="xs" mb="xs">
-                    <Badge size="sm" variant="light" color="blue">
-                      Score: {analysis.overall_score}
-                    </Badge>
                     <Badge size="sm" variant="outline" color="gray">
                       {formatDisplayDate(analysis.created_at)}
                     </Badge>
                     {analysis.template_id !== undefined && (
                       <Badge size="sm" variant="filled" color="green">
                         Template ID: {analysis.template_id}
+                      </Badge>
+                    )}
+                    {user?.role === 'super_admin' && analysis.ai_model && (
+                      <Badge
+                        size="sm"
+                        variant="outline"
+                        color="violet"
+                        title={`AI model used: ${analysis.ai_model}`}
+                      >
+                        AI: {analysis.ai_model}
                       </Badge>
                     )}
                   </Group>

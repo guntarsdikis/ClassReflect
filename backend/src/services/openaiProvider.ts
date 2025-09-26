@@ -42,12 +42,14 @@ export class OpenAIProvider {
       if (Number.isFinite(n)) return Math.max(256, Math.min(n, 8000));
     }
     // Reasonable default caps; adjust per model family if needed
-    if ((model || '').includes('gpt-4o')) return 4000;
+    // gpt-4o can handle larger structured outputs; allow a higher cap by default
+    if ((model || '').includes('gpt-4o')) return 7000;
     return 2000;
   }
 
-  private getResponseFormat(): { type: 'json_object' } | { type: 'json_schema'; json_schema: any } {
-    const mode = (process.env.OPENAI_RESPONSE_FORMAT || 'json_object').toLowerCase();
+  private getResponseFormat(modeOverride?: 'json_object' | 'json_schema'): { type: 'json_object' } | { type: 'json_schema'; json_schema: any } {
+    const envMode = (process.env.OPENAI_RESPONSE_FORMAT || 'json_object').toLowerCase() as 'json_object' | 'json_schema';
+    const mode = (modeOverride || envMode);
     if (mode === 'json_schema') {
       const schema = {
         name: 'analysis_schema',
@@ -193,22 +195,22 @@ export class OpenAIProvider {
       throw new Error(message);
     }
 
-    // Build OpenAI-specific Universal Template-Aware Prompt (updated)
+    // Build OpenAI-specific Universal Template-Aware Prompt (updated to latest spec)
     const buildOpenAiCoachPrompt = () => {
       const lines: string[] = [];
       lines.push(
         'You are an expert instructional coach analyzing a classroom transcript using a dynamic evaluation template.',
         '',
         'PRIMARY GOAL',
-        '- Provide constructive, motivational, evidence-based coaching feedback for the teacher.',
-        '- This report is for growth, not punishment.',
-        '- Numbers are for admin tracking; narrative must be teacher-facing and improvement-focused.',
+        '- Provide constructive, motivational, and evidence-based coaching feedback.',
+        '- Reports should motivate teachers, not punish them.',
+        '- Numbers are for admin tracking; narrative feedback must always be teacher-facing and improvement-focused.',
         '',
         'STYLE',
         '- Coaching voice: warm, specific, encouraging; use direct address (“You did…”, “Next time, consider…”).',
-        '- Ground every claim in transcript evidence (quotes + timestamps).',
-        '- For each criterion’s “feedback”, write 6 sentences (not fewer) and ≤120 words.',
-        '- Avoid generic advice; always include a micro-action and an exemplar script.',
+        '- Always ground claims in transcript evidence (quotes + timestamps).',
+        '- For each criterion, write exactly 6 sentences (≥6), ≤120 words.',
+        '- Avoid vague “No evidence available” comments. Always give at least one actionable suggestion and exemplar.',
         '',
         'MOTIVATIONAL SCORING RUBRIC',
         '- 55–65 = Baseline / Absent but improvable → Give credit, explain one easy way to add it next lesson.',
@@ -218,26 +220,26 @@ export class OpenAIProvider {
         '- 93–100 = Exemplary → Best practice; affirm and encourage sharing.',
         '',
         'CONTEXT CALIBRATION (subject + grade)',
-        '- Always interpret evidence in light of grade level and subject area.',
-        '- Younger (K–5): prioritize engagement, routines, presence over formal academic language.',
-        '- Middle/High (6–12): emphasize precision, academic vocabulary, independent participation.',
-        '- Mathematics: Cold Call & Wait Time often mean short factual checks—focus on distribution, clarity, and error analysis rather than long responses.',
-        '- Humanities/Language: emphasize elaboration, extended responses, textual evidence.',
-        '- Do NOT penalize developmentally typical responses; offer age-appropriate improvements.',
+        '- Interpret evidence in light of grade and subject.',
+        '- Younger (K–5): prioritize engagement, routines, presence over formal academic responses.',
+        '- Middle/High (6–12): emphasize precision, vocabulary, independence.',
+        '- Mathematics: Cold Call & Wait Time may be short factual checks; focus on distribution and clarity.',
+        '- Humanities/Language: prioritize elaboration, extended responses, use of evidence.',
+        '- Never penalize developmentally typical behavior—always suggest age-appropriate growth moves.',
         '',
         'TARGET ADJUSTMENT BY CONTEXT',
-        '- If grade ≤2: treat “Format Matters—Complete Sentences” as emerging if students respond in words/phrases while teacher models stems; coach using brief sentence starters.',
-        '- If grade ≤5: treat Wait Time target as 2–4s (instead of 3–5s); emphasize routines that prevent blurting and enable think time.',
-        '- For “100%—Universal Participation” in K–5: interpret as on-task signals (eyes, hands, partner talk) rather than only verbal turns.',
-        '- For Math: short, frequent checks are valid; focus coaching on distribution and clarity rather than response length.',
+        '- If grade ≤2: treat “Format Matters – Complete Sentences” as emerging if students respond with words/phrases while teacher models stems; coach with sentence starters.',
+        '- If grade ≤5: adjust Wait Time to 2–4s (instead of 3–5s); emphasize routines that prevent blurting.',
+        '- For “100% Participation” in K–5: interpret as on-task signals (eyes on speaker, partner talk) not only verbal turns.',
+        '- For Math: short responses are valid; focus on distribution, error analysis, scaffolding precision.',
         '',
         'CLASS CONTEXT',
         '- Teacher: ' + classInfo.teacherName,
         '- Class: ' + classInfo.className,
         '- Subject: ' + classInfo.subject,
         '- Grade: ' + classInfo.grade,
-        '' ,
-        'EVALUATION TEMPLATE (dynamic)',
+        '',
+        'EVALUATION TEMPLATE',
         'Template Name: ' + templateName,
         'Criteria (with weights and definitions):'
       );
@@ -246,34 +248,36 @@ export class OpenAIProvider {
         const weightStr = Number.isFinite(weight) ? weight.toFixed(2) : String(weight || '0');
         lines.push(`- ${c.criteria_name} (${weightStr}%): ${c.prompt_template || `Evaluate the teacher's ${c.criteria_name.toLowerCase()}`}`);
       });
-      lines.push('', 'CRITERIA TO ANALYZE (template-linked)',
-        '- Use ONLY the criteria listed above (no additions/substitutions).',
-        '- In “detailed_feedback”, create one object per criterion using the EXACT criterion names (same spelling, hyphens, capitalization).',
-        '- If the template supplies weights/definitions, use them to interpret evidence and coach next steps.',
+      lines.push('', 'CRITERIA TO ANALYZE',
+        '- Use ONLY the listed criteria (no additions).',
+        '- In “detailed_feedback”, create one object per criterion using the EXACT criterion names from the template.',
+        '- Always include: score, feedback (6 sentences), evidence, observed_vs_target, next step, vision, exemplar, look_fors, avoid, context_anchor.',
         '',
-        'SHORT/QUIET SEGMENTS RULE',
-        '- If the transcript provides limited dialogue for a criterion, write “Limited evidence due to transcript context” and suggest one change that would produce evidence next time (e.g., “Insert 3 cold calls in the next 10 minutes”).',
+        'RULES FOR EVIDENCE',
+        '- Every criterion must include at least one transcript quote + timestamp.',
+        '- If transcript has limited evidence: write “Limited evidence due to transcript context” AND still suggest one change that would create evidence next time.',
+        '- Never output “No evidence available” without coaching advice.',
         '',
-        'LENGTH & CONSISTENCY RULES',
-        '- “feedback” = exactly 6 sentences (≥6), ≤120 words.',
-        '- Max 2 short quotes per criterion.',
-        '- Do not omit or rename fields; keep key names exactly as specified.',
-        '- If a required number is unknown, write “unknown” and still provide next_step_teacher_move + exemplar.',
+        'BALANCE REQUIREMENT',
+        '- Provide exactly 4 strengths and 4 improvements overall.',
+        '- Strengths must span different domains (e.g., questioning, framing, assessment).',
+        '- Improvements must include concrete teacher moves, not vague advice.',
         '',
         'IMPORTANT',
-        '- Do NOT include any overall/total score in JSON or narrative; if generated, remove it.',
-        '- Use criterion names exactly as in the template (including punctuation).',
-        '- Choose at most 2 “prioritized_criteria” (one quick win + one deeper skill).',
-        '- If evidence is missing, use Baseline scoring (55–65), write “No transcript evidence available” or “Limited evidence due to transcript context,” and still provide a micro-action + exemplar.'
+        '- Do NOT calculate or include any overall score.',
+        '- Do NOT omit any criterion, even if little/no evidence exists.',
+        '- Use criterion names exactly as written in the template (punctuation matters).',
+        '- Every criterion must produce feedback with evidence, next step, and exemplar.',
+        '- Coaching tone must be positive, actionable, and motivating.'
       );
       // Data to use (pause metrics if available)
       if (opts?.pauseMetrics) {
         const pm = opts.pauseMetrics;
         const fmt = (n: number, d = 2) => Number.isFinite(n) ? Number(n).toFixed(d) : String(n);
-        lines.push('WAIT-TIME METRICS (provided)',
+        lines.push('WAIT-TIME METRICS',
           `- Lesson span: ${fmt(pm.totalDurationSeconds)}s; Speech: ${fmt(pm.totalSpeechSeconds)}s; Silence: ${fmt(pm.totalSilenceSeconds)}s (${fmt(pm.silencePercentage)}%)`,
           `- Avg pause: ${fmt(pm.averageSilenceSeconds)}s; Median: ${fmt(pm.medianSilenceSeconds)}s; p90: ${fmt(pm.p90SilenceSeconds)}s; Long (≥${fmt(pm.longSilenceThresholdSeconds, 0)}s): ${pm.longSilenceCount}; Longest: ${fmt(pm.longestSilenceSeconds)}s`,
-          'Use these to support the Wait Time criterion.',
+          'Use these to support evaluation of Wait Time. Anchor feedback in these numbers + transcript excerpts.',
           '- Always pull at least one transcript quote per criterion, or mark “No transcript evidence available.”',
           '',
           'DO NOT:',
@@ -285,16 +289,16 @@ export class OpenAIProvider {
           '',
           'OUTPUT REQUIREMENT (return ONE JSON object exactly):',
           '{',
-          '  "strengths": ["strength1", "strength2", ...],',
-          '  "improvements": ["improvement1", "improvement2", ...],',
+          '  "strengths": ["strength1","strength2","strength3","strength4"],',
+          '  "improvements": ["improvement1","improvement2","improvement3","improvement4"],',
           '  "detailed_feedback": {',
           '    "<criterion_name>": {',
           '      "score": number,',
-          '      "feedback": "6 sentences (≤120 words): strength; evidence quote+timestamp; gap; why it matters; immediate next step; vision (include explicit subject+grade)",',
+          '      "feedback": "6 sentences: (1) concrete strength; (2) quote+timestamp evidence; (3) describe gap; (4) why it matters; (5) actionable next step; (6) vision of better practice (mention subject+grade).",',
           '      "evidence_excerpt": ["short quote 1","short quote 2 (optional)"],',
           '      "evidence_timestamp": ["[mm:ss]","[mm:ss] (optional)"],',
-          '      "observed_vs_target": "e.g., Cold Calls: 3 vs 8–12 (weight 7%); or Wait Time: avg 1.02s vs 2–4s (K–2 adjusted)",',
-          '      "next_step_teacher_move": "one precise micro-action",',
+          '      "observed_vs_target": "counts or averages vs target (with weight)",',
+          '      "next_step_teacher_move": "specific micro-action",',
           '      "vision_of_better_practice": "1–2 sentence improvement vision",',
           '      "exemplar": "≤25-word teacher script",',
           '      "look_fors": ["observable #1","observable #2"],',
@@ -302,7 +306,7 @@ export class OpenAIProvider {
           '      "context_anchor": "how subject + grade shaped scoring/advice"',
           '    }',
           '  },',
-          '  "coaching_summary": "2–3 upbeat paragraphs: celebrate 2–3 wins; set 1–2 growth priorities; connect to student outcomes; explicitly reference subject + grade.",',
+          '  "coaching_summary": "2–3 upbeat paragraphs: celebrate 2–3 wins; set 1–2 growth priorities; explain how these will improve student learning. Explicitly mention subject+grade.",',
           '  "next_lesson_plan": {',
           '    "focus_priorities": ["Priority 1","Priority 2"],',
           '    "10_min_practice_block": ["Minute 0–3: …","Minute 3–6: …","Minute 6–10: …"],',
@@ -393,7 +397,7 @@ export class OpenAIProvider {
       if (isParseError) {
         try {
           console.warn('🛠️ Retrying OpenAI call with strict json_schema to enforce valid JSON...');
-          const response = await doCall(primaryModel, this.getResponseFormat());
+          const response = await doCall(primaryModel, this.getResponseFormat('json_schema'));
           const content = response.data?.choices?.[0]?.message?.content || '{}';
           const analysisResult = this.safeParseJson(content);
           const overallScore = lemurService.calculateWeightedScore(analysisResult.detailed_feedback, criterions);

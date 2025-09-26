@@ -166,6 +166,13 @@ export class AnalysisService {
   }
 
   /**
+   * Delete a single analysis result by id
+   */
+  async deleteAnalysisResult(id: number): Promise<{ message: string }> {
+    return this.api.delete<{ message: string }>(`/analysis/result/${id}`);
+  }
+
+  /**
    * Get status of an analysis job
    */
   async getJobStatus(jobId: string): Promise<AnalysisJobStatus> {

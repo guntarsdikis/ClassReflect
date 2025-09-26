@@ -786,6 +786,44 @@ router.get('/job-status/:jobId',
 );
 
 /**
+ * DELETE /api/analysis/result/:id
+ * Delete a single analysis result
+ */
+router.delete('/result/:id',
+  authenticate,
+  authorize('school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Fetch analysis result to validate access and existence
+      const [rows] = await pool.execute(`
+        SELECT ar.id, ar.school_id 
+        FROM analysis_results ar 
+        WHERE ar.id = ?
+      `, [id]);
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(404).json({ error: 'Analysis result not found' });
+      }
+
+      const row: any = rows[0];
+      if (req.user!.role === 'school_manager' && row.school_id !== req.user!.schoolId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Delete the analysis result
+      await pool.execute('DELETE FROM analysis_results WHERE id = ? LIMIT 1', [id]);
+
+      res.json({ message: 'Analysis result deleted' });
+    } catch (error) {
+      console.error('Delete analysis result error:', error);
+      res.status(500).json({ error: 'Failed to delete analysis result' });
+    }
+  }
+);
+
+/**
  * Helper function to generate progress messages
  */
 function getProgressMessage(status: string, progressPercent: number): string {

@@ -185,15 +185,24 @@ export function TeacherReports() {
       }
       
       const results = await analysisService.getAnalysisResults(transcriptId);
+      // Sort analyses by most recent first
+      const sorted = Array.isArray(results)
+        ? [...results].sort((a, b) => {
+            const da = new Date(a.created_at).getTime();
+            const db = new Date(b.created_at).getTime();
+            if (Number.isNaN(da) || Number.isNaN(db)) return 0;
+            return db - da;
+          })
+        : [];
       
-      setAnalysisResults(results);
+      setAnalysisResults(sorted);
       setSelectedRecording(recording);
       
-      if (results.length === 1) {
+      if (sorted.length === 1) {
         // Single analysis - show directly
-        setSelectedAnalysis(results[0]);
+        setSelectedAnalysis(sorted[0]);
         openAnalysisModal();
-      } else if (results.length > 1) {
+      } else if (sorted.length > 1) {
         // Multiple analyses - show selection modal first
         openAnalysisSelectionModal();
       } else {
@@ -310,15 +319,20 @@ export function TeacherReports() {
       console.log('📝 Generating PDF for analysis:', analysis.id);
 
       // Generate PDF blob (hide scores and evaluations for teachers)
-      const doc = (
-        <AnalysisReportPDF 
-          analysis={analysis} 
-          hideScores
-        />
-      );
-      const asPdf = pdf(doc);
       console.log('🔄 Converting to blob...');
-      const blob = await asPdf.toBlob();
+      let blob: Blob | null = null;
+      try {
+        blob = await pdf(
+          <AnalysisReportPDF analysis={analysis} hideScores />
+        ).toBlob();
+      } catch (innerErr) {
+        console.warn('Primary PDF blob generation failed, attempting dataURL fallback...', innerErr);
+        const dataUrl = await pdf(
+          <AnalysisReportPDF analysis={analysis} hideScores />
+        ).toDataURL();
+        const res = await fetch(dataUrl);
+        blob = await res.blob();
+      }
       console.log('✅ PDF blob generated, size:', blob.size);
       
       // Create download link
@@ -362,6 +376,27 @@ export function TeacherReports() {
         message: `Failed to generate PDF report: ${error.message}. Please try again.`,
         color: 'red',
       });
+    }
+  };
+
+  const handleDeleteAnalysis = async (analysis: AnalysisResult) => {
+    if (!['school_manager', 'super_admin'].includes(user?.role || '')) return;
+    const confirmed = window.confirm(
+      `Delete analysis "${analysis.template_name || 'Template'}" created on ${formatDisplayDate(analysis.created_at)}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+    try {
+      await analysisService.deleteAnalysisResult(analysis.id);
+      notifications.show({ title: 'Analysis Deleted', message: 'The analysis has been removed.', color: 'green', icon: <IconCheck /> });
+      setAnalysisResults((prev) => {
+        const next = prev.filter((a) => a.id !== analysis.id);
+        if (next.length === 0) {
+          closeAnalysisSelectionModal();
+        }
+        return next;
+      });
+    } catch (e: any) {
+      notifications.show({ title: 'Deletion Failed', message: e?.response?.data?.error || e?.message || 'Failed to delete analysis', color: 'red' });
     }
   };
 
@@ -1048,6 +1083,7 @@ export function TeacherReports() {
                     variant="light" 
                     color="green"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       if (selectedRecording) {
                         handleExportPDF(selectedRecording, analysis);
@@ -1057,6 +1093,20 @@ export function TeacherReports() {
                   >
                     <IconDownload size={16} />
                   </ActionIcon>
+                  {['school_manager', 'super_admin'].includes(user?.role || '') && (
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteAnalysis(analysis);
+                      }}
+                      aria-label="Delete Analysis"
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  )}
                 </Group>
               </Group>
             </Paper>

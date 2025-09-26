@@ -123,17 +123,26 @@ export function RecordingsList() {
     }
   };
 
+  const [downloadingAnalysisId, setDownloadingAnalysisId] = useState<number | null>(null);
   const handleDownloadPDF = async (analysis: AnalysisResult) => {
     try {
+      setDownloadingAnalysisId(analysis.id);
       const isTeacher = user?.role === 'teacher';
-      const doc = (
-        <AnalysisReportPDF 
-          analysis={analysis} 
-          hideScores={isTeacher}
-        />
-      );
-      const asPdf = pdf(doc);
-      const blob = await asPdf.toBlob();
+      // Generate blob directly; fallback to data URL on failure
+      let blob: Blob | null = null;
+      try {
+        blob = await pdf(
+          <AnalysisReportPDF analysis={analysis} hideScores={isTeacher} />
+        ).toBlob();
+      } catch (innerErr) {
+        console.warn('Primary PDF blob generation failed, attempting dataURL fallback...', innerErr);
+        const dataUrl = await pdf(
+          <AnalysisReportPDF analysis={analysis} hideScores={isTeacher} />
+        ).toDataURL();
+        // Convert base64 dataURL to blob
+        const res = await fetch(dataUrl);
+        blob = await res.blob();
+      }
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -146,12 +155,36 @@ export function RecordingsList() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch (err: any) {
+      console.error('PDF generation failed:', err);
       notifications.show({
         title: 'Download Failed',
-        message: 'Could not generate PDF report. Please try again.',
+        message: err?.message || 'Could not generate PDF report. Please try again.',
         color: 'red',
       });
+    } finally {
+      setDownloadingAnalysisId(null);
+    }
+  };
+
+  const handleDeleteAnalysis = async (analysis: AnalysisResult) => {
+    if (!['school_manager', 'super_admin'].includes(user?.role || '')) return;
+    const confirmed = window.confirm(
+      `Delete analysis "${analysis.template_name || 'Template'}" created on ${new Date(analysis.created_at).toLocaleString()}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+    try {
+      await analysisService.deleteAnalysisResult(analysis.id);
+      notifications.show({ title: 'Analysis Deleted', message: 'The analysis has been removed.', color: 'green', icon: <IconCheck /> });
+      setAnalysisResults((prev) => {
+        const next = prev.filter((a) => a.id !== analysis.id);
+        if (next.length === 0) {
+          setAnalysisSelectionModalOpened(false);
+        }
+        return next;
+      });
+    } catch (e: any) {
+      notifications.show({ title: 'Deletion Failed', message: e?.response?.data?.error || e?.message || 'Failed to delete analysis', color: 'red' });
     }
   };
 
@@ -297,11 +330,20 @@ export function RecordingsList() {
       }
       const results = await analysisService.getAnalysisResults(recording.transcript_id);
       setSelectedRecording(recording);
-      setAnalysisResults(results);
+      // Sort analyses by most recent first
+      const sorted = Array.isArray(results)
+        ? [...results].sort((a, b) => {
+            const da = new Date(a.created_at).getTime();
+            const db = new Date(b.created_at).getTime();
+            if (Number.isNaN(da) || Number.isNaN(db)) return 0;
+            return db - da;
+          })
+        : [];
+      setAnalysisResults(sorted);
       if (results.length > 1) {
         setAnalysisSelectionModalOpened(true);
       } else {
-        setSelectedAnalysis(results[0] || null);
+        setSelectedAnalysis(sorted[0] || null);
         setResultsModalOpened(true);
       }
     } catch (e: any) {
@@ -1069,6 +1111,7 @@ export function RecordingsList() {
                     variant="light" 
                     color="green"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       handleDownloadPDF(analysis);
                     }}
@@ -1076,6 +1119,20 @@ export function RecordingsList() {
                   >
                     <IconDownload size={16} />
                   </ActionIcon>
+                  {['school_manager', 'super_admin'].includes(user?.role || '') && (
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteAnalysis(analysis);
+                      }}
+                      aria-label="Delete Analysis"
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  )}
                 </Group>
               </Group>
             </Paper>

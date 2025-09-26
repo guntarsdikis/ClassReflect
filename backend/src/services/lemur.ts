@@ -130,15 +130,22 @@ Please analyze this classroom transcript and provide:
 - Example: instead of “increase wait time,” write: “After asking a question, silently count to 5 before rephrasing (e.g., [06:12] ‘What do we have to do?’ → teacher moved on too quickly).”
 - Include a short exemplar of improved practice when helpful (e.g., “Instead of only calling on Ivan [05:51], add: ‘Sasha, what do you think? Amelia, can you add to that?’”).
 
-3) DETAILED ANALYSIS BY CATEGORY (Per Criterion)
-- score (0–100, motivational rubric)
-- feedback: 3–4 sentences that (a) acknowledge strengths, (b) describe observed evidence, (c) explain gaps, and (d) why it matters
-- evidence_excerpt: a short transcript quote (1–2 lines)
-- evidence_timestamp: approximate [mm:ss] or [hh:mm:ss]
-- observed_vs_target: counts or averages vs. benchmark
-- next_step_teacher_move: clear, actionable suggestion
-- vision_of_better_practice: how implementing this change would improve lesson dynamics
-- exemplar: a short model (e.g., sample teacher prompt, cold-call phrasing, or wait-time script)
+ 3) DETAILED ANALYSIS BY CATEGORY (Per Criterion)
+ - score (0–100, motivational rubric)
+ - feedback: 5–7 sentences minimum, covering in order:
+   1) one concrete strength you observed (positive framing)
+   2) one transcript quote + timestamp as evidence
+   3) what the teacher did that limited the technique (gap)
+   4) why this gap matters for student learning
+   5) one actionable next step the teacher can try immediately
+   6) a short “vision of better practice” (what the class would look/feel like if improved)
+   7) if possible, provide a model teacher script or routine
+ - evidence_excerpt: a short transcript quote (1–2 lines)
+ - evidence_timestamp: approximate [mm:ss] or [hh:mm:ss]
+ - observed_vs_target: counts or averages vs. benchmark
+ - next_step_teacher_move: clear, actionable suggestion
+ - vision_of_better_practice: how implementing this change would improve lesson dynamics
+ - exemplar: a short model (e.g., sample teacher prompt, cold-call phrasing, or wait-time script)
 
 IMPORTANT:
 - Do NOT calculate an overall score. Only provide individual criterion scores.
@@ -151,7 +158,7 @@ OUTPUT REQUIREMENT (return ONE JSON object exactly):
   "detailed_feedback": {
     "criterion_name": {
       "score": number,
-      "feedback": "praise + improvement coaching (4–6 sentences)",
+      "feedback": "5–7 sentences minimum covering: strength; evidence quote+timestamp; gap; why it matters; immediate next step; vision of better practice; model teacher script/routine if possible",
       "evidence_excerpt": ["short quote 1", "short quote 2 (optional)"],
       "evidence_timestamp": ["[mm:ss]", "[mm:ss] (optional)"],
       "observed_vs_target": "quantified comparison",

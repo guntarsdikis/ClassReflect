@@ -1,11 +1,7 @@
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { type AnalysisResult } from '../services/analysis.service';
 
-// Register fonts (optional - uses built-in fonts if not specified)
-Font.register({
-  family: 'Roboto',
-  src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-light-webfont.ttf',
-});
+// Use built-in PDF fonts to avoid remote font loading delays
 
 // Create styles
 const styles = StyleSheet.create({
@@ -169,14 +165,21 @@ interface AnalysisReportPDFProps {
 }
 
 export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisReportPDFProps) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatDate = (dateString?: string) => {
+    try {
+      if (!dateString) return '';
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return '';
+    }
   };
 
   const getScoreLabel = (score: number) => {
@@ -204,37 +207,25 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
           <View style={styles.infoGrid}>
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Teacher</Text>
-              <Text style={styles.infoValue}>
-                {analysis.teacher_first_name} {analysis.teacher_last_name}
-              </Text>
+              <Text style={styles.infoValue}>{`${analysis.teacher_first_name || ''} ${analysis.teacher_last_name || ''}`.trim() || '—'}</Text>
 
               <Text style={styles.infoLabel}>Class</Text>
-              <Text style={styles.infoValue}>
-                {analysis.class_name}
-              </Text>
+              <Text style={styles.infoValue}>{String(analysis.class_name || '—')}</Text>
 
               <Text style={styles.infoLabel}>Subject & Grade</Text>
-              <Text style={styles.infoValue}>
-                {analysis.subject} - Grade {analysis.grade}
-              </Text>
+              <Text style={styles.infoValue}>{`${analysis.subject || ''}${analysis.grade ? ` - Grade ${analysis.grade}` : ''}` || '—'}</Text>
             </View>
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Analysis Template</Text>
-              <Text style={styles.infoValue}>
-                {analysis.template_name || 'Unknown Template'}
-              </Text>
+              <Text style={styles.infoValue}>{String(analysis.template_name || 'Unknown Template')}</Text>
 
               <Text style={styles.infoLabel}>Analysis Date</Text>
-              <Text style={styles.infoValue}>
-                {formatDate(analysis.created_at)}
-              </Text>
+              <Text style={styles.infoValue}>{formatDate(analysis.created_at) || '—'}</Text>
 
               {analysis.applied_by_first_name && (
                 <>
                   <Text style={styles.infoLabel}>Applied By</Text>
-                  <Text style={styles.infoValue}>
-                    {analysis.applied_by_first_name} {analysis.applied_by_last_name}
-                  </Text>
+                  <Text style={styles.infoValue}>{`${analysis.applied_by_first_name || ''} ${analysis.applied_by_last_name || ''}`.trim() || '—'}</Text>
                 </>
               )}
             </View>
@@ -246,7 +237,7 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Overall Performance</Text>
             <View style={styles.scoreContainer}>
-              <Text style={styles.scoreText}>{Math.round(analysis.overall_score)}%</Text>
+              <Text style={styles.scoreText}>{`${Math.round(Number(analysis.overall_score || 0))}%`}</Text>
               <Text style={styles.scoreLabel}>
                 {getScoreLabel(analysis.overall_score)} Performance
               </Text>
@@ -262,7 +253,7 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
               {analysis.strengths.map((strength, index) => (
                 <View key={index} style={styles.listItem}>
                   <View style={styles.bullet} />
-                  <Text style={styles.listText}>{strength}</Text>
+                  <Text style={styles.listText}>{String(strength || '')}</Text>
                 </View>
               ))}
             </View>
@@ -277,7 +268,7 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
               {analysis.improvements.map((improvement, index) => (
                 <View key={index} style={styles.listItem}>
                   <View style={[styles.bullet, styles.improvementBullet]} />
-                  <Text style={styles.listText}>{improvement}</Text>
+                  <Text style={styles.listText}>{String(improvement || '')}</Text>
                 </View>
               ))}
             </View>
@@ -293,12 +284,12 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
             {Object.entries(analysis.detailed_feedback).map(([category, feedback], index) => (
               <View key={category} style={styles.categoryContainer}>
                 <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryName}>{category}</Text>
+                  <Text style={styles.categoryName}>{String(category)}</Text>
                   {!hideScores && (
-                    <Text style={styles.categoryScore}>{Math.round(feedback.score)}%</Text>
+                    <Text style={styles.categoryScore}>{`${Math.round(Number((feedback as any)?.score || 0))}%`}</Text>
                   )}
                 </View>
-                <Text style={styles.feedbackText}>{feedback.feedback}</Text>
+                <Text style={styles.feedbackText}>{String((feedback as any)?.feedback || '')}</Text>
               </View>
             ))}
           </View>
@@ -310,32 +301,25 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
           <View style={styles.infoGrid}>
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>AI Model</Text>
-              <Text style={styles.infoValue}>
-                {analysis.ai_model || 'Unknown Model'}
-              </Text>
+              <Text style={styles.infoValue}>{String(analysis.ai_model || 'Unknown Model')}</Text>
 
               <Text style={styles.infoLabel}>Analysis Summary</Text>
-              <Text style={styles.infoValue}>
-                {analysis.strengths?.length || 0} Strengths, {analysis.improvements?.length || 0} Improvements
-              </Text>
+              <Text style={styles.infoValue}>{`${analysis.strengths?.length || 0} Strengths, ${analysis.improvements?.length || 0} Improvements`}</Text>
             </View>
             <View style={styles.infoColumn}>
               {analysis.template_description && (
                 <>
                   <Text style={styles.infoLabel}>Template Description</Text>
-                  <Text style={styles.infoValue}>
-                    {analysis.template_description.length > 100 
-                      ? `${analysis.template_description.substring(0, 100)}...` 
-                      : analysis.template_description
-                    }
-                  </Text>
+                  <Text style={styles.infoValue}>{String(
+                    (analysis.template_description || '').length > 100
+                      ? `${(analysis.template_description || '').substring(0, 100)}...`
+                      : (analysis.template_description || '')
+                  )}</Text>
                 </>
               )}
 
               <Text style={styles.infoLabel}>Evaluation Criteria</Text>
-              <Text style={styles.infoValue}>
-                {analysis.detailed_feedback ? Object.keys(analysis.detailed_feedback).length : 0} criteria evaluated
-              </Text>
+              <Text style={styles.infoValue}>{`${analysis.detailed_feedback ? Object.keys(analysis.detailed_feedback).length : 0} criteria evaluated`}</Text>
             </View>
           </View>
         </View>

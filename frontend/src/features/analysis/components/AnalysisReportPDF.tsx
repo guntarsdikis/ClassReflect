@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { type AnalysisResult } from '../services/analysis.service';
+import { formatDateTimeLocal } from '@shared/utils/date';
 
 // Use built-in PDF fonts to avoid remote font loading delays
 
@@ -166,20 +167,8 @@ interface AnalysisReportPDFProps {
 
 export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisReportPDFProps) {
   const formatDate = (dateString?: string) => {
-    try {
-      if (!dateString) return '';
-      const d = new Date(dateString);
-      if (isNaN(d.getTime())) return '';
-      return d.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return '';
-    }
+    if (!dateString) return '';
+    return formatDateTimeLocal(dateString, { locale: 'en-US', dateStyle: 'long', timeStyle: 'short' });
   };
 
   const getScoreLabel = (score: number) => {

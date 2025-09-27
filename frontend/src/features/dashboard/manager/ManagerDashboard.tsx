@@ -29,6 +29,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
 import { format } from 'date-fns';
+import { formatDateLocal } from '@shared/utils/date';
 import { useQuery } from '@tanstack/react-query';
 import { jobsService } from '@features/jobs/services/jobs.service';
 import { usersService } from '@features/users/services/users.service';
@@ -308,7 +309,7 @@ export function ManagerDashboard() {
                     <Text size="sm" c="dimmed">N/A</Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="sm">{teacher.lastLogin ? format(new Date(teacher.lastLogin), 'MMM dd') : 'N/A'}</Text>
+                  <Text size="sm">{teacher.lastLogin ? formatDateLocal(teacher.lastLogin) : 'N/A'}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Group gap={4}>

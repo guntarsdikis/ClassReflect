@@ -49,7 +49,7 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
-import { format } from 'date-fns';
+import { formatDateLocal } from '@shared/utils/date';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { useAuthStore } from '@store/auth.store';
@@ -708,7 +708,7 @@ export function TemplateManagement() {
                           {template.description || 'No description'}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          Created: {format(new Date(template.created_at), 'MMM dd, yyyy')}
+                          Created: {formatDateLocal(template.created_at)}
                         </Text>
                       </div>
                     </Table.Td>

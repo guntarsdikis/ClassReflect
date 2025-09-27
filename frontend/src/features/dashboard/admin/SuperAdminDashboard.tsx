@@ -28,6 +28,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
 import { format } from 'date-fns';
+import { formatDateLocal, formatDateTimeLocal } from '@shared/utils/date';
 import { useQuery } from '@tanstack/react-query';
 import { schoolsService } from '@features/schools/services/schools.service';
 import { usersService } from '@features/users/services/users.service';
@@ -267,7 +268,7 @@ export function SuperAdminDashboard() {
                     <Table.Td>{schoolTeachers.length}</Table.Td>
                     <Table.Td>
                       <Text size="sm">
-                        {school.createdAt ? format(new Date(school.createdAt), 'MMM dd, yyyy') : 'N/A'}
+                        {school.createdAt ? formatDateLocal(school.createdAt) : 'N/A'}
                       </Text>
                     </Table.Td>
                     <Table.Td>
@@ -359,7 +360,7 @@ export function SuperAdminDashboard() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm">
-                        {format(new Date(recording.created_at), 'MMM dd, HH:mm')}
+                        {formatDateTimeLocal(recording.created_at, { dateStyle: 'medium', timeStyle: 'short' })}
                       </Text>
                     </Table.Td>
                     <Table.Td>

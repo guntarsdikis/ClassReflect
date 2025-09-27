@@ -25,7 +25,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { api } from '@shared/services/api.client';
 import { useAuthStore } from '@store/auth.store';
-import { format } from 'date-fns';
+import { formatDateLocal, formatDateTimeLocal } from '@shared/utils/date';
 
 interface ProfileData {
   id: number;
@@ -336,9 +336,8 @@ export function ProfilePage() {
                 <Text size="sm" fw={500}>Account Created:</Text>
                 <Text size="sm" c="dimmed">
                   {profile.createdAt && !isNaN(Date.parse(profile.createdAt))
-                    ? format(new Date(profile.createdAt), 'PPP')
-                    : 'Unknown'
-                  }
+                    ? formatDateLocal(profile.createdAt, { dateStyle: 'long' })
+                    : 'Unknown'}
                 </Text>
               </Group>
               
@@ -346,7 +345,7 @@ export function ProfilePage() {
                 <Group>
                   <Text size="sm" fw={500}>Last Login:</Text>
                   <Text size="sm" c="dimmed">
-                    {format(new Date(profile.lastLogin), 'PPP p')}
+                    {formatDateTimeLocal(profile.lastLogin, { dateStyle: 'long', timeStyle: 'short' })}
                   </Text>
                 </Group>
               )}

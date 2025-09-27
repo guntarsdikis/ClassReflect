@@ -34,6 +34,7 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { subjectsService, SchoolCategory, CreateCategoryRequest } from '../services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
+import { formatDateLocal } from '@shared/utils/date';
 
 interface CategoryFormData extends CreateCategoryRequest {
   color?: string;
@@ -293,7 +294,7 @@ export function CategoryManagement() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" c="dimmed">
-                        {new Date(category.created_at).toLocaleDateString()}
+                        {formatDateLocal(category.created_at)}
                       </Text>
                     </Table.Td>
                     <Table.Td>

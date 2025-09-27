@@ -35,6 +35,7 @@ import { modals } from '@mantine/modals';
 import { useAuthStore } from '@store/auth.store';
 import { useSchoolContextStore } from '@store/school-context.store';
 import { schoolsService, TemplateCategory, CreateTemplateCategoryRequest } from '@features/schools/services/schools.service';
+import { formatDateLocal } from '@shared/utils/date';
 
 interface CategoryFormData extends CreateTemplateCategoryRequest {
   color?: string;
@@ -320,7 +321,7 @@ export function TemplateCategoryManagement() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" c="dimmed">
-                        {new Date(category.created_at).toLocaleDateString()}
+                        {formatDateLocal(category.created_at)}
                       </Text>
                     </Table.Td>
                     <Table.Td>

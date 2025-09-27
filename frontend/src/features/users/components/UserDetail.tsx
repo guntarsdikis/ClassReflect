@@ -19,6 +19,7 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { useAuthStore } from '@store/auth.store';
 import { usersService, User } from '../services/users.service';
+import { formatDateLocal } from '@shared/utils/date';
 
 export function UserDetail() {
   const { id } = useParams<{ id: string }>();
@@ -343,12 +344,12 @@ export function UserDetail() {
               <Stack gap="sm">
                 <Group justify="space-between">
                   <Text fw={500}>Created:</Text>
-                  <Text>{new Date(user.createdAt).toLocaleDateString()}</Text>
+                  <Text>{formatDateLocal(user.createdAt)}</Text>
                 </Group>
                 {user.lastLogin && (
                   <Group justify="space-between">
                     <Text fw={500}>Last Login:</Text>
-                    <Text>{new Date(user.lastLogin).toLocaleDateString()}</Text>
+                    <Text>{formatDateLocal(user.lastLogin)}</Text>
                   </Group>
                 )}
                 <Group justify="space-between">

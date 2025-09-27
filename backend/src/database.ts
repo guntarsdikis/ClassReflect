@@ -9,6 +9,10 @@ const dbConfig = {
   user: process.env.DATABASE_USER || process.env.DB_USER || 'root',
   password: process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || '',
   database: process.env.DATABASE_NAME || process.env.DB_NAME || 'classreflect',
+  // Ensure all DATETIME/TIMESTAMP values are treated as UTC
+  timezone: 'Z',
+  // Keep DATE-only values as strings to avoid TZ-related day shifts
+  dateStrings: ['DATE'] as ('DATE' | 'DATETIME' | 'TIMESTAMP')[],
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -16,10 +20,20 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
+// Note: For mysql2/promise, there is no reliable 'connection' event on the
+// PromisePool wrapper. We set timezone via pool config (timezone: 'Z') and
+// explicitly in testConnection(). Avoid attaching non-promise listeners here.
+
 export async function testConnection(): Promise<boolean> {
   try {
     const connection = await pool.getConnection();
     await connection.ping();
+    // Force session time zone to UTC for this connection
+    try {
+      await connection.query("SET time_zone = '+00:00'");
+    } catch (e) {
+      console.warn('Could not set session time_zone to UTC:', e);
+    }
     connection.release();
     console.log('✅ Database connected successfully');
     return true;
@@ -33,7 +47,7 @@ export async function initializeDatabase(): Promise<void> {
   try {
     // Test connection
     await testConnection();
-    
+
     // Run lightweight migrations to ensure required columns exist
     await runMigrations();
     console.log('Database initialization complete');

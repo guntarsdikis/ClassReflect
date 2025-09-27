@@ -35,7 +35,7 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
-import { format } from 'date-fns';
+import { formatDateLocal } from '@shared/utils/date';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { schoolsService, School } from '../services/schools.service';
@@ -321,10 +321,10 @@ export function SchoolManagement() {
                     <Table.Td>
                       <div>
                         <Text size="sm">
-                          {format(new Date(school.created_at), 'MMM dd, yyyy')}
+                          {formatDateLocal(school.created_at)}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          Updated: {format(new Date(school.updated_at), 'MMM dd, yyyy')}
+                          Updated: {formatDateLocal(school.updated_at)}
                         </Text>
                       </div>
                     </Table.Td>

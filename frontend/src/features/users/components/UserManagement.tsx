@@ -45,6 +45,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@mantine/hooks';
 import { format } from 'date-fns';
+import { formatDateLocal } from '@shared/utils/date';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { usersService, User, CreateTeacherRequest, CreateUserRequest, UpdateUserRoleRequest } from '../services/users.service';
@@ -774,11 +775,11 @@ export function UserManagement() {
                           {user.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                         <Text size="xs" c="dimmed">
-                          Created: {format(new Date(user.createdAt), 'MMM dd, yyyy')}
+                          Created: {formatDateLocal(user.createdAt)}
                         </Text>
                         {user.lastLogin && (
                           <Text size="xs" c="dimmed">
-                            Last login: {format(new Date(user.lastLogin), 'MMM dd, yyyy')}
+                            Last login: {formatDateLocal(user.lastLogin)}
                           </Text>
                         )}
                       </div>

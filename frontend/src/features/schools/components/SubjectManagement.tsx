@@ -35,6 +35,7 @@ import { modals } from '@mantine/modals';
 import { subjectsService, SchoolSubject, CreateSubjectRequest } from '../services/subjects.service';
 import { useAuthStore } from '@store/auth.store';
 import { useSchoolContextStore } from '@store/school-context.store';
+import { formatDateLocal } from '@shared/utils/date';
 
 interface SubjectFormData extends CreateSubjectRequest {}
 
@@ -342,7 +343,7 @@ export function SubjectManagement() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" c="dimmed">
-                        {new Date(subject.created_at).toLocaleDateString()}
+                        {formatDateLocal(subject.created_at)}
                       </Text>
                     </Table.Td>
                     <Table.Td>

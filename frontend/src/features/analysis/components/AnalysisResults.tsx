@@ -27,6 +27,7 @@ import {
 } from '@tabler/icons-react';
 import { type AnalysisResult } from '../services/analysis.service';
 import { useAuthStore } from '@store/auth.store';
+import { formatDateTimeLocal } from '@shared/utils/date';
 
 interface AnalysisResultsProps {
   analysis: AnalysisResult;
@@ -58,15 +59,8 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
     return 'Requires Attention';
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (dateString: string) =>
+    formatDateTimeLocal(dateString, { locale: 'en-US', dateStyle: 'long', timeStyle: 'short' });
 
   return (
     <Stack>

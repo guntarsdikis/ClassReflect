@@ -40,6 +40,7 @@ import { useSchoolContextStore } from '@store/school-context.store';
 import { analysisService, type RecordingForAnalysis, type AnalysisResult, type AnalysisJobStatus } from '../services/analysis.service';
 import { templatesService, type Template } from '@features/templates/services/templates.service';
 import { AnalysisResults } from './AnalysisResults';
+import { formatDateTimeLocal } from '@shared/utils/date';
 import { AnalysisReportPDF } from './AnalysisReportPDF';
 import { pdf } from '@react-pdf/renderer';
 
@@ -303,21 +304,14 @@ export function AnalysisManager() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (dateString: string) =>
+    formatDateTimeLocal(dateString, { locale: 'en-US', dateStyle: 'medium', timeStyle: 'short' });
 
   const [downloadingAnalysisId, setDownloadingAnalysisId] = useState<number | null>(null);
   const handleDeleteAnalysis = async (analysis: AnalysisResult) => {
     if (!['school_manager', 'super_admin'].includes(user?.role || '')) return;
     const confirmed = window.confirm(
-      `Delete analysis "${analysis.template_name || 'Template'}" created on ${new Date(analysis.created_at).toLocaleString()}? This cannot be undone.`
+      `Delete analysis "${analysis.template_name || 'Template'}" created on ${formatDateTimeLocal(analysis.created_at)}? This cannot be undone.`
     );
     if (!confirmed) return;
     try {

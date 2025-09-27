@@ -47,6 +47,7 @@ import {
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { formatDateLocal, formatTimeLocal, formatDateTimeLocal } from '@shared/utils/date';
 import { notifications } from '@mantine/notifications';
 import { DatePickerInput } from '@mantine/dates';
 import { useAuthStore } from '@store/auth.store';
@@ -181,7 +182,7 @@ export function RecordingsList() {
   const handleDeleteAnalysis = async (analysis: AnalysisResult) => {
     if (!['school_manager', 'super_admin'].includes(user?.role || '')) return;
     const confirmed = window.confirm(
-      `Delete analysis "${analysis.template_name || 'Template'}" created on ${new Date(analysis.created_at).toLocaleString()}? This cannot be undone.`
+      `Delete analysis "${analysis.template_name || 'Template'}" created on ${formatDateTimeLocal(analysis.created_at)}? This cannot be undone.`
     );
     if (!confirmed) return;
     try {
@@ -820,10 +821,10 @@ export function RecordingsList() {
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm">
-                          {format(new Date(recording.created_at), 'MMM dd, yyyy')}
+                          {formatDateLocal(recording.created_at)}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          {format(new Date(recording.created_at), 'HH:mm')}
+                          {formatTimeLocal(recording.created_at, { timeStyle: 'short' })}
                         </Text>
                       </Table.Td>
                       <Table.Td>
@@ -1142,7 +1143,7 @@ export function RecordingsList() {
                     {user?.role !== 'teacher' && (
                       <Badge size="sm" variant="light" color="blue">Score: {analysis.overall_score}</Badge>
                     )}
-                    <Badge size="sm" variant="outline" color="gray">{new Date(analysis.created_at).toLocaleString()}</Badge>
+                    <Badge size="sm" variant="outline" color="gray">{formatDateTimeLocal(analysis.created_at)}</Badge>
                     {typeof analysis.template_id !== 'undefined' && (
                       <Badge size="sm" variant="filled" color="green">
                         Template ID: {analysis.template_id}

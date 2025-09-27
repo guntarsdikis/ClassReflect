@@ -42,6 +42,7 @@ import { useQuery } from '@tanstack/react-query';
 import { jobsService } from '@features/jobs/services/jobs.service';
 import { useAuthStore } from '@store/auth.store';
 import { format } from 'date-fns';
+import { formatDateLocal, formatDateTimeLocal, formatTimeLocal } from '@shared/utils/date';
 import { useState, useMemo, useEffect } from 'react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -108,19 +109,8 @@ export function TeacherReports() {
   const [playbackFileName, setPlaybackFileName] = useState<string | null>(null);
   
   // Match manager-style date display for analysis list
-  const formatDisplayDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
-  };
+  const formatDisplayDate = (dateString: string) =>
+    formatDateTimeLocal(dateString, { locale: 'en-US', dateStyle: 'medium', timeStyle: 'short' });
   
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -771,7 +761,7 @@ export function TeacherReports() {
                       <Table.Td>
                         <div>
                           <Text size="sm" fw={500}>{recording.file_name}</Text>
-                          <Text size="xs" c="dimmed">{format(new Date(recording.created_at), 'MMM dd, yyyy h:mm a')}</Text>
+                          <Text size="xs" c="dimmed">{formatDateTimeLocal(recording.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</Text>
                           {getStatusBadge(recording.status)}
                         </div>
                       </Table.Td>
@@ -881,7 +871,7 @@ export function TeacherReports() {
               </Grid.Col>
               <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Text size="sm" c="dimmed">Upload Date</Text>
-                <Text fw={500}>{format(new Date(selectedRecording.created_at), 'MMM dd, yyyy h:mm a')}</Text>
+                <Text fw={500}>{formatDateTimeLocal(selectedRecording.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</Text>
               </Grid.Col>
               <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Text size="sm" c="dimmed">Status</Text>
@@ -968,8 +958,8 @@ export function TeacherReports() {
               <div>
                 <Text size="lg" fw={600}>{selectedAnalysis.template_name}</Text>
                 <Text size="sm" c="dimmed">
-                  Applied by {selectedAnalysis.applied_by_first_name} {selectedAnalysis.applied_by_last_name} • {' '}
-                  {format(new Date(selectedAnalysis.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                  Applied by {selectedAnalysis.applied_by_first_name} {selectedAnalysis.applied_by_last_name} • {" "}
+                  {formatDateTimeLocal(selectedAnalysis.created_at, { dateStyle: 'medium', timeStyle: 'short' })}
                 </Text>
               </div>
               <Button

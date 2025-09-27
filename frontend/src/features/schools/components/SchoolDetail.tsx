@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import { IconArrowLeft, IconAlertCircle } from '@tabler/icons-react';
 import { schoolsService, School } from '../services/schools.service';
+import { formatDateLocal } from '@shared/utils/date';
 
 export function SchoolDetail() {
   const { id } = useParams<{ id: string }>();
@@ -141,11 +142,11 @@ export function SchoolDetail() {
                 </Group>
                 <Group justify="space-between">
                   <Text fw={500}>Expires:</Text>
-                  <Text>{new Date(school.subscription_expires).toLocaleDateString()}</Text>
+                  <Text>{formatDateLocal(school.subscription_expires)}</Text>
                 </Group>
                 <Group justify="space-between">
                   <Text fw={500}>Created:</Text>
-                  <Text>{new Date(school.created_at).toLocaleDateString()}</Text>
+                  <Text>{formatDateLocal(school.created_at)}</Text>
                 </Group>
               </Stack>
             </Card>

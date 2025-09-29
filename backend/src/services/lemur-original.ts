@@ -1,6 +1,5 @@
 import axios from 'axios';
 import type { PauseMetrics } from './pauseMetrics';
-import { promptManager, type PromptVariables } from './promptManager';
 
 export interface LemurTaskRequest {
   prompt: string;
@@ -33,7 +32,7 @@ export class LemurService {
   constructor() {
     this.apiKey = process.env.ASSEMBLYAI_API_KEY || '';
     this.baseUrl = 'https://api.assemblyai.com';
-
+    
     if (!this.apiKey) {
       console.warn('AssemblyAI API key not found. AI analysis will use mock data.');
     }
@@ -52,7 +51,7 @@ export class LemurService {
   /**
    * Build analysis prompt from template criterions
    */
-  async buildAnalysisPrompt(
+  buildAnalysisPrompt(
     templateName: string,
     criterions: TemplateCriterion[],
     classInfo: {
@@ -61,56 +60,25 @@ export class LemurService {
       grade: string;
       teacherName: string;
     },
-    options?: { pauseMetrics?: PauseMetrics | null; timingContext?: string; templateId?: number }
-  ): Promise<string> {
+    options?: { pauseMetrics?: PauseMetrics | null; timingContext?: string }
+  ): string {
+    const criteriaDescriptions = criterions.map(criterion => 
+      `- ${criterion.criteria_name} (${criterion.weight}% weight): ${criterion.prompt_template || `Evaluate the teacher's ${criterion.criteria_name.toLowerCase()}`}`
+    ).join('\n');
+
     const formatNumber = (value: number, decimals = 2) => Number.isFinite(value) ? value.toFixed(decimals) : '0.00';
 
-    // Try to get prompt from database
-    // First check if template has a specific prompt assigned
-    let dbPrompt = null;
-    if (options?.templateId) {
-      dbPrompt = await promptManager.getTemplatePrompt(options.templateId, 'lemur');
-      if (dbPrompt) {
-        console.log(`📝 Using template-specific prompt version ${dbPrompt.version} for LemUR (template ${options.templateId})`);
-      }
-    }
+    const pauseMetricsSection = options?.pauseMetrics ? `
 
-    // If no template-specific prompt, get the active default
-    if (!dbPrompt) {
-      dbPrompt = await promptManager.getActivePrompt('lemur', 'analysis_prompt');
-      if (dbPrompt) {
-        console.log(`📝 Using default active prompt version ${dbPrompt.version} for LemUR`);
-      }
-    }
+WAIT TIME METRICS (from transcript timing data):
+- Total lesson span (first to last spoken word): ${formatNumber(options.pauseMetrics.totalDurationSeconds)} seconds
+- Speaking time detected: ${formatNumber(options.pauseMetrics.totalSpeechSeconds)} seconds
+- Silence between utterances: ${formatNumber(options.pauseMetrics.totalSilenceSeconds)} seconds (${formatNumber(options.pauseMetrics.silencePercentage)}% of lesson span)
+- Average pause: ${formatNumber(options.pauseMetrics.averageSilenceSeconds)} seconds (median ${formatNumber(options.pauseMetrics.medianSilenceSeconds)}s, 90th percentile ${formatNumber(options.pauseMetrics.p90SilenceSeconds)}s)
+- Long pauses (≥${formatNumber(options.pauseMetrics.longSilenceThresholdSeconds, 1)}s): ${options.pauseMetrics.longSilenceCount} occurrences (${formatNumber(options.pauseMetrics.longSilencePercentage)}% of pauses). Longest pause observed: ${formatNumber(options.pauseMetrics.longestSilenceSeconds)}s
 
-    // If we have a database prompt, use it with variable replacement
-    if (dbPrompt) {
-      const variables: PromptVariables = {
-        // Individual variables that match the database template
-        TEACHER_NAME: classInfo.teacherName,
-        CLASS_NAME: classInfo.className,
-        SUBJECT: classInfo.subject,
-        GRADE: classInfo.grade,
-
-        TEMPLATE_NAME: templateName,
-        CRITERIA_LIST: criterions.map(c => `- ${c.criteria_name} (${Number(c.weight).toFixed(2)}%): ${c.prompt_template || `Evaluate the teacher's ${c.criteria_name.toLowerCase()}`}`).join('\n'),
-
-        WAIT_TIME_METRICS: options?.pauseMetrics ? `WAIT-TIME METRICS (provided)
-- Lesson span: ${formatNumber(options.pauseMetrics.totalDurationSeconds)}s; Speech: ${formatNumber(options.pauseMetrics.totalSpeechSeconds)}s; Silence: ${formatNumber(options.pauseMetrics.totalSilenceSeconds)}s (${formatNumber(options.pauseMetrics.silencePercentage)}%)
-- Avg pause: ${formatNumber(options.pauseMetrics.averageSilenceSeconds)}s; Median: ${formatNumber(options.pauseMetrics.medianSilenceSeconds)}s; p90: ${formatNumber(options.pauseMetrics.p90SilenceSeconds)}s; Long (≥${formatNumber(options.pauseMetrics.longSilenceThresholdSeconds, 0)}s): ${options.pauseMetrics.longSilenceCount}; Longest: ${formatNumber(options.pauseMetrics.longestSilenceSeconds)}s
-Use these to support the Wait Time criterion.` : '',
-
-        TIMING_SECTION: options?.timingContext ? `
-
-TIME-CODED EVIDENCE (selected excerpts):
-${options.timingContext}` : ''
-      };
-
-      return promptManager.replaceTemplateVariables(dbPrompt.prompt_template, variables);
-    }
-
-    // Fall back to original hardcoded prompt
-    console.log('📝 Using hardcoded prompt for LemUR (no database prompt found)');
+Use these metrics to support your evaluation of wait time. Combine them with qualitative evidence from the transcript when scoring criteria.
+`.trimEnd() : '';
 
     const timingSection = options?.timingContext ? `\n\nTIME-CODED EVIDENCE (selected excerpts):\n${options.timingContext}` : '';
 
@@ -123,9 +91,9 @@ PRIMARY GOAL
 - Numbers are for admin tracking; narrative must be teacher-facing and improvement-focused.
 
 STYLE
-- Coaching voice: warm, specific, encouraging; use direct address ("You did…", "Next time, consider…").
+- Coaching voice: warm, specific, encouraging; use direct address (“You did…”, “Next time, consider…”).
 - Ground every claim in transcript evidence (quotes + timestamps).
-- For each criterion's "feedback", write 6 sentences (not fewer) and ≤120 words.
+- For each criterion’s “feedback”, write 6 sentences (not fewer) and ≤120 words.
 - Avoid generic advice; always include a micro-action and an exemplar script.
 
 MOTIVATIONAL SCORING RUBRIC
@@ -144,9 +112,9 @@ CONTEXT CALIBRATION (subject + grade)
 - Do NOT penalize developmentally typical responses; offer age-appropriate improvements.
 
 TARGET ADJUSTMENT BY CONTEXT
-- If grade ≤2: treat "Format Matters—Complete Sentences" as emerging if students respond in words/phrases while teacher models stems; coach using brief sentence starters.
+- If grade ≤2: treat “Format Matters—Complete Sentences” as emerging if students respond in words/phrases while teacher models stems; coach using brief sentence starters.
 - If grade ≤5: treat Wait Time target as 2–4s (instead of 3–5s); emphasize routines that prevent blurting and enable think time.
-- For "100%—Universal Participation" in K–5: interpret as on-task signals (eyes, hands, partner talk) rather than only verbal turns.
+- For “100%—Universal Participation” in K–5: interpret as on-task signals (eyes, hands, partner talk) rather than only verbal turns.
 - For Math: short, frequent checks are valid; focus coaching on distribution and clarity rather than response length.
 
 CLASS CONTEXT
@@ -168,23 +136,23 @@ ${criterions.map(c => `- ${c.criteria_name} (${Number(c.weight).toFixed(2)}%): $
 
 CRITERIA TO ANALYZE (template-linked)
 - Use ONLY the criteria listed above (no additions/substitutions).
-- In "detailed_feedback", create one object per criterion using the EXACT criterion names (same spelling, hyphens, capitalization).
+- In “detailed_feedback”, create one object per criterion using the EXACT criterion names (same spelling, hyphens, capitalization).
 - If the template supplies weights/definitions, use them to interpret evidence and coach next steps.
 
 SHORT/QUIET SEGMENTS RULE
-- If the transcript provides limited dialogue for a criterion, write "Limited evidence due to transcript context" and suggest one change that would produce evidence next time (e.g., "Insert 3 cold calls in the next 10 minutes").
+- If the transcript provides limited dialogue for a criterion, write “Limited evidence due to transcript context” and suggest one change that would produce evidence next time (e.g., “Insert 3 cold calls in the next 10 minutes”).
 
 LENGTH & CONSISTENCY RULES
-- "feedback" = exactly 6 sentences (≥6), ≤120 words.
+- “feedback” = exactly 6 sentences (≥6), ≤120 words.
 - Max 2 short quotes per criterion.
 - Do not omit or rename fields; keep key names exactly as specified.
-- If a required number is unknown, write "unknown" and still provide next_step_teacher_move + exemplar.
+- If a required number is unknown, write “unknown” and still provide next_step_teacher_move + exemplar.
 
 IMPORTANT
 - Do NOT calculate an overall/total score in the JSON or narrative; if generated, remove it.
 - Use criterion names exactly as in the template (including punctuation).
-- Choose at most 2 "prioritized_criteria" (one quick win + one deeper skill).
-- If evidence is missing, use Baseline scoring (55–65), write "No transcript evidence available" or "Limited evidence due to transcript context," and still provide a micro-action + exemplar.
+- Choose at most 2 “prioritized_criteria” (one quick win + one deeper skill).
+- If evidence is missing, use Baseline scoring (55–65), write “No transcript evidence available” or “Limited evidence due to transcript context,” and still provide a micro-action + exemplar.
 
 OUTPUT REQUIREMENT (return ONE JSON object exactly)
 {
@@ -241,7 +209,7 @@ OUTPUT REQUIREMENT (return ONE JSON object exactly)
       grade: string;
       teacherName: string;
     },
-    options?: { pauseMetrics?: PauseMetrics | null; timingContext?: string; templateId?: number }
+    options?: { pauseMetrics?: PauseMetrics | null; timingContext?: string }
   ): Promise<{
     overall_score: number;
     strengths: string[];
@@ -255,11 +223,7 @@ OUTPUT REQUIREMENT (return ONE JSON object exactly)
     }
 
     try {
-      const prompt = await this.buildAnalysisPrompt(templateName, criterions, classInfo, {
-        pauseMetrics: options?.pauseMetrics,
-        timingContext: options?.timingContext,
-        templateId: options?.templateId
-      });
+      const prompt = this.buildAnalysisPrompt(templateName, criterions, classInfo, options);
 
       console.log('🧠 LeMUR request prepared:', {
         transcriptId,
@@ -303,14 +267,14 @@ OUTPUT REQUIREMENT (return ONE JSON object exactly)
       // Parse the JSON response (clean up markdown code blocks if present)
       try {
         let jsonResponse = response.data.response.trim();
-
+        
         // Remove markdown code blocks if present
         if (jsonResponse.startsWith('```json')) {
           jsonResponse = jsonResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
         } else if (jsonResponse.startsWith('```')) {
           jsonResponse = jsonResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
-
+        
         const analysisResult = JSON.parse(jsonResponse);
 
         // Calculate weighted average overall score

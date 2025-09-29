@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { authenticate, authorize } from '../middleware/auth';
 import { analyzeWithTemplateUsingProvider } from '../services/analysisProvider';
 import { lemurService } from '../services/lemur';
-import { savePromptMarkdown } from '../services/promptLogger';
+import { savePromptMarkdown, saveModelOutputJson } from '../services/promptLogger';
 import { computePauseMetrics } from '../services/pauseMetrics';
 import { buildTimingContext } from '../services/timingContext';
 import { getAnalysisSettings } from '../services/systemSettings';
@@ -116,7 +116,7 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
     });
 
     // Build the unified analysis prompt (instructions)
-    const instructions = lemurService.buildAnalysisPrompt(
+    const instructions = await lemurService.buildAnalysisPrompt(
       job.template_name,
       criterions,
       {
@@ -157,7 +157,18 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
         grade: job.grade || 'Grade',
         teacherName: `${job.first_name} ${job.last_name}`
       }
-    }, { openaiModel: openaiModelToUse, pauseMetrics, timingContext });
+    }, { openaiModel: openaiModelToUse, pauseMetrics, timingContext, templateId: job.template_id });
+
+    // Save raw model JSON output for auditing (before any post-processing)
+    await saveModelOutputJson({
+      analysisJobId,
+      provider,
+      model: aiModelIdentifier,
+      jobId: job.job_id,
+      transcriptId: job.external_id,
+      templateName: job.template_name,
+      result: analysisResults
+    });
 
     // Ensure every criterion has a score; fill missing per rubric (≤20 when no evidence)
     try {
@@ -205,6 +216,50 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
             };
           }
         }
+      }
+
+      // Enforce actionable_strategies_for_improvement presence/absence per score threshold
+      try {
+        Object.entries(completed).forEach(([key, value]) => {
+          const entry: any = value || {};
+          const rawScore = entry.score;
+          const scoreNum = typeof rawScore === 'number' ? rawScore : Number(String(rawScore || '').replace(/%/g, '').trim());
+          const hasArray = Array.isArray(entry.actionable_strategies_for_improvement) && entry.actionable_strategies_for_improvement.length > 0;
+
+          if (Number.isFinite(scoreNum)) {
+            if (scoreNum < 86) {
+              if (!hasArray) {
+                const strategies: string[] = [];
+                if (entry.next_step_teacher_move && typeof entry.next_step_teacher_move === 'string') {
+                  strategies.push(String(entry.next_step_teacher_move));
+                }
+                if (entry.exemplar && typeof entry.exemplar === 'string') {
+                  strategies.push(`Use this script: ${String(entry.exemplar)}`);
+                }
+                if (Array.isArray(entry.look_fors) && entry.look_fors.length > 0) {
+                  strategies.push(`During practice, verify: ${String(entry.look_fors[0])}.`);
+                }
+                // Fallbacks to ensure at least 2 strategies
+                if (strategies.length < 2 && entry.observed_vs_target) {
+                  strategies.push(`Set a visible target based on: ${String(entry.observed_vs_target)}.`);
+                }
+                if (strategies.length < 2) {
+                  strategies.push('Plan 1–2 concrete moves tied to this criterion and check all students complete them.');
+                }
+                completed[key] = { ...entry, actionable_strategies_for_improvement: strategies.slice(0, 3) };
+                patched = true;
+              }
+            } else {
+              if (hasArray) {
+                const { actionable_strategies_for_improvement, ...rest } = entry;
+                completed[key] = rest;
+                patched = true;
+              }
+            }
+          }
+        });
+      } catch (e) {
+        console.warn('⚠️ Post-processing strategies enforcement failed:', (e as any)?.message || e);
       }
 
       if (patched) {

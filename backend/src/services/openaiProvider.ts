@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { lemurService, type TemplateCriterion } from './lemur';
 import type { PauseMetrics } from './pauseMetrics';
+import { promptManager, type PromptVariables } from './promptManager';
 
 export class OpenAIProvider {
   private model: string;
@@ -181,7 +182,7 @@ export class OpenAIProvider {
       grade: string;
       teacherName: string;
     },
-    opts?: { model?: string; pauseMetrics?: PauseMetrics | null; timingContext?: string }
+    opts?: { model?: string; pauseMetrics?: PauseMetrics | null; timingContext?: string; templateId?: number }
   ): Promise<{
     overall_score: number;
     strengths: string[];
@@ -195,139 +196,56 @@ export class OpenAIProvider {
       throw new Error(message);
     }
 
-    // Build OpenAI-specific Universal Template-Aware Prompt (updated to latest spec)
-    const buildOpenAiCoachPrompt = () => {
-      const lines: string[] = [];
-      lines.push(
-        'You are an expert instructional coach analyzing a classroom transcript using a dynamic evaluation template.',
-        '',
-        'PRIMARY GOAL',
-        '- Provide constructive, motivational, and evidence-based coaching feedback.',
-        '- Reports should motivate teachers, not punish them.',
-        '- Numbers are for admin tracking; narrative feedback must always be teacher-facing and improvement-focused.',
-        '',
-        'STYLE',
-        '- Coaching voice: warm, specific, encouraging; use direct address (“You did…”, “Next time, consider…”).',
-        '- Always ground claims in transcript evidence (quotes + timestamps).',
-        '- For each criterion, write exactly 6 sentences (≥6), ≤120 words.',
-        '- Avoid vague “No evidence available” comments. Always give at least one actionable suggestion and exemplar.',
-        '',
-        'MOTIVATIONAL SCORING RUBRIC',
-        '- 55–65 = Baseline / Absent but improvable → Give credit, explain one easy way to add it next lesson.',
-        '- 66–75 = Emerging → Praise attempt, suggest refinement.',
-        '- 76–85 = Developing → Present but inconsistent; provide a coaching move.',
-        '- 86–92 = Strong → Consistently applied; celebrate and refine.',
-        '- 93–100 = Exemplary → Best practice; affirm and encourage sharing.',
-        '',
-        'CONTEXT CALIBRATION (subject + grade)',
-        '- Interpret evidence in light of grade and subject.',
-        '- Younger (K–5): prioritize engagement, routines, presence over formal academic responses.',
-        '- Middle/High (6–12): emphasize precision, vocabulary, independence.',
-        '- Mathematics: Cold Call & Wait Time may be short factual checks; focus on distribution and clarity.',
-        '- Humanities/Language: prioritize elaboration, extended responses, use of evidence.',
-        '- Never penalize developmentally typical behavior—always suggest age-appropriate growth moves.',
-        '',
-        'TARGET ADJUSTMENT BY CONTEXT',
-        '- If grade ≤2: treat “Format Matters – Complete Sentences” as emerging if students respond with words/phrases while teacher models stems; coach with sentence starters.',
-        '- If grade ≤5: adjust Wait Time to 2–4s (instead of 3–5s); emphasize routines that prevent blurting.',
-        '- For “100% Participation” in K–5: interpret as on-task signals (eyes on speaker, partner talk) not only verbal turns.',
-        '- For Math: short responses are valid; focus on distribution, error analysis, scaffolding precision.',
-        '',
-        'CLASS CONTEXT',
-        '- Teacher: ' + classInfo.teacherName,
-        '- Class: ' + classInfo.className,
-        '- Subject: ' + classInfo.subject,
-        '- Grade: ' + classInfo.grade,
-        '',
-        'EVALUATION TEMPLATE',
-        'Template Name: ' + templateName,
-        'Criteria (with weights and definitions):'
-      );
-      criterions.forEach(c => {
-        const weight = typeof (c as any).weight === 'number' ? (c as any).weight : Number((c as any).weight);
-        const weightStr = Number.isFinite(weight) ? weight.toFixed(2) : String(weight || '0');
-        lines.push(`- ${c.criteria_name} (${weightStr}%): ${c.prompt_template || `Evaluate the teacher's ${c.criteria_name.toLowerCase()}`}`);
-      });
-      lines.push('', 'CRITERIA TO ANALYZE',
-        '- Use ONLY the listed criteria (no additions).',
-        '- In “detailed_feedback”, create one object per criterion using the EXACT criterion names from the template.',
-        '- Always include: score, feedback (6 sentences), evidence, observed_vs_target, next step, vision, exemplar, look_fors, avoid, context_anchor.',
-        '',
-        'RULES FOR EVIDENCE',
-        '- Every criterion must include at least one transcript quote + timestamp.',
-        '- If transcript has limited evidence: write “Limited evidence due to transcript context” AND still suggest one change that would create evidence next time.',
-        '- Never output “No evidence available” without coaching advice.',
-        '',
-        'BALANCE REQUIREMENT',
-        '- Provide exactly 4 strengths and 4 improvements overall.',
-        '- Strengths must span different domains (e.g., questioning, framing, assessment).',
-        '- Improvements must include concrete teacher moves, not vague advice.',
-        '',
-        'IMPORTANT',
-        '- Do NOT calculate or include any overall score.',
-        '- Do NOT omit any criterion, even if little/no evidence exists.',
-        '- Use criterion names exactly as written in the template (punctuation matters).',
-        '- Every criterion must produce feedback with evidence, next step, and exemplar.',
-        '- Coaching tone must be positive, actionable, and motivating.'
-      );
-      // Data to use (pause metrics if available)
-      if (opts?.pauseMetrics) {
-        const pm = opts.pauseMetrics;
-        const fmt = (n: number, d = 2) => Number.isFinite(n) ? Number(n).toFixed(d) : String(n);
-        lines.push('WAIT-TIME METRICS',
-          `- Lesson span: ${fmt(pm.totalDurationSeconds)}s; Speech: ${fmt(pm.totalSpeechSeconds)}s; Silence: ${fmt(pm.totalSilenceSeconds)}s (${fmt(pm.silencePercentage)}%)`,
-          `- Avg pause: ${fmt(pm.averageSilenceSeconds)}s; Median: ${fmt(pm.medianSilenceSeconds)}s; p90: ${fmt(pm.p90SilenceSeconds)}s; Long (≥${fmt(pm.longSilenceThresholdSeconds, 0)}s): ${pm.longSilenceCount}; Longest: ${fmt(pm.longestSilenceSeconds)}s`,
-          'Use these to support evaluation of Wait Time. Anchor feedback in these numbers + transcript excerpts.',
-          '- Always pull at least one transcript quote per criterion, or mark “No transcript evidence available.”',
-          '',
-          'DO NOT:',
-          '- Do not calculate an overall score.',
-          '- Do not omit any criterion.',
-          '- Do not output generic suggestions; every suggestion must include an exemplar script + look-fors.',
-          '',
-          '---',
-          '',
-          'OUTPUT REQUIREMENT (return ONE JSON object exactly):',
-          '{',
-          '  "strengths": ["strength1","strength2","strength3","strength4"],',
-          '  "improvements": ["improvement1","improvement2","improvement3","improvement4"],',
-          '  "detailed_feedback": {',
-          '    "<criterion_name>": {',
-          '      "score": number,',
-          '      "feedback": "6 sentences: (1) concrete strength; (2) quote+timestamp evidence; (3) describe gap; (4) why it matters; (5) actionable next step; (6) vision of better practice (mention subject+grade).",',
-          '      "evidence_excerpt": ["short quote 1","short quote 2 (optional)"],',
-          '      "evidence_timestamp": ["[mm:ss]","[mm:ss] (optional)"],',
-          '      "observed_vs_target": "counts or averages vs target (with weight)",',
-          '      "next_step_teacher_move": "specific micro-action",',
-          '      "vision_of_better_practice": "1–2 sentence improvement vision",',
-          '      "exemplar": "≤25-word teacher script",',
-          '      "look_fors": ["observable #1","observable #2"],',
-          '      "avoid": ["pitfall #1"],',
-          '      "context_anchor": "how subject + grade shaped scoring/advice"',
-          '    }',
-          '  },',
-          '  "coaching_summary": "2–3 upbeat paragraphs: celebrate 2–3 wins; set 1–2 growth priorities; explain how these will improve student learning. Explicitly mention subject+grade.",',
-          '  "next_lesson_plan": {',
-          '    "focus_priorities": ["Priority 1","Priority 2"],',
-          '    "10_min_practice_block": ["Minute 0–3: …","Minute 3–6: …","Minute 6–10: …"],',
-          '    "success_metrics": ["Metric 1 with target","Metric 2 with target"]',
-          '  },',
-          '  "prioritized_criteria": [',
-          '    {"criterion": "<name>", "reason": "largest impact / easiest win", "expected_gain": "student-facing improvement"},',
-          '    {"criterion": "<name>", "reason": "second priority", "expected_gain": "…"}',
-          '  ],',
-          '  "admin_notes": {',
-          '    "data_quality_flags": ["e.g., short transcript","few questions","speaker labels missing"],',
-          '    "aggregation_ready": true',
-          '  }',
-          '}',
-          ''
-        );
+    // Try to get prompt from database
+    let dbPrompt = null;
+    if (opts?.templateId) {
+      dbPrompt = await promptManager.getTemplatePrompt(opts.templateId, 'openai');
+      if (dbPrompt) {
+        console.log(`📝 Using template-specific prompt version ${dbPrompt.version} for OpenAI (template ${opts.templateId})`);
       }
-      return lines.join('\n');
-    };
+    }
 
-    const userContent = `${buildOpenAiCoachPrompt()}\n\nTRANSCRIPT (plain text):\n${transcriptText}`;
+    // If no template-specific prompt, get the active default
+    if (!dbPrompt) {
+      dbPrompt = await promptManager.getActivePrompt('openai', 'analysis_prompt');
+      if (dbPrompt) {
+        console.log(`📝 Using default active prompt version ${dbPrompt.version} for OpenAI`);
+      }
+    }
+
+    let userContent: string;
+
+    // If we have a database prompt, use it with variable replacement
+    if (dbPrompt) {
+      const formatNumber = (value: number, decimals = 2) => Number.isFinite(value) ? value.toFixed(decimals) : '0.00';
+
+      const variables: PromptVariables = {
+        // Individual variables that match the database template
+        TEACHER_NAME: classInfo.teacherName,
+        CLASS_NAME: classInfo.className,
+        SUBJECT: classInfo.subject,
+        GRADE: classInfo.grade,
+
+        TEMPLATE_NAME: templateName,
+        CRITERIA_LIST: criterions.map(c => {
+          const weight = typeof (c as any).weight === 'number' ? (c as any).weight : Number((c as any).weight);
+          const weightStr = Number.isFinite(weight) ? weight.toFixed(2) : String(weight || '0');
+          return `- ${c.criteria_name} (${weightStr}%): ${c.prompt_template || `Evaluate the teacher's ${c.criteria_name.toLowerCase()}`}`;
+        }).join('\n'),
+
+        WAIT_TIME_METRICS: opts?.pauseMetrics ? `WAIT-TIME METRICS
+- Lesson span: ${formatNumber(opts.pauseMetrics.totalDurationSeconds)}s; Speech: ${formatNumber(opts.pauseMetrics.totalSpeechSeconds)}s; Silence: ${formatNumber(opts.pauseMetrics.totalSilenceSeconds)}s (${formatNumber(opts.pauseMetrics.silencePercentage)}%)
+- Avg pause: ${formatNumber(opts.pauseMetrics.averageSilenceSeconds)}s; Median: ${formatNumber(opts.pauseMetrics.medianSilenceSeconds)}s; p90: ${formatNumber(opts.pauseMetrics.p90SilenceSeconds)}s; Long (≥${formatNumber(opts.pauseMetrics.longSilenceThresholdSeconds, 0)}s): ${opts.pauseMetrics.longSilenceCount}; Longest: ${formatNumber(opts.pauseMetrics.longestSilenceSeconds)}s
+Use these to support evaluation of Wait Time. Anchor feedback in these numbers + transcript excerpts.` : ''
+      };
+
+      const processedPrompt = promptManager.replaceTemplateVariables(dbPrompt.prompt_template, variables);
+      userContent = `${processedPrompt}\n\nTRANSCRIPT (plain text):\n${transcriptText}`;
+    } else {
+      // Fall back to original hardcoded prompt
+      console.log('📝 Using hardcoded prompt for OpenAI (no database prompt found)');
+      userContent = this.buildOpenAiCoachPrompt(templateName, criterions, classInfo, opts) + `\n\nTRANSCRIPT (plain text):\n${transcriptText}`;
+    }
 
     const authHeader = `Bearer ${apiKey}`;
     const primaryModel = opts?.model || this.model;
@@ -419,6 +337,147 @@ export class OpenAIProvider {
       }
       throw error;
     }
+  }
+
+  private buildOpenAiCoachPrompt(
+    templateName: string,
+    criterions: TemplateCriterion[],
+    classInfo: {
+      className: string;
+      subject: string;
+      grade: string;
+      teacherName: string;
+    },
+    opts?: { pauseMetrics?: PauseMetrics | null; timingContext?: string }
+  ): string {
+    const lines: string[] = [];
+    lines.push(
+      'You are an expert instructional coach analyzing a classroom transcript using a dynamic evaluation template.',
+      '',
+      'PRIMARY GOAL',
+      '- Provide constructive, motivational, and evidence-based coaching feedback.',
+      '- Reports should motivate teachers, not punish them.',
+      '- Numbers are for admin tracking; narrative feedback must always be teacher-facing and improvement-focused.',
+      '',
+      'STYLE',
+      '- Coaching voice: warm, specific, encouraging; use direct address ("You did…", "Next time, consider…").',
+      '- Always ground claims in transcript evidence (quotes + timestamps).',
+      '- For each criterion, write exactly 6 sentences (≥6), ≤120 words.',
+      '- Avoid vague "No evidence available" comments. Always give at least one actionable suggestion and exemplar.',
+      '',
+      'MOTIVATIONAL SCORING RUBRIC',
+      '- 55–65 = Baseline / Absent but improvable → Give credit, explain one easy way to add it next lesson.',
+      '- 66–75 = Emerging → Praise attempt, suggest refinement.',
+      '- 76–85 = Developing → Present but inconsistent; provide a coaching move.',
+      '- 86–92 = Strong → Consistently applied; celebrate and refine.',
+      '- 93–100 = Exemplary → Best practice; affirm and encourage sharing.',
+      '',
+      'CONTEXT CALIBRATION (subject + grade)',
+      '- Interpret evidence in light of grade and subject.',
+      '- Younger (K–5): prioritize engagement, routines, presence over formal academic responses.',
+      '- Middle/High (6–12): emphasize precision, vocabulary, independence.',
+      '- Mathematics: Cold Call & Wait Time may be short factual checks; focus on distribution and clarity.',
+      '- Humanities/Language: prioritize elaboration, extended responses, use of evidence.',
+      '- Never penalize developmentally typical behavior—always suggest age-appropriate growth moves.',
+      '',
+      'TARGET ADJUSTMENT BY CONTEXT',
+      '- If grade ≤2: treat "Format Matters – Complete Sentences" as emerging if students respond with words/phrases while teacher models stems; coach with sentence starters.',
+      '- If grade ≤5: adjust Wait Time to 2–4s (instead of 3–5s); emphasize routines that prevent blurting.',
+      '- For "100% Participation" in K–5: interpret as on-task signals (eyes on speaker, partner talk) not only verbal turns.',
+      '- For Math: short responses are valid; focus on distribution, error analysis, scaffolding precision.',
+      '',
+      'CLASS CONTEXT',
+      '- Teacher: ' + classInfo.teacherName,
+      '- Class: ' + classInfo.className,
+      '- Subject: ' + classInfo.subject,
+      '- Grade: ' + classInfo.grade,
+      '',
+      'EVALUATION TEMPLATE',
+      'Template Name: ' + templateName,
+      'Criteria (with weights and definitions):'
+    );
+    criterions.forEach(c => {
+      const weight = typeof (c as any).weight === 'number' ? (c as any).weight : Number((c as any).weight);
+      const weightStr = Number.isFinite(weight) ? weight.toFixed(2) : String(weight || '0');
+      lines.push(`- ${c.criteria_name} (${weightStr}%): ${c.prompt_template || `Evaluate the teacher's ${c.criteria_name.toLowerCase()}`}`);
+    });
+    lines.push('', 'CRITERIA TO ANALYZE',
+      '- Use ONLY the listed criteria (no additions).',
+      '- In "detailed_feedback", create one object per criterion using the EXACT criterion names from the template.',
+      '- Always include: score, feedback (6 sentences), evidence, observed_vs_target, next step, vision, exemplar, look_fors, avoid, context_anchor.',
+      '',
+      'RULES FOR EVIDENCE',
+      '- Every criterion must include at least one transcript quote + timestamp.',
+      '- If transcript has limited evidence: write "Limited evidence due to transcript context" AND still suggest one change that would create evidence next time.',
+      '- Never output "No evidence available" without coaching advice.',
+      '',
+      'BALANCE REQUIREMENT',
+      '- Provide exactly 4 strengths and 4 improvements overall.',
+      '- Strengths must span different domains (e.g., questioning, framing, assessment).',
+      '- Improvements must include concrete teacher moves, not vague advice.',
+      '',
+      'IMPORTANT',
+      '- Do NOT calculate or include any overall score.',
+      '- Do NOT omit any criterion, even if little/no evidence exists.',
+      '- Use criterion names exactly as written in the template (punctuation matters).',
+      '- Every criterion must produce feedback with evidence, next step, and exemplar.',
+      '- Coaching tone must be positive, actionable, and motivating.'
+    );
+    // Data to use (pause metrics if available)
+    if (opts?.pauseMetrics) {
+      const pm = opts.pauseMetrics;
+      const fmt = (n: number, d = 2) => Number.isFinite(n) ? Number(n).toFixed(d) : String(n);
+      lines.push('WAIT-TIME METRICS',
+        `- Lesson span: ${fmt(pm.totalDurationSeconds)}s; Speech: ${fmt(pm.totalSpeechSeconds)}s; Silence: ${fmt(pm.totalSilenceSeconds)}s (${fmt(pm.silencePercentage)}%)`,
+        `- Avg pause: ${fmt(pm.averageSilenceSeconds)}s; Median: ${fmt(pm.medianSilenceSeconds)}s; p90: ${fmt(pm.p90SilenceSeconds)}s; Long (≥${fmt(pm.longSilenceThresholdSeconds, 0)}s): ${pm.longSilenceCount}; Longest: ${fmt(pm.longestSilenceSeconds)}s`,
+        'Use these to support evaluation of Wait Time. Anchor feedback in these numbers + transcript excerpts.',
+        '- Always pull at least one transcript quote per criterion, or mark "No transcript evidence available."',
+        '',
+        'DO NOT:',
+        '- Do not calculate an overall score.',
+        '- Do not omit any criterion.',
+        '- Do not output generic suggestions; every suggestion must include an exemplar script + look-fors.',
+        '',
+        '---',
+        '',
+        'OUTPUT REQUIREMENT (return ONE JSON object exactly):',
+        '{',
+        '  "strengths": ["strength1","strength2","strength3","strength4"],',
+        '  "improvements": ["improvement1","improvement2","improvement3","improvement4"],',
+        '  "detailed_feedback": {',
+        '    "<criterion_name>": {',
+        '      "score": number,',
+        '      "feedback": "6 sentences: (1) concrete strength; (2) quote+timestamp evidence; (3) describe gap; (4) why it matters; (5) actionable next step; (6) vision of better practice (mention subject+grade).",',
+        '      "evidence_excerpt": ["short quote 1","short quote 2 (optional)"],',
+        '      "evidence_timestamp": ["[mm:ss]","[mm:ss] (optional)"],',
+        '      "observed_vs_target": "counts or averages vs target (with weight)",',
+        '      "next_step_teacher_move": "specific micro-action",',
+        '      "vision_of_better_practice": "1–2 sentence improvement vision",',
+        '      "exemplar": "≤25-word teacher script",',
+        '      "look_fors": ["observable #1","observable #2"],',
+        '      "avoid": ["pitfall #1"],',
+        '      "context_anchor": "how subject + grade shaped scoring/advice"',
+        '    }',
+        '  },',
+        '  "coaching_summary": "2–3 upbeat paragraphs: celebrate 2–3 wins; set 1–2 growth priorities; explain how these will improve student learning. Explicitly mention subject+grade.",',
+        '  "next_lesson_plan": {',
+        '    "focus_priorities": ["Priority 1","Priority 2"],',
+        '    "10_min_practice_block": ["Minute 0–3: …","Minute 3–6: …","Minute 6–10: …"],',
+        '    "success_metrics": ["Metric 1 with target","Metric 2 with target"]',
+        '  },',
+        '  "prioritized_criteria": [',
+        '    {"criterion": "<name>", "reason": "largest impact / easiest win", "expected_gain": "student-facing improvement"},',
+        '    {"criterion": "<name>", "reason": "second priority", "expected_gain": "…"}',
+        '  ],',
+        '  "admin_notes": {',
+        '    "data_quality_flags": ["e.g., short transcript","few questions","speaker labels missing"],',
+        '    "aggregation_ready": true',
+        '  }',
+        '}',
+        ''
+      );
+    }
+    return lines.join('\n');
   }
 }
 

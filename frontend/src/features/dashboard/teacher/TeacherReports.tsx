@@ -272,13 +272,14 @@ export function TeacherReports() {
 
   // Handle PDF export
   const handleExportPDF = async (recording: TeacherRecording, analysisResult?: AnalysisResult) => {
+    let analysis: AnalysisResult | undefined;
     try {
       console.log('🔄 Starting PDF export for recording:', recording.id);
       console.log('📄 Recording transcript_id:', recording.transcript_id);
       console.log('📊 Analysis result provided:', !!analysisResult);
       
       // If no analysis result provided, get the first one
-      let analysis = analysisResult;
+      analysis = analysisResult;
       if (!analysis) {
         if (!recording.transcript_id) {
           console.error('❌ No transcript_id found for recording:', recording);
@@ -310,15 +311,30 @@ export function TeacherReports() {
 
       // Generate PDF blob (hide scores and evaluations for teachers)
       console.log('🔄 Converting to blob...');
+      // TeacherReports is teacher-only, but keep logic explicit
+      const analysisForPdf: AnalysisResult = ({
+        ...analysis!,
+        overall_score: 0,
+        detailed_feedback: Object.fromEntries(
+          Object.entries(analysis!.detailed_feedback || {}).filter(([_, fb]) => {
+            const arr = (fb as any)?.actionable_strategies_for_improvement;
+            return Array.isArray(arr) && arr.length > 0;
+          }).map(([k, fb]) => [k, {
+            score: 0,
+            feedback: '',
+            actionable_strategies_for_improvement: (fb as any).actionable_strategies_for_improvement
+          }])
+        ) as any
+      } as any);
       let blob: Blob | null = null;
       try {
         blob = await pdf(
-          <AnalysisReportPDF analysis={analysis} hideScores />
+          <AnalysisReportPDF analysis={analysisForPdf} hideScores />
         ).toBlob();
       } catch (innerErr) {
         console.warn('Primary PDF blob generation failed, attempting dataURL fallback...', innerErr);
         const dataUrl = await pdf(
-          <AnalysisReportPDF analysis={analysis} hideScores />
+          <AnalysisReportPDF analysis={analysisForPdf} hideScores />
         ).toDataURL();
         const res = await fetch(dataUrl);
         blob = await res.blob();
@@ -358,7 +374,7 @@ export function TeacherReports() {
         message: error.message,
         stack: error.stack,
         recording: recording,
-        analysis: analysis
+        analysisId: analysis?.id
       });
       
       notifications.show({

@@ -106,6 +106,13 @@ const styles = StyleSheet.create({
     lineHeight: 1.4,
     flex: 1,
   },
+  subSectionTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 8,
+    marginBottom: 6,
+  },
   categoryContainer: {
     marginBottom: 16,
     padding: 12,
@@ -166,6 +173,9 @@ interface AnalysisReportPDFProps {
 }
 
 export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisReportPDFProps) {
+  // IMPORTANT: Do not use external React stores inside react-pdf components.
+  // The PDF renderer uses a custom reconciler that may not support hooks like useSyncExternalStore.
+  const teacherView = !!hideScores;
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     return formatDateTimeLocal(dateString, { locale: 'en-US', dateStyle: 'long', timeStyle: 'short' });
@@ -222,7 +232,7 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
         </View>
 
         {/* Overall Score (hidden when hideScores) */}
-        {!hideScores && (
+        {!teacherView && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Overall Performance</Text>
             <View style={styles.scoreContainer}>
@@ -266,19 +276,40 @@ export function AnalysisReportPDF({ analysis, hideScores = false }: AnalysisRepo
 
         {/* Page break - content will flow to next page automatically */}
 
-        {/* Detailed Feedback */}
+        {/* Detailed Feedback / Strategies */}
         {analysis.detailed_feedback && Object.keys(analysis.detailed_feedback).length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Detailed Analysis by Category</Text>
-            {Object.entries(analysis.detailed_feedback).map(([category, feedback], index) => (
+            <Text style={styles.sectionTitle}>{teacherView ? 'Actionable Strategies by Category' : 'Detailed Analysis by Category'}</Text>
+            {(
+              teacherView
+                ? Object.entries(analysis.detailed_feedback).filter(([_, fb]) => Array.isArray((fb as any)?.actionable_strategies_for_improvement) && (fb as any).actionable_strategies_for_improvement.length > 0)
+                : Object.entries(analysis.detailed_feedback)
+            ).map(([category, feedback], index) => (
               <View key={category} style={styles.categoryContainer}>
                 <View style={styles.categoryHeader}>
                   <Text style={styles.categoryName}>{String(category)}</Text>
-                  {!hideScores && (
+                  {!teacherView && (
                     <Text style={styles.categoryScore}>{`${Math.round(Number((feedback as any)?.score || 0))}%`}</Text>
                   )}
                 </View>
-                <Text style={styles.feedbackText}>{String((feedback as any)?.feedback || '')}</Text>
+                {!teacherView && (
+                  <Text style={styles.feedbackText}>{String((feedback as any)?.feedback || '')}</Text>
+                )}
+
+                {Array.isArray((feedback as any)?.actionable_strategies_for_improvement) &&
+                  (feedback as any).actionable_strategies_for_improvement.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={styles.subSectionTitle}>Actionable Strategies</Text>
+                    <View style={styles.listContainer}>
+                      {((feedback as any).actionable_strategies_for_improvement as string[]).map((strategy, idx) => (
+                        <View key={idx} style={styles.listItem}>
+                          <View style={[styles.bullet, styles.improvementBullet]} />
+                          <Text style={styles.listText}>{String(strategy || '')}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
             ))}
           </View>

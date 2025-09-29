@@ -333,15 +333,31 @@ export function AnalysisManager() {
       setDownloadingAnalysisId(analysis.id);
       // Generate PDF blob directly, with dataURL fallback
       const isTeacher = user?.role === 'teacher';
+      const analysisForPdf: AnalysisResult = isTeacher
+        ? ({
+            ...analysis,
+            overall_score: 0,
+            detailed_feedback: Object.fromEntries(
+              Object.entries(analysis.detailed_feedback || {}).filter(([_, fb]) => {
+                const arr = (fb as any)?.actionable_strategies_for_improvement;
+                return Array.isArray(arr) && arr.length > 0;
+              }).map(([k, fb]) => [k, {
+                score: 0,
+                feedback: '',
+                actionable_strategies_for_improvement: (fb as any).actionable_strategies_for_improvement
+              }])
+            ) as any
+          } as any)
+        : analysis;
       let blob: Blob | null = null;
       try {
         blob = await pdf(
-          <AnalysisReportPDF analysis={analysis} hideScores={isTeacher} />
+          <AnalysisReportPDF analysis={analysisForPdf} hideScores={isTeacher} />
         ).toBlob();
       } catch (innerErr) {
         console.warn('Primary PDF blob generation failed, attempting dataURL fallback...', innerErr);
         const dataUrl = await pdf(
-          <AnalysisReportPDF analysis={analysis} hideScores={isTeacher} />
+          <AnalysisReportPDF analysis={analysisForPdf} hideScores={isTeacher} />
         ).toDataURL();
         const res = await fetch(dataUrl);
         blob = await res.blob();

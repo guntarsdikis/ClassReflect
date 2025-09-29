@@ -125,7 +125,8 @@
       "Read(//tmp/**)",
       "Read(//Users/guntarsdikis/Desktop/**)",
       "Bash(awk:*)",
-      "Bash(unset:*)"
+      "Bash(unset:*)",
+      "Bash(./auto-compare-schemas.sh:*)"
     ],
     "deny": [
       "Bash(npm start)",

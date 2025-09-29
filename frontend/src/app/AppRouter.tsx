@@ -18,6 +18,7 @@ import { UploadWizard } from '@features/uploads/components/UploadWizard';
 import { RecordingsList } from '@features/recordings/components/RecordingsList';
 import { ProfilePage } from '@features/profile';
 import { SystemSettings } from '@features/settings/components/SystemSettings';
+import { PromptManager } from '@features/prompts/components/PromptManager';
 // import { TeacherManagement } from '@features/teachers/components/TeacherManagement';
 // import { TemplateEditor } from '@features/templates/components/TemplateEditor';
 // import { SchoolAnalytics } from '@features/analytics/components/SchoolAnalytics';
@@ -76,6 +77,7 @@ export function AppRouter() {
             <Route path="/admin/templates" element={<TemplateManagement />} />
             <Route path="/admin/categories" element={<TemplateCategoryManagement />} />
             <Route path="/admin/subjects" element={<SubjectManagement />} />
+            <Route path="/admin/prompts" element={<PromptManager />} />
           </Route>
           
           {/* Shared Routes - Super Admin and School Manager */}

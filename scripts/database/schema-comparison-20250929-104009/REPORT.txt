@@ -1,0 +1,32 @@
+DATABASE COMPARISON REPORT
+==========================
+Generated: Mon Sep 29 10:40:33 EEST 2025
+
+SUMMARY
+-------
+Local Database: classreflect@127.0.0.1
+Production Database: classreflect@gdwd.cluster-cjjl7f5jormj.eu-west-2.rds.amazonaws.com
+
+Tables in Local:       19
+Tables in Production:       16
+
+TABLES MISSING IN PRODUCTION
+----------------------------
+prompt_history
+prompt_test_results
+prompts
+
+STRUCTURAL DIFFERENCES
+---------------------
+  - analysis_jobs
+  - analysis_results
+  - api_keys
+  - audio_jobs
+  - password_reset_tokens
+
+FILES GENERATED
+--------------
+  schema-diff.txt         - Full unified diff
+  migrate-to-production.sql - Migration script
+  local-*.txt            - Local database analysis
+  prod-*.txt             - Production database analysis

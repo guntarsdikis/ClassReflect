@@ -25,7 +25,7 @@ interface AnalyzeOptions {
 export async function analyzeWithTemplateUsingProvider(
   provider: AnalysisProviderName,
   opts: AnalyzeOptions,
-  extra?: { openaiModel?: string; pauseMetrics?: PauseMetrics | null; timingContext?: string | null }
+  extra?: { openaiModel?: string; pauseMetrics?: PauseMetrics | null; timingContext?: string | null; templateId?: number }
 ): Promise<{
   overall_score: number;
   strengths: string[];
@@ -33,20 +33,20 @@ export async function analyzeWithTemplateUsingProvider(
   detailed_feedback: Record<string, { score: number; feedback: string }>;
 }> {
   if (provider === 'openai') {
-    return openaiProvider.analyzeWithTemplate(
+    return await openaiProvider.analyzeWithTemplate(
       opts.transcriptText,
       opts.templateName,
       opts.criterions,
       opts.classInfo,
-      { model: extra?.openaiModel, pauseMetrics: extra?.pauseMetrics, timingContext: extra?.timingContext || undefined }
+      { model: extra?.openaiModel, pauseMetrics: extra?.pauseMetrics, timingContext: extra?.timingContext || undefined, templateId: extra?.templateId }
     );
   }
 
-  return lemurService.analyzeWithTemplate(
+  return await lemurService.analyzeWithTemplate(
     opts.transcriptId,
     opts.templateName,
     opts.criterions,
     opts.classInfo,
-    { pauseMetrics: extra?.pauseMetrics, timingContext: extra?.timingContext || undefined }
+    { pauseMetrics: extra?.pauseMetrics, timingContext: extra?.timingContext || undefined, templateId: extra?.templateId }
   );
 }

@@ -24,6 +24,8 @@ import {
   IconEye,
   IconDownload,
   IconAlertCircle,
+  IconEdit,
+  IconSettings,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@store/auth.store';
@@ -118,6 +120,13 @@ export function SuperAdminDashboard() {
       icon: IconChartBar,
       color: 'teal',
     },
+    {
+      title: 'AI Prompts',
+      value: 'Manage',
+      icon: IconSettings,
+      color: 'violet',
+      action: () => navigate('/admin/prompts'),
+    },
   ];
 
 
@@ -141,6 +150,13 @@ export function SuperAdminDashboard() {
             onClick={() => navigate('/admin/users/new')}
           >
             Add Manager
+          </Button>
+          <Button
+            variant="outline"
+            leftSection={<IconEdit size={16} />}
+            onClick={() => navigate('/admin/prompts')}
+          >
+            Manage Prompts
           </Button>
         </Group>
       </Group>

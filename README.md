@@ -227,11 +227,6 @@ Configure via `backend/.env`:
 - `OPENAI_API_KEY=...` (required for `openai`)
 - `OPENAI_MODEL=gpt-4o-mini` (or `gpt-4o`, etc.)
 
-Switching provider doesn’t change the rubric or weighting — only which model generates the per‑criterion scores. The backend calculates the weighted overall score consistently across providers.
 
-Super admins can change the active provider at runtime on `/settings` in the web app. Model keys remain in the backend `.env` for security.
+Run ./auto-compare-schemas.sh periodically to catch any future drift
 
-does assemblyai provides for analisys also pause and quiet time information? if provides does it include them for analysis prompt? can you check it?
-
-
-Detailed Analysis by Category explanation the text is quite short, maybe a little more could be added?

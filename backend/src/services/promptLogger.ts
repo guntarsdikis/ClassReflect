@@ -76,3 +76,57 @@ export async function savePromptMarkdown(opts: PromptLogOptions): Promise<string
     return null;
   }
 }
+
+export interface ModelOutputLogOptions {
+  analysisJobId: string;
+  provider: 'openai' | 'lemur';
+  model?: string;
+  jobId: string;
+  transcriptId?: string;
+  templateName: string;
+  result: any; // Parsed JSON result from provider
+}
+
+/**
+ * Save the full AI model JSON output to a .json file for auditing/debugging.
+ * Respects PROMPT_LOG_ENABLED and PROMPT_LOG_DIR (same behavior as savePromptMarkdown).
+ */
+export async function saveModelOutputJson(opts: ModelOutputLogOptions): Promise<string | null> {
+  try {
+    const rawEnabled = process.env.PROMPT_LOG_ENABLED;
+    const isDisabled = rawEnabled ? /^(0|false|no|off)$/i.test(rawEnabled.trim()) : false;
+    if (isDisabled) return null;
+
+    const baseDir = process.env.PROMPT_LOG_DIR
+      ? path.resolve(process.env.PROMPT_LOG_DIR)
+      : path.resolve(process.cwd(), 'storage', 'prompts');
+    await fs.mkdir(baseDir, { recursive: true });
+
+    const now = new Date();
+    const dateStr = now.toISOString().replace(/[:.]/g, '-');
+    const safe = (s: string) => (s || '').toString().replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = `${dateStr}__${safe(opts.analysisJobId)}__${safe(opts.provider)}__${safe(opts.jobId)}__output.json`;
+    const filePath = path.join(baseDir, fileName);
+
+    const metadata = {
+      date: now.toISOString(),
+      analysis_job_id: opts.analysisJobId,
+      recording_job_id: opts.jobId,
+      provider: opts.provider,
+      model: opts.model || 'default',
+      template: opts.templateName,
+      transcript_id: opts.transcriptId || 'N/A',
+    };
+
+    const payload = {
+      metadata,
+      result: opts.result
+    };
+
+    await fs.writeFile(filePath, JSON.stringify(payload, null, 2), 'utf8');
+    return filePath;
+  } catch (e) {
+    console.warn('Model output logging failed:', (e as any)?.message || e);
+    return null;
+  }
+}

@@ -34,6 +34,16 @@ export interface AnalysisResult {
   detailed_feedback: Record<string, {
     score: number;
     feedback: string;
+    evidence_excerpt?: string[];
+    evidence_timestamp?: string[];
+    observed_vs_target?: string;
+    next_step_teacher_move?: string;
+    vision_of_better_practice?: string;
+    exemplar?: string;
+    look_fors?: string[];
+    avoid?: string[];
+    context_anchor?: string;
+    actionable_strategies_for_improvement?: string[];
   }>;
   ai_model: string;
   created_at: string;

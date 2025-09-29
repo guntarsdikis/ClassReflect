@@ -293,7 +293,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
           <ThemeIcon color="blue" variant="light" radius="xl">
             <IconBulb size={16} />
           </ThemeIcon>
-          <Title order={4}>Detailed Feedback by Category</Title>
+          <Title order={4}>{isTeacher ? 'Actionable Strategies by Category' : 'Detailed Feedback by Category'}</Title>
         </Group>
 
         {analysis.detailed_feedback && Object.keys(analysis.detailed_feedback).length > 0 ? (
@@ -368,18 +368,41 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
                       </>
                     )}
                     
+                    {!isTeacher && (
+                      <div>
+                        <Text size="sm" fw={500} mb="xs" c="dark">
+                          Detailed Analysis:
+                        </Text>
+                        <Text size="sm" style={{ lineHeight: 1.6 }}>
+                          {feedback.feedback}
+                        </Text>
+                      </div>
+                    )}
+
+                  {Array.isArray((feedback as any)?.actionable_strategies_for_improvement) &&
+                    (feedback as any).actionable_strategies_for_improvement.length > 0 && (
                     <div>
-                      <Text size="sm" fw={500} mb="xs" c="dark">
-                        Detailed Analysis:
+                      <Divider my="sm" />
+                      <Text size="sm" fw={600} mb="xs" c="dark">
+                        Actionable Strategies
                       </Text>
-                      <Text size="sm" style={{ lineHeight: 1.6 }}>
-                        {feedback.feedback}
-                      </Text>
+                      <List spacing="xs" size="sm">
+                        {((feedback as any).actionable_strategies_for_improvement as string[]).map((s, i) => (
+                          <List.Item key={i} icon={
+                            <ThemeIcon color="orange" size={16} radius="xl">
+                              <Text size="xs">→</Text>
+                            </ThemeIcon>
+                          }>
+                            <Text size="sm">{s}</Text>
+                          </List.Item>
+                        ))}
+                      </List>
                     </div>
-                  </Stack>
-                </Paper>
-              </Timeline.Item>
-            ))}
+                  )}
+                </Stack>
+              </Paper>
+            </Timeline.Item>
+          ))}
           </Timeline>
         ) : (
           <Alert icon={<IconBulb size={16} />} color="gray" variant="light">

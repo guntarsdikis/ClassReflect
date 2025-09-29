@@ -18,6 +18,7 @@ import teachersRoutes from './routes/teachers';
 import templatesRoutes from './routes/templates';
 import analysisRoutes, { initializeAnalysisRoutes } from './routes/analysis';
 import settingsRoutes, { initializeSettingsRoutes } from './routes/settings';
+import promptsRoutes from './routes/prompts';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -63,7 +64,8 @@ app.get('/', (req: Request, res: Response) => {
       schools: '/api/schools',
       teachers: '/api/teachers',
       templates: '/api/templates',
-      analysis: '/api/analysis'
+      analysis: '/api/analysis',
+      prompts: '/api/prompts'
     }
   });
 });
@@ -86,6 +88,7 @@ app.use('/api/templates', templatesRoutes);
 console.log('🔧 Mounting analysis routes at /api/analysis');
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/prompts', promptsRoutes);
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

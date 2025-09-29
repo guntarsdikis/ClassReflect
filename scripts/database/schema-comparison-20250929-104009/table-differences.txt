@@ -1,0 +1,67 @@
+Table: analysis_jobs
+--- ./schema-comparison-20250929-104009/tmp-local-analysis_jobs.sql	2025-09-29 10:40:32
++++ ./schema-comparison-20250929-104009/tmp-prod-analysis_jobs.sql	2025-09-29 10:40:32
+@@ -3,9 +3,6 @@
+ CREATE TABLE `api_keys` (
+ CREATE TABLE `audio_jobs` (
+ CREATE TABLE `password_reset_tokens` (
+-CREATE TABLE `prompt_history` (
+-CREATE TABLE `prompt_test_results` (
+-CREATE TABLE `prompts` (
+ CREATE TABLE `school_subjects` (
+ CREATE TABLE `schools` (
+ CREATE TABLE `system_settings` (
+
+Table: analysis_results
+--- ./schema-comparison-20250929-104009/tmp-local-analysis_results.sql	2025-09-29 10:40:32
++++ ./schema-comparison-20250929-104009/tmp-prod-analysis_results.sql	2025-09-29 10:40:32
+@@ -2,9 +2,6 @@
+ CREATE TABLE `api_keys` (
+ CREATE TABLE `audio_jobs` (
+ CREATE TABLE `password_reset_tokens` (
+-CREATE TABLE `prompt_history` (
+-CREATE TABLE `prompt_test_results` (
+-CREATE TABLE `prompts` (
+ CREATE TABLE `school_subjects` (
+ CREATE TABLE `schools` (
+ CREATE TABLE `system_settings` (
+
+Table: api_keys
+--- ./schema-comparison-20250929-104009/tmp-local-api_keys.sql	2025-09-29 10:40:32
++++ ./schema-comparison-20250929-104009/tmp-prod-api_keys.sql	2025-09-29 10:40:32
+@@ -1,9 +1,6 @@
+ CREATE TABLE `api_keys` (
+ CREATE TABLE `audio_jobs` (
+ CREATE TABLE `password_reset_tokens` (
+-CREATE TABLE `prompt_history` (
+-CREATE TABLE `prompt_test_results` (
+-CREATE TABLE `prompts` (
+ CREATE TABLE `school_subjects` (
+ CREATE TABLE `schools` (
+ CREATE TABLE `system_settings` (
+
+Table: audio_jobs
+--- ./schema-comparison-20250929-104009/tmp-local-audio_jobs.sql	2025-09-29 10:40:32
++++ ./schema-comparison-20250929-104009/tmp-prod-audio_jobs.sql	2025-09-29 10:40:32
+@@ -1,8 +1,5 @@
+ CREATE TABLE `audio_jobs` (
+ CREATE TABLE `password_reset_tokens` (
+-CREATE TABLE `prompt_history` (
+-CREATE TABLE `prompt_test_results` (
+-CREATE TABLE `prompts` (
+ CREATE TABLE `school_subjects` (
+ CREATE TABLE `schools` (
+ CREATE TABLE `system_settings` (
+
+Table: password_reset_tokens
+--- ./schema-comparison-20250929-104009/tmp-local-password_reset_tokens.sql	2025-09-29 10:40:32
++++ ./schema-comparison-20250929-104009/tmp-prod-password_reset_tokens.sql	2025-09-29 10:40:32
+@@ -1,7 +1,4 @@
+ CREATE TABLE `password_reset_tokens` (
+-CREATE TABLE `prompt_history` (
+-CREATE TABLE `prompt_test_results` (
+-CREATE TABLE `prompts` (
+ CREATE TABLE `school_subjects` (
+ CREATE TABLE `schools` (
+ CREATE TABLE `system_settings` (
+

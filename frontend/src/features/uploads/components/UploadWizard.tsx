@@ -42,6 +42,7 @@ import { templatesService, Template } from '@features/templates/services/templat
 import { subjectsService, type SchoolSubject } from '@features/schools/services/subjects.service';
 import { usersService, User } from '@features/users/services/users.service';
 import { RecordingPanel } from './RecordingPanel';
+import { useJobStatus } from '../hooks/useJobStatus';
 
 interface CriterionConfig {
   id: string;
@@ -65,7 +66,9 @@ export function UploadWizard() {
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubject[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
-  
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
   // Form state
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -74,6 +77,11 @@ export function UploadWizard() {
   const [grade, setGrade] = useState('');
   const [duration, setDuration] = useState<number>(45);
   const [notes, setNotes] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
+  // Job status tracking
+  const [uploadedJobId, setUploadedJobId] = useState<string | null>(null);
+  const jobStatus = useJobStatus(uploadedJobId);
 
   // Determine which school ID to use
   const getEffectiveSchoolId = () => {
@@ -105,6 +113,7 @@ export function UploadWizard() {
     // Load subjects for the selected school
     if (currentSchoolId) {
       loadSubjects();
+      loadTemplates();
     }
   }, [currentSchoolId, selectedSchool, isTeacher, user?.id]);
 
@@ -177,6 +186,28 @@ export function UploadWizard() {
       })) as unknown as SchoolSubject[]);
     } finally {
       setLoadingSubjects(false);
+    }
+  };
+
+  const loadTemplates = async () => {
+    if (!currentSchoolId) return;
+    try {
+      setLoadingTemplates(true);
+      const templatesData = await templatesService.getTemplates();
+      setTemplates(templatesData);
+      // Auto-select first template if only one exists
+      if (templatesData.length === 1 && !selectedTemplate) {
+        setSelectedTemplate(templatesData[0].id.toString());
+      }
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+      notifications.show({
+        title: 'Warning',
+        message: 'Failed to load analysis templates',
+        color: 'yellow',
+      });
+    } finally {
+      setLoadingTemplates(false);
     }
   };
   
@@ -257,6 +288,9 @@ export function UploadWizard() {
       if (!jobId || !uploadUrl) {
         throw new Error('Invalid presigned URL response');
       }
+
+      // Start tracking job status
+      setUploadedJobId(jobId);
       try {
         const u = new URL(uploadUrl);
         console.log('🚀 Frontend Upload Debug - Using upload URL:', { host: u.host, path: u.pathname });
@@ -408,6 +442,9 @@ export function UploadWizard() {
     formData.append('grade', grade);
     formData.append('duration', duration.toString());
     formData.append('notes', notes);
+    if (selectedTemplate) {
+      formData.append('templateId', selectedTemplate);
+    }
 
     const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/direct`;
     await new Promise((resolve, reject) => {
@@ -634,18 +671,80 @@ export function UploadWizard() {
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
               />
+
+              <Divider label="Analysis Template (Optional)" labelPosition="center" mt="md" />
+
+              <Select
+                label="Analysis Template"
+                placeholder={loadingTemplates ? "Loading templates..." : "Select a template for AI analysis"}
+                description="Choose a template to automatically analyze this recording"
+                data={templates.map(t => ({
+                  value: t.id.toString(),
+                  label: t.template_name
+                }))}
+                value={selectedTemplate}
+                onChange={(value) => setSelectedTemplate(value || '')}
+                disabled={loadingTemplates}
+                leftSection={<IconTemplate size={16} />}
+                clearable
+              />
             </Stack>
           </Stepper.Step>
           
           <Stepper.Completed>
             <Stack mt="xl" align="center">
-              {isUploading ? (
+              {isUploading || jobStatus?.isPolling ? (
                 <>
-                  <IconUpload size={48} />
-                  <Title order={3}>Uploading Recording...</Title>
-                  <Text c="dimmed">Please don't close this page</Text>
-                  <Progress value={uploadProgress} w="100%" mt="md" />
-                  <Text size="sm">{uploadProgress}% uploaded</Text>
+                  {jobStatus?.status ? (
+                    <>
+                      {jobStatus.status.progress.stage === 'transcribing' && <IconFileMusic size={48} />}
+                      {jobStatus.status.progress.stage === 'analyzing' && <IconTemplate size={48} />}
+                      {!['transcribing', 'analyzing'].includes(jobStatus.status.progress.stage) && <IconUpload size={48} />}
+                      <Title order={3}>{jobStatus.status.progress.message}</Title>
+                      <Text c="dimmed">Please don't close this page</Text>
+                      <Progress value={jobStatus.status.progress.percent} w="100%" mt="md" />
+                      <Text size="sm">{jobStatus.status.progress.percent}% complete</Text>
+                      {jobStatus.status.analysis.templateName && (
+                        <Badge size="lg" variant="light" color="blue" mt="sm">
+                          Using template: {jobStatus.status.analysis.templateName}
+                        </Badge>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <IconUpload size={48} />
+                      <Title order={3}>Uploading Recording...</Title>
+                      <Text c="dimmed">Please don't close this page</Text>
+                      <Progress value={uploadProgress} w="100%" mt="md" />
+                      <Text size="sm">{uploadProgress}% uploaded</Text>
+                    </>
+                  )}
+                </>
+              ) : jobStatus?.isComplete ? (
+                <>
+                  <IconCheck size={48} color="green" />
+                  <Title order={3}>Processing Complete!</Title>
+                  <Text c="dimmed">Your recording has been uploaded and processed</Text>
+                  {jobStatus.status?.analysis.completed && (
+                    <Badge size="lg" variant="filled" color="green" mt="sm">
+                      ✓ Analysis Complete
+                    </Badge>
+                  )}
+                  <Button
+                    mt="lg"
+                    onClick={() => navigate(user?.role === 'teacher' ? '/reports' : '/recordings')}
+                  >
+                    View Results
+                  </Button>
+                </>
+              ) : jobStatus?.isFailed ? (
+                <>
+                  <IconAlertCircle size={48} color="red" />
+                  <Title order={3}>Processing Failed</Title>
+                  <Text c="dimmed">{jobStatus.error || 'An error occurred during processing'}</Text>
+                  <Button variant="default" mt="lg" onClick={() => navigate('/uploads')}>
+                    Try Again
+                  </Button>
                 </>
               ) : (
                 <>

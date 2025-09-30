@@ -13,11 +13,11 @@ router.get('/provider/:provider', async (req: Request, res: Response) => {
   try {
     const { provider } = req.params;
 
-    if (!['lemur', 'openai'].includes(provider)) {
-      return res.status(400).json({ error: 'Invalid provider. Must be lemur or openai' });
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
+      return res.status(400).json({ error: 'Invalid provider. Must be lemur, openai, gemini, vertex, or openrouter' });
     }
 
-    const prompts = await promptManager.getProviderPrompts(provider as 'lemur' | 'openai');
+    const prompts = await promptManager.getProviderPrompts(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter');
 
     res.json({
       provider,
@@ -35,11 +35,11 @@ router.get('/:provider/:name/versions', async (req: Request, res: Response) => {
   try {
     const { provider, name } = req.params;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
-    const versions = await promptManager.getPromptVersions(provider as 'lemur' | 'openai', name);
+    const versions = await promptManager.getPromptVersions(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name);
 
     res.json({
       provider,
@@ -58,11 +58,11 @@ router.get('/:provider/:name/active', async (req: Request, res: Response) => {
   try {
     const { provider, name } = req.params;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
-    const prompt = await promptManager.getActivePrompt(provider as 'lemur' | 'openai', name);
+    const prompt = await promptManager.getActivePrompt(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name);
 
     if (!prompt) {
       return res.status(404).json({ error: 'No active prompt found' });
@@ -80,7 +80,7 @@ router.get('/:provider/:name/version/:version', async (req: Request, res: Respon
   try {
     const { provider, name, version } = req.params;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
@@ -90,7 +90,7 @@ router.get('/:provider/:name/version/:version', async (req: Request, res: Respon
     }
 
     const prompt = await promptManager.getPromptVersion(
-      provider as 'lemur' | 'openai',
+      provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter',
       name,
       versionNum
     );
@@ -113,7 +113,7 @@ router.post('/:provider/:name/version', async (req: Request, res: Response) => {
     const { prompt_template, description, change_description } = req.body;
     const user = (req as any).user;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
@@ -131,7 +131,7 @@ router.post('/:provider/:name/version', async (req: Request, res: Response) => {
     }
 
     const result = await promptManager.createPromptVersion(
-      provider as 'lemur' | 'openai',
+      provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter',
       name,
       prompt_template,
       description || '',
@@ -161,7 +161,7 @@ router.post('/:provider/:name/revert/:version', async (req: Request, res: Respon
     const { provider, name, version } = req.params;
     const user = (req as any).user;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
@@ -171,7 +171,7 @@ router.post('/:provider/:name/revert/:version', async (req: Request, res: Respon
     }
 
     const success = await promptManager.revertToVersion(
-      provider as 'lemur' | 'openai',
+      provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter',
       name,
       versionNum,
       user.email || 'api'
@@ -197,7 +197,7 @@ router.get('/:provider/:name/compare', async (req: Request, res: Response) => {
     const { provider, name } = req.params;
     const { version1, version2 } = req.query;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
@@ -208,8 +208,8 @@ router.get('/:provider/:name/compare', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid version numbers' });
     }
 
-    const prompt1 = await promptManager.getPromptVersion(provider as 'lemur' | 'openai', name, v1);
-    const prompt2 = await promptManager.getPromptVersion(provider as 'lemur' | 'openai', name, v2);
+    const prompt1 = await promptManager.getPromptVersion(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name, v1);
+    const prompt2 = await promptManager.getPromptVersion(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name, v2);
 
     if (!prompt1 || !prompt2) {
       return res.status(404).json({ error: 'One or both versions not found' });
@@ -248,7 +248,7 @@ router.post('/:provider/:name/test', async (req: Request, res: Response) => {
     const { version, test_input } = req.body;
     const user = (req as any).user;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
@@ -262,9 +262,9 @@ router.post('/:provider/:name/test', async (req: Request, res: Response) => {
       if (isNaN(versionNum)) {
         return res.status(400).json({ error: 'Invalid version number' });
       }
-      prompt = await promptManager.getPromptVersion(provider as 'lemur' | 'openai', name, versionNum);
+      prompt = await promptManager.getPromptVersion(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name, versionNum);
     } else {
-      prompt = await promptManager.getActivePrompt(provider as 'lemur' | 'openai', name);
+      prompt = await promptManager.getActivePrompt(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name);
     }
 
     if (!prompt) {
@@ -346,11 +346,11 @@ router.get('/export/:provider', async (req: Request, res: Response) => {
   try {
     const { provider } = req.params;
 
-    if (!['lemur', 'openai'].includes(provider)) {
+    if (!['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
-    const exportData = await promptManager.exportPrompts(provider as 'lemur' | 'openai');
+    const exportData = await promptManager.exportPrompts(provider as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter');
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename=prompts-export-${provider}-${Date.now()}.json`);
@@ -389,7 +389,7 @@ router.post('/import', async (req: Request, res: Response) => {
 router.post('/template/:templateId/assign', async (req: Request, res: Response) => {
   try {
     const templateId = parseInt(req.params.templateId);
-    const { lemur_prompt_id, openai_prompt_id } = req.body;
+    const { lemur_prompt_id, openai_prompt_id, gemini_prompt_id, vertex_prompt_id, openrouter_prompt_id } = req.body;
 
     if (isNaN(templateId)) {
       return res.status(400).json({ error: 'Invalid template ID' });
@@ -400,9 +400,9 @@ router.post('/template/:templateId/assign', async (req: Request, res: Response) 
 
     await pool.query(
       `UPDATE templates
-       SET lemur_prompt_id = ?, openai_prompt_id = ?, updated_at = NOW()
+       SET lemur_prompt_id = ?, openai_prompt_id = ?, gemini_prompt_id = ?, vertex_prompt_id = ?, openrouter_prompt_id = ?, updated_at = NOW()
        WHERE id = ?`,
-      [lemur_prompt_id || null, openai_prompt_id || null, templateId]
+      [lemur_prompt_id || null, openai_prompt_id || null, gemini_prompt_id || null, vertex_prompt_id || null, openrouter_prompt_id || null, templateId]
     );
 
     res.json({
@@ -410,7 +410,10 @@ router.post('/template/:templateId/assign', async (req: Request, res: Response) 
       message: 'Prompt assignments updated for template',
       template_id: templateId,
       lemur_prompt_id,
-      openai_prompt_id
+      openai_prompt_id,
+      gemini_prompt_id,
+      vertex_prompt_id,
+      openrouter_prompt_id
     });
   } catch (error) {
     console.error('Error assigning prompts to template:', error);
@@ -435,13 +438,25 @@ router.get('/template/:templateId/assignments', async (req: Request, res: Respon
         t.template_name,
         t.lemur_prompt_id,
         t.openai_prompt_id,
+        t.gemini_prompt_id,
+        t.vertex_prompt_id,
+        t.openrouter_prompt_id,
         lp.version as lemur_version,
         lp.is_active as lemur_active,
         op.version as openai_version,
-        op.is_active as openai_active
+        op.is_active as openai_active,
+        gp.version as gemini_version,
+        gp.is_active as gemini_active,
+        vp.version as vertex_version,
+        vp.is_active as vertex_active,
+        orp.version as openrouter_version,
+        orp.is_active as openrouter_active
        FROM templates t
        LEFT JOIN prompts lp ON t.lemur_prompt_id = lp.id
        LEFT JOIN prompts op ON t.openai_prompt_id = op.id
+       LEFT JOIN prompts gp ON t.gemini_prompt_id = gp.id
+       LEFT JOIN prompts vp ON t.vertex_prompt_id = vp.id
+       LEFT JOIN prompts orp ON t.openrouter_prompt_id = orp.id
        WHERE t.id = ?`,
       [templateId]
     );

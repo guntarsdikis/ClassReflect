@@ -4,7 +4,7 @@ import type { TemplateCriterion } from './lemur';
 
 export interface PromptLogOptions {
   analysisJobId: string;
-  provider: 'openai' | 'lemur';
+  provider: 'openai' | 'lemur' | 'gemini' | 'vertex' | 'openrouter';
   model?: string;
   jobId: string;
   transcriptId?: string; // AssemblyAI transcript ID (for LeMUR)
@@ -79,7 +79,7 @@ export async function savePromptMarkdown(opts: PromptLogOptions): Promise<string
 
 export interface ModelOutputLogOptions {
   analysisJobId: string;
-  provider: 'openai' | 'lemur';
+  provider: 'openai' | 'lemur' | 'gemini' | 'vertex' | 'openrouter';
   model?: string;
   jobId: string;
   transcriptId?: string;

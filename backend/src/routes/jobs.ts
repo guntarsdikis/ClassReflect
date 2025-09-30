@@ -47,13 +47,14 @@ router.get('/recordings',
 
     // Main query
     const queryStr = `
-      SELECT 
+      SELECT
         aj.id,
         aj.teacher_id,
         aj.school_id,
         aj.file_name,
         aj.file_size,
         aj.status,
+        aj.analysis_status,
         aj.created_at,
         aj.processing_started_at,
         aj.processing_completed_at,
@@ -82,8 +83,8 @@ router.get('/recordings',
       LEFT JOIN transcripts tr ON aj.id = tr.job_id
       LEFT JOIN analysis_results ar ON aj.id = ar.job_id
       WHERE ${whereClause}
-      GROUP BY 
-        aj.id, aj.teacher_id, aj.school_id, aj.file_name, aj.file_size, aj.status,
+      GROUP BY
+        aj.id, aj.teacher_id, aj.school_id, aj.file_name, aj.file_size, aj.status, aj.analysis_status,
         aj.created_at, aj.processing_started_at, aj.processing_completed_at, aj.error_message,
         aj.assemblyai_upload_url, aj.assemblyai_transcript_id, aj.class_name, aj.subject, aj.grade,
         aj.class_duration_minutes, aj.notes, u.first_name, u.last_name, u.email, s.name,
@@ -236,9 +237,9 @@ router.get('/teacher/:teacherId',
   }
 });
 
-// Get single job details
-// Users can only see jobs they have access to (own jobs for teachers, school jobs for managers)
-router.get('/:jobId', 
+// Get job status for real-time progress tracking
+// Lightweight endpoint for polling during upload/processing
+router.get('/:jobId/status',
   authenticate,
   authorize('teacher', 'school_manager', 'super_admin'),
   async (req: Request, res: Response) => {
@@ -246,7 +247,130 @@ router.get('/:jobId',
     const { jobId } = req.params;
 
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT 
+      `SELECT
+        aj.id,
+        aj.teacher_id,
+        aj.school_id,
+        aj.status,
+        aj.analysis_status,
+        aj.error_message,
+        aj.processing_started_at,
+        aj.processing_completed_at,
+        aj.analysis_started_at,
+        aj.analysis_completed_at,
+        aj.template_id,
+        tr.id as transcript_id,
+        tr.transcript_text,
+        ajob.id as analysis_job_id,
+        ajob.status as analysis_job_status,
+        ajob.progress_percent,
+        tpl.template_name
+      FROM audio_jobs aj
+      LEFT JOIN transcripts tr ON aj.id = tr.job_id
+      LEFT JOIN analysis_jobs ajob ON aj.id = ajob.job_id
+      LEFT JOIN templates tpl ON aj.template_id = tpl.id
+      WHERE aj.id = ?
+      LIMIT 1`,
+      [jobId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const job = rows[0] as any;
+
+    // Role-based access control
+    if (req.user!.role === 'teacher' && job.teacher_id !== req.user!.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    } else if (req.user!.role === 'school_manager' && job.school_id !== req.user!.schoolId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Determine current stage and progress
+    let stage = 'queued';
+    let percent = 0;
+    let message = 'Waiting to start...';
+
+    if (job.status === 'failed') {
+      stage = 'failed';
+      percent = 0;
+      message = job.error_message || 'Processing failed';
+    } else if (job.status === 'processing') {
+      stage = 'transcribing';
+      percent = 30;
+      message = 'Transcribing audio with AssemblyAI...';
+    } else if (job.status === 'completed' && !job.transcript_id) {
+      stage = 'transcribing';
+      percent = 50;
+      message = 'Finalizing transcription...';
+    } else if (job.transcript_id) {
+      // Transcription complete
+      if (job.template_id && job.analysis_status !== 'skipped') {
+        // Should have analysis
+        if (job.analysis_job_status === 'processing') {
+          stage = 'analyzing';
+          percent = 60 + (job.progress_percent || 0) * 0.4; // 60-100%
+          message = `Analyzing with ${job.template_name || 'template'}...`;
+        } else if (job.analysis_job_status === 'completed') {
+          stage = 'completed';
+          percent = 100;
+          message = 'Analysis complete!';
+        } else if (job.analysis_job_status === 'failed') {
+          stage = 'completed'; // Transcription succeeded
+          percent = 60;
+          message = 'Transcription complete (analysis failed)';
+        } else {
+          // Analysis queued or pending
+          stage = 'analyzing';
+          percent = 60;
+          message = 'Starting analysis...';
+        }
+      } else {
+        // No analysis requested
+        stage = 'completed';
+        percent = 100;
+        message = 'Transcription complete!';
+      }
+    }
+
+    res.json({
+      jobId: job.id,
+      status: job.status,
+      analysisStatus: job.analysis_status,
+      progress: {
+        stage,
+        percent,
+        message
+      },
+      transcription: {
+        completed: !!job.transcript_id,
+        hasText: !!job.transcript_text
+      },
+      analysis: {
+        completed: job.analysis_job_status === 'completed',
+        jobId: job.analysis_job_id,
+        templateName: job.template_name
+      },
+      error: job.error_message
+    });
+  } catch (error) {
+    console.error('Error fetching job status:', error);
+    res.status(500).json({ error: 'Failed to fetch job status' });
+  }
+});
+
+// Get single job details
+// Users can only see jobs they have access to (own jobs for teachers, school jobs for managers)
+router.get('/:jobId',
+  authenticate,
+  authorize('teacher', 'school_manager', 'super_admin'),
+  async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT
         aj.*,
         u.first_name,
         u.last_name,
@@ -270,7 +394,7 @@ router.get('/:jobId',
     }
 
     const job = rows[0];
-    
+
     // Role-based access control
     if (req.user!.role === 'teacher') {
       // Teachers can only see their own jobs

@@ -19,12 +19,12 @@ import { IconAlertCircle, IconCheck, IconX } from '@tabler/icons-react';
 
 interface PromptEditorProps {
   initialPrompt: string;
-  provider: 'lemur' | 'openai';
+  provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter';
   onSave: (promptTemplate: string, description: string, changeDescription: string) => Promise<void>;
   onCancel: () => void;
 }
 
-const TEMPLATE_VARIABLES = {
+const TEMPLATE_VARIABLES: Record<'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', Array<{ name: string; description: string }>> = {
   lemur: [
     { name: 'CONTEXT_CALIBRATION', description: 'Grade and subject-specific context adjustments' },
     { name: 'CLASS_CONTEXT', description: 'Teacher, class, subject, and grade information' },
@@ -46,6 +46,39 @@ const TEMPLATE_VARIABLES = {
     { name: 'IMPORTANT_NOTES', description: 'Important notes and warnings' },
     { name: 'WAIT_TIME_METRICS', description: 'Wait time metrics if available' },
     { name: 'OUTPUT_REQUIREMENT', description: 'Output format specification' }
+  ],
+  gemini: [
+    { name: 'TRANSCRIPT_TEXT', description: 'Full transcript text passed to the model' },
+    { name: 'TEACHER_NAME', description: 'Teacher\'s full name' },
+    { name: 'CLASS_NAME', description: 'Class name' },
+    { name: 'SUBJECT', description: 'Subject name' },
+    { name: 'GRADE', description: 'Grade or year group' },
+    { name: 'TEMPLATE_NAME', description: 'Evaluation template name' },
+    { name: 'CRITERIA_LIST', description: 'Bullet list of criteria with weights and descriptions' },
+    { name: 'WAIT_TIME_METRICS', description: 'Summary of pause/wait-time metrics if available' },
+    { name: 'TIMING_SECTION', description: 'Time-coded evidence excerpt block if available' }
+  ],
+  vertex: [
+    { name: 'TRANSCRIPT_TEXT', description: 'Full transcript text passed to the model' },
+    { name: 'TEACHER_NAME', description: 'Teacher\'s full name' },
+    { name: 'CLASS_NAME', description: 'Class name' },
+    { name: 'SUBJECT', description: 'Subject name' },
+    { name: 'GRADE', description: 'Grade or year group' },
+    { name: 'TEMPLATE_NAME', description: 'Evaluation template name' },
+    { name: 'CRITERIA_LIST', description: 'Bullet list of criteria with weights and descriptions' },
+    { name: 'WAIT_TIME_METRICS', description: 'Summary of pause/wait-time metrics if available' },
+    { name: 'TIMING_SECTION', description: 'Time-coded evidence excerpt block if available' }
+  ],
+  openrouter: [
+    { name: 'TRANSCRIPT_TEXT', description: 'Full transcript text passed to the model' },
+    { name: 'TEACHER_NAME', description: 'Teacher\'s full name' },
+    { name: 'CLASS_NAME', description: 'Class name' },
+    { name: 'SUBJECT', description: 'Subject name' },
+    { name: 'GRADE', description: 'Grade or year group' },
+    { name: 'TEMPLATE_NAME', description: 'Evaluation template name' },
+    { name: 'CRITERIA_LIST', description: 'Bullet list of criteria with weights and descriptions' },
+    { name: 'WAIT_TIME_METRICS', description: 'Summary of pause/wait-time metrics if available' },
+    { name: 'TIMING_SECTION', description: 'Time-coded evidence excerpt block if available' }
   ]
 };
 
@@ -71,13 +104,28 @@ export function PromptEditor({ initialPrompt, provider, onSave, onCancel }: Prom
       errors.push('Unclosed template variables detected');
     }
 
-    // Check for required sections
-    const requiredSections = ['PRIMARY GOAL', 'STYLE'];
-    requiredSections.forEach(section => {
-      if (!promptTemplate.includes(section)) {
-        errors.push(`Missing required section: ${section}`);
+    // Check for required sections per provider
+    if (provider === 'lemur') {
+      const required = ['PRIMARY GOAL', 'STYLE'];
+      required.forEach(section => {
+        if (!promptTemplate.includes(section)) {
+          errors.push(`Missing required section: ${section}`);
+        }
+      });
+    } else if (provider === 'openai') {
+      const required = ['SCORING', 'OUTPUT'];
+      const found = required.some(section => promptTemplate.toUpperCase().includes(section));
+      if (!found) {
+        errors.push('OpenAI prompt should include guidance for scoring and output.');
       }
-    });
+    } else if (provider === 'gemini' || provider === 'vertex' || provider === 'openrouter') {
+      const mustContain = ['CRITERIA_LIST', 'TEMPLATE_NAME'];
+      mustContain.forEach(token => {
+        if (!promptTemplate.includes(`{{${token}}}`)) {
+          errors.push(`${provider} prompt should reference {{${token}}}.`);
+        }
+      });
+    }
 
     if (!changeDescription.trim()) {
       errors.push('Please provide a description of your changes');

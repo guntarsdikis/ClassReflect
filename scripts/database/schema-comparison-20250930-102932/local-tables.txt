@@ -1,0 +1,21 @@
+Table	Engine	Rows	Size_MB	Created	Updated
+analysis_job_status	NULL	NULL	NULL	2025-08-28 20:30:45	NULL
+analysis_jobs	InnoDB	52	1.69	2025-08-28 20:30:45	2025-09-30 07:28:41
+analysis_results	InnoDB	36	1.63	2025-08-28 14:33:05	2025-09-30 07:28:41
+api_keys	InnoDB	0	0.08	2025-08-24 08:21:15	NULL
+audio_jobs	InnoDB	7	0.11	2025-09-30 06:51:46	2025-09-30 07:28:41
+password_reset_tokens	InnoDB	2	0.08	2025-09-17 19:27:58	NULL
+prompt_history	InnoDB	4	0.08	2025-09-29 14:27:25	2025-09-29 06:09:25
+prompt_test_results	InnoDB	0	0.03	2025-09-28 07:34:40	NULL
+prompts	InnoDB	8	0.16	2025-09-30 05:52:28	2025-09-29 06:23:00
+school_subjects	InnoDB	17	0.09	2025-08-28 05:18:42	2025-09-26 11:56:42
+schools	InnoDB	0	0.05	2025-08-29 06:45:20	NULL
+system_settings	InnoDB	1	0.02	2025-09-25 10:37:23	2025-09-30 07:01:32
+system_subjects	InnoDB	0	0.08	2025-08-28 04:49:06	NULL
+template_categories	InnoDB	1	0.08	2025-08-28 05:15:32	NULL
+template_criteria	InnoDB	35	0.08	2025-09-25 19:22:05	2025-09-25 19:22:05
+template_usage	InnoDB	0	0.08	2025-08-27 10:57:28	NULL
+templates	InnoDB	2	0.16	2025-09-30 06:04:16	2025-09-30 07:28:07
+transcripts	InnoDB	9	1.09	2025-09-30 06:51:46	2025-09-30 06:58:07
+users	InnoDB	3	0.11	2025-08-30 08:15:49	2025-09-29 07:02:23
+word_timestamps	InnoDB	82544	14.06	2025-08-28 11:23:05	2025-09-30 06:58:07

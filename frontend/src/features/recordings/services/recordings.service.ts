@@ -7,6 +7,7 @@ export interface Recording {
   file_name: string;
   file_size: number;
   status: 'pending' | 'uploading' | 'queued' | 'processing' | 'completed' | 'failed';
+  analysis_status?: 'pending' | 'queued' | 'processing' | 'completed' | 'failed' | 'skipped';
   created_at: string;
   processing_started_at?: string;
   processing_completed_at?: string;

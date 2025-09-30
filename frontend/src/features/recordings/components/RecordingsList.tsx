@@ -22,6 +22,7 @@ import {
   RangeSlider,
   Switch,
   Menu,
+  Progress,
 } from '@mantine/core';
 import {
   IconSearch,
@@ -61,6 +62,7 @@ import { AnalysisReportPDF } from '@features/analysis/components/AnalysisReportP
 import { pdf } from '@react-pdf/renderer';
 import { useNavigate } from 'react-router-dom';
 import { useSchoolContextStore } from '@store/school-context.store';
+import { jobStatusService, type JobStatusResponse } from '@features/uploads/services/job-status.service';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -98,6 +100,8 @@ export function RecordingsList() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisResult | null>(null);
   const [downloadingRecordingId, setDownloadingRecordingId] = useState<string | null>(null);
   const [downloadingTranscriptId, setDownloadingTranscriptId] = useState<string | null>(null);
+  const [analysisJobStatus, setAnalysisJobStatus] = useState<JobStatusResponse | null>(null);
+  const [isPollingAnalysis, setIsPollingAnalysis] = useState(false);
   // Detailed transcript view state
   const [detailedView, setDetailedView] = useState(false);
   const [wordTimestamps, setWordTimestamps] = useState<WordTimestamp[]>([]);
@@ -236,7 +240,7 @@ export function RecordingsList() {
   } = useQuery({
     queryKey: ['recordings', filters],
     queryFn: () => RecordingsService.getRecordings(filters),
-    refetchInterval: 10000, // Refresh every 10 seconds to show processing updates
+    refetchInterval: 2000, // Refresh every 2 seconds to show processing updates
   });
 
   // Update filters when school context changes for super admin
@@ -389,13 +393,75 @@ export function RecordingsList() {
 
   const applyTemplate = async () => {
     if (!selectedRecording || !selectedRecording.transcript_id || !selectedTemplateId) return;
+
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      notifications.show({ title: 'Error', message: 'Not authenticated', color: 'red' });
+      return;
+    }
+
     try {
-      const resp = await analysisService.applyTemplate({ transcriptId: selectedRecording.transcript_id, templateId: parseInt(selectedTemplateId, 10) });
-      notifications.show({ title: 'Analysis Queued', message: 'Template analysis started in background.', color: 'green', icon: <IconCheck /> });
-      setApplyModalOpened(false);
-      // Optional: poll or refresh list
+      setIsPollingAnalysis(true);
+      const resp = await analysisService.applyTemplate({
+        transcriptId: selectedRecording.transcript_id,
+        templateId: parseInt(selectedTemplateId, 10)
+      });
+
+      notifications.show({
+        title: 'Analysis Started',
+        message: 'AI analysis is now running. Watch the progress below.',
+        color: 'blue',
+        icon: <IconTemplate />
+      });
+
+      // Don't close modal - show progress instead
+      // setApplyModalOpened(false);
+
+      // Start polling for status using the job ID
+      const jobId = selectedRecording.id; // The audio job ID
+
+      jobStatusService.pollUntilComplete(
+        jobId,
+        token,
+        (status) => {
+          setAnalysisJobStatus(status);
+        },
+        {
+          pollInterval: 2000,
+          maxAttempts: 300
+        }
+      ).then((finalStatus) => {
+        setIsPollingAnalysis(false);
+        if (finalStatus.progress.stage === 'completed') {
+          notifications.show({
+            title: 'Analysis Complete!',
+            message: 'Your analysis results are ready to view.',
+            color: 'green',
+            icon: <IconCheck />
+          });
+          setApplyModalOpened(false);
+          setAnalysisJobStatus(null);
+          // Refresh the recordings list
+          refetch();
+        }
+      }).catch((err) => {
+        setIsPollingAnalysis(false);
+        setAnalysisJobStatus(null);
+        notifications.show({
+          title: 'Polling Error',
+          message: err.message || 'Failed to track analysis progress',
+          color: 'orange'
+        });
+      });
+
     } catch (e: any) {
-      notifications.show({ title: 'Failed to Start Analysis', message: e?.message || 'Error applying template', color: 'red' });
+      setIsPollingAnalysis(false);
+      setAnalysisJobStatus(null);
+      notifications.show({
+        title: 'Failed to Start Analysis',
+        message: e?.message || 'Error applying template',
+        color: 'red'
+      });
     }
   };
 
@@ -612,7 +678,7 @@ export function RecordingsList() {
           <Text c="dimmed">
             {user?.role === 'super_admin' && selectedSchool
               ? `Managing recordings for ${selectedSchool.name}`
-              : user?.role === 'super_admin' 
+              : user?.role === 'super_admin'
               ? 'Manage all recordings across all schools'
               : 'View and manage recordings from your school'
             }
@@ -625,10 +691,28 @@ export function RecordingsList() {
         </Group>
       </Group>
 
+      {/* Analysis Running Banner */}
+      {recordingsData && recordingsData.recordings.filter(r => r.analysis_status === 'processing' || r.analysis_status === 'queued').length > 0 && (
+        <Alert
+          icon={<Loader size="sm" />}
+          title="Template Analysis in Progress"
+          color="violet"
+          variant="light"
+          mb="md"
+        >
+          <Group gap="xs">
+            <Text size="sm">
+              {recordingsData.recordings.filter(r => r.analysis_status === 'processing' || r.analysis_status === 'queued').length} recording(s) currently being analyzed with AI templates.
+            </Text>
+            <Text size="sm" c="dimmed">Auto-refreshing every 2 seconds...</Text>
+          </Group>
+        </Alert>
+      )}
+
       {/* Stats Cards */}
       {recordingsData && (
         <Grid gutter="md" mb="xl">
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2.4 }}>
             <Paper p="md" withBorder>
               <Group>
                 <IconFileText size={20} color="blue" />
@@ -643,7 +727,7 @@ export function RecordingsList() {
               </Group>
             </Paper>
           </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2.4 }}>
             <Paper p="md" withBorder>
               <Group>
                 <IconClock size={20} color="orange" />
@@ -658,7 +742,26 @@ export function RecordingsList() {
               </Group>
             </Paper>
           </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2.4 }}>
+            <Paper p="md" withBorder style={{ borderColor: recordingsData.recordings.filter(r => r.analysis_status === 'processing' || r.analysis_status === 'queued').length > 0 ? '#7950f2' : undefined }}>
+              <Group>
+                {recordingsData.recordings.filter(r => r.analysis_status === 'processing' || r.analysis_status === 'queued').length > 0 ? (
+                  <Loader size="sm" color="violet" />
+                ) : (
+                  <IconTemplate size={20} color="violet" />
+                )}
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                    Analyzing
+                  </Text>
+                  <Text fw={700} size="xl" c={recordingsData.recordings.filter(r => r.analysis_status === 'processing' || r.analysis_status === 'queued').length > 0 ? 'violet' : undefined}>
+                    {recordingsData.recordings.filter(r => r.analysis_status === 'processing' || r.analysis_status === 'queued').length}
+                  </Text>
+                </div>
+              </Group>
+            </Paper>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2.4 }}>
             <Paper p="md" withBorder>
               <Group>
                 <IconFileText size={20} color="green" />
@@ -673,7 +776,7 @@ export function RecordingsList() {
               </Group>
             </Paper>
           </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Grid.Col span={{ base: 12, sm: 6, md: 2.4 }}>
             <Paper p="md" withBorder>
               <Group>
                 <IconAlertCircle size={20} color="red" />
@@ -830,12 +933,36 @@ export function RecordingsList() {
                         </Group>
                       </Table.Td>
                       <Table.Td>
-                        <Badge
-                          color={RecordingsService.getStatusColor(recording.status)}
-                          variant="light"
-                        >
-                          {recording.status}
-                        </Badge>
+                        <Stack gap={4}>
+                          {recording.status === 'processing' || recording.status === 'queued' ? (
+                            <Group gap="xs">
+                              <Loader size="xs" />
+                              <Badge color="blue" variant="light">
+                                {recording.status === 'processing' ? 'Transcribing' : 'Queued'}
+                              </Badge>
+                            </Group>
+                          ) : (
+                            <Badge
+                              color={RecordingsService.getStatusColor(recording.status)}
+                              variant="light"
+                            >
+                              {recording.status}
+                            </Badge>
+                          )}
+
+                          {recording.analysis_status === 'processing' || recording.analysis_status === 'queued' ? (
+                            <Group gap="xs">
+                              <Loader size="xs" color="violet" />
+                              <Badge color="violet" variant="light" size="sm">
+                                {recording.analysis_status === 'processing' ? 'Analyzing...' : 'Analysis Queued'}
+                              </Badge>
+                            </Group>
+                          ) : recording.analysis_status === 'completed' && recording.analysis_count && recording.analysis_count > 0 ? (
+                            <Badge color="green" variant="dot" size="sm">
+                              Analyzed
+                            </Badge>
+                          ) : null}
+                        </Stack>
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm">
@@ -1084,25 +1211,70 @@ export function RecordingsList() {
       </Modal>
 
       {/* Apply Template Modal */}
-      <Modal opened={applyModalOpened} onClose={() => setApplyModalOpened(false)} title="Apply Template Analysis" size="md">
+      <Modal
+        opened={applyModalOpened}
+        onClose={() => {
+          if (!isPollingAnalysis) {
+            setApplyModalOpened(false);
+            setAnalysisJobStatus(null);
+          }
+        }}
+        title="Apply Template Analysis"
+        size="md"
+        closeOnClickOutside={!isPollingAnalysis}
+        closeOnEscape={!isPollingAnalysis}
+      >
         <Stack>
-          {loadingTemplates ? (
-            <Loader />
-          ) : templates.length === 0 ? (
-            <Alert color="gray">No templates available.</Alert>
+          {isPollingAnalysis && analysisJobStatus ? (
+            <>
+              <Alert color="blue" icon={<IconTemplate size={16} />}>
+                <Text fw={500}>{analysisJobStatus.progress.message}</Text>
+                <Text size="sm" c="dimmed" mt={4}>
+                  Stage: {analysisJobStatus.progress.stage}
+                </Text>
+              </Alert>
+              <Progress
+                value={analysisJobStatus.progress.percent}
+                size="lg"
+                animated
+                label={`${analysisJobStatus.progress.percent}%`}
+              />
+              {analysisJobStatus.analysis.templateName && (
+                <Badge size="lg" variant="light" color="blue">
+                  Using: {analysisJobStatus.analysis.templateName}
+                </Badge>
+              )}
+              <Text size="sm" c="dimmed" ta="center">
+                Please wait while AI analyzes your recording...
+              </Text>
+            </>
           ) : (
-            <Select
-              label="Select Template"
-              placeholder="Choose a template"
-              data={templates.map(t => ({ value: String(t.id), label: t.template_name }))}
-              value={selectedTemplateId}
-              onChange={(v) => setSelectedTemplateId(v || '')}
-            />
+            <>
+              {loadingTemplates ? (
+                <Loader />
+              ) : templates.length === 0 ? (
+                <Alert color="gray">No templates available.</Alert>
+              ) : (
+                <Select
+                  label="Select Template"
+                  placeholder="Choose a template"
+                  data={templates.map(t => ({ value: String(t.id), label: t.template_name }))}
+                  value={selectedTemplateId}
+                  onChange={(v) => setSelectedTemplateId(v || '')}
+                />
+              )}
+              <Group justify="flex-end">
+                <Button variant="subtle" onClick={() => setApplyModalOpened(false)}>Cancel</Button>
+                <Button
+                  disabled={!selectedTemplateId || isPollingAnalysis}
+                  onClick={applyTemplate}
+                  leftSection={<IconTemplate size={16} />}
+                >
+                  Apply
+                </Button>
+              </Group>
+            </>
           )}
-          <Group justify="flex-end">
-            <Button variant="subtle" onClick={() => setApplyModalOpened(false)}>Cancel</Button>
-            <Button disabled={!selectedTemplateId} onClick={applyTemplate} leftSection={<IconTemplate size={16} />}>Apply</Button>
-          </Group>
         </Stack>
       </Modal>
 

@@ -71,7 +71,7 @@ export class LemurService {
     if (options?.templateId) {
       dbPrompt = await promptManager.getTemplatePrompt(options.templateId, 'lemur');
       if (dbPrompt) {
-        console.log(`📝 Using template-specific prompt version ${dbPrompt.version} for LemUR (template ${options.templateId})`);
+        console.log(`📝 Using template-specific prompt version ${dbPrompt.version} (template ${options.templateId})`);
       }
     }
 
@@ -79,7 +79,7 @@ export class LemurService {
     if (!dbPrompt) {
       dbPrompt = await promptManager.getActivePrompt('lemur', 'analysis_prompt');
       if (dbPrompt) {
-        console.log(`📝 Using default active prompt version ${dbPrompt.version} for LemUR`);
+        console.log(`📝 Using default active prompt version ${dbPrompt.version}`);
       }
     }
 
@@ -110,7 +110,7 @@ ${options.timingContext}` : ''
     }
 
     // Fall back to original hardcoded prompt
-    console.log('📝 Using hardcoded prompt for LemUR (no database prompt found)');
+    console.log('📝 Using hardcoded prompt (no database prompt found)');
 
     const timingSection = options?.timingContext ? `\n\nTIME-CODED EVIDENCE (selected excerpts):\n${options.timingContext}` : '';
 

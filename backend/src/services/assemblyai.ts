@@ -180,7 +180,7 @@ class AssemblyAIService {
         console.log(`💾 AssemblyAI transcript ID stored in database`);
 
         // Store transcript results
-        await this.storeTranscript(jobId, transcript, job);
+        const transcriptId = await this.storeTranscript(jobId, transcript, job);
 
         // Mark job as completed
         await pool.execute(
@@ -189,6 +189,14 @@ class AssemblyAIService {
         );
 
         console.log(`✅ AssemblyAI transcription completed for job ${jobId}`);
+
+        // Auto-trigger analysis if template was selected
+        if (job.template_id) {
+          console.log(`🤖 Auto-triggering analysis with template ${job.template_id} for job ${jobId}`);
+          await this.triggerAnalysis(jobId, transcriptId, job.template_id);
+        } else {
+          console.log(`ℹ️  No template selected for job ${jobId}, skipping analysis`);
+        }
 
       } catch (transcriptionError: any) {
         console.error(`❌ AssemblyAI transcription failed for job ${jobId}:`, transcriptionError.message);
@@ -572,18 +580,18 @@ class AssemblyAIService {
   }
 
   /**
-   * Store transcript in database
+   * Store transcript in database and return the transcript ID
    */
-  private async storeTranscript(jobId: string, transcript: any, job: any): Promise<void> {
+  private async storeTranscript(jobId: string, transcript: any, job: any): Promise<number> {
     try {
       const wordCount = transcript.text ? transcript.text.split(' ').length : 0;
       const processingTime = transcript.audio_duration || 0;
       const confidence = transcript.confidence || 0.95;
 
-      await pool.execute(
+      const [result] = await pool.execute(
         `INSERT INTO transcripts (
-          job_id, teacher_id, school_id, transcript_text, 
-          word_count, confidence_score, processing_time_seconds, 
+          job_id, teacher_id, school_id, transcript_text,
+          word_count, confidence_score, processing_time_seconds,
           external_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
@@ -598,12 +606,15 @@ class AssemblyAIService {
         ]
       );
 
-      console.log(`💾 Transcript stored for job ${jobId}`);
+      const transcriptId = (result as any).insertId;
+      console.log(`💾 Transcript stored for job ${jobId} with ID ${transcriptId}`);
 
       // Store word-level timestamps if available
       if (transcript.words && transcript.words.length > 0) {
         await this.storeWordTimestamps(jobId, transcript.words);
       }
+
+      return transcriptId;
 
     } catch (error: any) {
       console.error(`Failed to store transcript for job ${jobId}:`, error);
@@ -671,6 +682,54 @@ class AssemblyAIService {
       'UPDATE audio_jobs SET status = ?, error_message = ?, processing_completed_at = NOW() WHERE id = ?',
       ['failed', errorMessage.substring(0, 500), jobId] // Limit error message length
     );
+  }
+
+  /**
+   * Trigger AI analysis for a completed transcription
+   */
+  private async triggerAnalysis(jobId: string, transcriptId: number, templateId: number): Promise<void> {
+    try {
+      console.log(`🤖 Starting analysis trigger for job ${jobId}, transcript ${transcriptId}, template ${templateId}`);
+
+      // Update audio job to indicate analysis is queued
+      await pool.execute(
+        'UPDATE audio_jobs SET analysis_status = ? WHERE id = ?',
+        ['queued', jobId]
+      );
+
+      // Create analysis job (this will be picked up by the analysis processor)
+      const analysisJobId = require('crypto').randomUUID();
+      await pool.execute(
+        `INSERT INTO analysis_jobs (id, job_id, transcript_id, teacher_id, school_id, template_id, status, created_at)
+         SELECT ?, aj.id, ?, aj.teacher_id, aj.school_id, ?, 'queued', NOW()
+         FROM audio_jobs aj
+         WHERE aj.id = ?`,
+        [analysisJobId, transcriptId, templateId, jobId]
+      );
+
+      console.log(`✅ Analysis job ${analysisJobId} created and queued`);
+
+      // Immediately start processing the analysis job (async)
+      // Import and call the analysis processor
+      const { processAnalysisJob } = require('../routes/analysis');
+
+      // Process in background without blocking
+      setImmediate(() => {
+        processAnalysisJob(analysisJobId).catch((err: Error) => {
+          console.error(`❌ Background analysis processing failed for job ${analysisJobId}:`, err);
+        });
+      });
+
+      console.log(`🚀 Analysis processing started for job ${analysisJobId}`);
+
+    } catch (error: any) {
+      console.error(`❌ Failed to trigger analysis for job ${jobId}:`, error);
+      // Don't throw - transcription succeeded, analysis can be retried manually
+      await pool.execute(
+        'UPDATE audio_jobs SET analysis_status = ? WHERE id = ?',
+        ['failed', jobId]
+      );
+    }
   }
 }
 

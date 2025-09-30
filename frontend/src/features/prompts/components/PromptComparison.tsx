@@ -23,7 +23,7 @@ interface Prompt {
 }
 
 interface PromptComparisonProps {
-  provider: 'lemur' | 'openai';
+  provider: 'lemur' | 'openai' | 'gemini';
   prompts: Prompt[];
   onClose: () => void;
 }

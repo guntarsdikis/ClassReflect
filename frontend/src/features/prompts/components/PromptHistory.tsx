@@ -27,7 +27,7 @@ interface HistoryEntry {
 
 interface PromptHistoryProps {
   promptId: number;
-  provider: 'lemur' | 'openai';
+  provider: 'lemur' | 'openai' | 'gemini';
   onClose: () => void;
 }
 

@@ -17,7 +17,8 @@ router.get('/analysis-provider', authenticate, authorize('super_admin'), async (
     res.json({
       provider: settings.provider,
       openai_model: settings.openai_model,
-      providers: ['lemur', 'openai']
+      openrouter_model: settings.openrouter_model,
+      providers: ['lemur', 'openai', 'gemini', 'vertex', 'openrouter']
     });
   } catch (error) {
     console.error('Get analysis provider settings error:', error);
@@ -28,11 +29,11 @@ router.get('/analysis-provider', authenticate, authorize('super_admin'), async (
 // PUT update analysis provider settings
 router.put('/analysis-provider', authenticate, authorize('super_admin'), async (req: Request, res: Response) => {
   try {
-    const { provider, openai_model } = req.body || {};
-    if (!provider || !['lemur', 'openai'].includes(provider)) {
-      return res.status(400).json({ error: 'Invalid provider. Use "lemur" or "openai".' });
+    const { provider, openai_model, openrouter_model } = req.body || {};
+    if (!provider || !['lemur', 'openai', 'gemini', 'vertex', 'openrouter'].includes(provider)) {
+      return res.status(400).json({ error: 'Invalid provider. Use "lemur", "openai", "gemini", "vertex", or "openrouter".' });
     }
-    await setAnalysisSettings(pool, { provider, openai_model });
+    await setAnalysisSettings(pool, { provider, openai_model, openrouter_model });
     const updated = await getAnalysisSettings(pool);
     res.json(updated);
   } catch (error) {
@@ -42,4 +43,3 @@ router.put('/analysis-provider', authenticate, authorize('super_admin'), async (
 });
 
 export default router;
-

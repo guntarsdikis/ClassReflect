@@ -19,16 +19,25 @@ export const initializeAnalysisRoutes = (dbPool: Pool) => {
 /**
  * Background job processor for analysis tasks
  * Handles the actual AI processing in the background
+ * Exported for use by AssemblyAI service to auto-trigger analysis
  */
-async function processAnalysisJob(analysisJobId: string): Promise<void> {
+export async function processAnalysisJob(analysisJobId: string): Promise<void> {
   console.log(`🔄 Starting background processing for analysis job ${analysisJobId}`);
   
   try {
     // Update job status to processing
     await pool.execute(`
-      UPDATE analysis_jobs 
-      SET status = 'processing', started_at = NOW(), progress_percent = 10 
+      UPDATE analysis_jobs
+      SET status = 'processing', started_at = NOW(), progress_percent = 10
       WHERE id = ?
+    `, [analysisJobId]);
+
+    // Also update the audio_jobs.analysis_status to 'processing'
+    await pool.execute(`
+      UPDATE audio_jobs aj
+      JOIN analysis_jobs ajob ON aj.id = ajob.job_id
+      SET aj.analysis_status = 'processing', aj.analysis_started_at = NOW()
+      WHERE ajob.id = ?
     `, [analysisJobId]);
 
     // Get job details with transcript and template information
@@ -100,11 +109,20 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
     `, [analysisJobId]);
 
     // Determine provider and optional model from system settings (DB), fall back to env defaults
-    const { provider, openai_model } = await getAnalysisSettings(pool);
+    const { provider, openai_model, openrouter_model } = await getAnalysisSettings(pool);
     const openaiModelToUse = openai_model || process.env.OPENAI_MODEL || 'gpt-4o';
+    const geminiModelToUse = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const vertexModelToUse = process.env.VERTEX_MODEL || 'gemini-1.5-pro-001';
+    const openrouterModelToUse = openrouter_model || process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
     const aiModelIdentifier = provider === 'openai'
       ? `openai/${openaiModelToUse}`
-      : 'anthropic/claude-sonnet-4-20250514';
+      : provider === 'gemini'
+        ? `gemini/${geminiModelToUse}`
+        : provider === 'vertex'
+          ? `vertex/${vertexModelToUse}`
+          : provider === 'openrouter'
+            ? `openrouter/${openrouterModelToUse}`
+            : 'assemblyai/lemur';
 
     console.log('🤖 Analysis provider selected:', {
       analysisJobId,
@@ -157,7 +175,7 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
         grade: job.grade || 'Grade',
         teacherName: `${job.first_name} ${job.last_name}`
       }
-    }, { openaiModel: openaiModelToUse, pauseMetrics, timingContext, templateId: job.template_id });
+    }, { openaiModel: openaiModelToUse, openrouterModel: openrouterModelToUse, pauseMetrics, timingContext, templateId: job.template_id });
 
     // Save raw model JSON output for auditing (before any post-processing)
     await saveModelOutputJson({
@@ -280,8 +298,8 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
 
     // Save analysis results to both analysis_jobs and analysis_results tables
     await pool.execute(`
-      UPDATE analysis_jobs 
-      SET 
+      UPDATE analysis_jobs
+      SET
         status = 'completed',
         progress_percent = 100,
         completed_at = NOW(),
@@ -299,6 +317,14 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
       aiModelIdentifier,
       analysisJobId
     ]);
+
+    // Also update the audio_jobs.analysis_status to 'completed'
+    await pool.execute(`
+      UPDATE audio_jobs aj
+      JOIN analysis_jobs ajob ON aj.id = ajob.job_id
+      SET aj.analysis_status = 'completed', aj.analysis_completed_at = NOW()
+      WHERE ajob.id = ?
+    `, [analysisJobId]);
 
     // Also save to analysis_results for backward compatibility
     await pool.execute(`
@@ -329,8 +355,8 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
     
     // Update job status to failed
     await pool.execute(`
-      UPDATE analysis_jobs 
-      SET 
+      UPDATE analysis_jobs
+      SET
         status = 'failed',
         completed_at = NOW(),
         error_message = ?
@@ -339,6 +365,14 @@ async function processAnalysisJob(analysisJobId: string): Promise<void> {
       fullMsg.substring(0, 500),
       analysisJobId
     ]);
+
+    // Also update the audio_jobs.analysis_status to 'failed'
+    await pool.execute(`
+      UPDATE audio_jobs aj
+      JOIN analysis_jobs ajob ON aj.id = ajob.job_id
+      SET aj.analysis_status = 'failed', aj.analysis_completed_at = NOW()
+      WHERE ajob.id = ?
+    `, [analysisJobId]);
     
     throw error;
   }

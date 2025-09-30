@@ -46,7 +46,7 @@ import { PromptComparison } from './PromptComparison';
 
 interface Prompt {
   id: number;
-  provider: 'lemur' | 'openai';
+  provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter';
   name: string;
   description?: string;
   prompt_template: string;
@@ -57,7 +57,7 @@ interface Prompt {
 }
 
 export function PromptManager() {
-  const [provider, setProvider] = useState<'lemur' | 'openai'>('lemur');
+  const [provider, setProvider] = useState<'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter'>('lemur');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [loading, setLoading] = useState(false);
@@ -139,8 +139,10 @@ export function PromptManager() {
           assignments[template.id] = {
             lemur_prompt_id: null,
             openai_prompt_id: null,
+            gemini_prompt_id: null,
             lemur_version: null,
-            openai_version: null
+            openai_version: null,
+            gemini_version: null
           };
         }
       }
@@ -157,11 +159,21 @@ export function PromptManager() {
     }
   };
 
-  const updateTemplateAssignment = async (templateId: number, lemurPromptId: number | null, openaiPromptId: number | null) => {
+  const updateTemplateAssignment = async (
+    templateId: number,
+    lemurPromptId: number | null,
+    openaiPromptId: number | null,
+    geminiPromptId: number | null = null,
+    vertexPromptId: number | null = null,
+    openrouterPromptId: number | null = null
+  ) => {
     try {
       await apiClient.post(`/prompts/template/${templateId}/assign`, {
         lemur_prompt_id: lemurPromptId,
-        openai_prompt_id: openaiPromptId
+        openai_prompt_id: openaiPromptId,
+        gemini_prompt_id: geminiPromptId,
+        vertex_prompt_id: vertexPromptId,
+        openrouter_prompt_id: openrouterPromptId
       });
 
       notifications.show({
@@ -354,10 +366,13 @@ export function PromptManager() {
             <Select
               label="Provider"
               value={provider}
-              onChange={(value) => setProvider(value as 'lemur' | 'openai')}
+              onChange={(value) => setProvider(value as 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter')}
               data={[
                 { value: 'lemur', label: 'LemUR (Claude)' },
-                { value: 'openai', label: 'OpenAI (GPT)' }
+                { value: 'openai', label: 'OpenAI (GPT)' },
+                { value: 'gemini', label: 'Google Gemini' },
+                { value: 'vertex', label: 'Vertex AI (Gemini)' },
+                { value: 'openrouter', label: 'OpenRouter' }
               ]}
               style={{ width: 200 }}
             />
@@ -592,6 +607,9 @@ export function PromptManager() {
                       <Table.Th>Template Name</Table.Th>
                       <Table.Th>LemUR Prompt</Table.Th>
                       <Table.Th>OpenAI Prompt</Table.Th>
+                      <Table.Th>Gemini Prompt</Table.Th>
+                      <Table.Th>Vertex Prompt</Table.Th>
+                      <Table.Th>OpenRouter Prompt</Table.Th>
                       <Table.Th>Actions</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
@@ -614,9 +632,9 @@ export function PromptManager() {
                               value={assignment.lemur_prompt_id?.toString() || ''}
                               onChange={(value) => {
                                 if (value === '') {
-                                  updateTemplateAssignment(template.id, null, assignment.openai_prompt_id);
+                                  updateTemplateAssignment(template.id, null, assignment.openai_prompt_id, assignment.gemini_prompt_id);
                                 } else {
-                                  updateTemplateAssignment(template.id, parseInt(value), assignment.openai_prompt_id);
+                                  updateTemplateAssignment(template.id, parseInt(value), assignment.openai_prompt_id, assignment.gemini_prompt_id);
                                 }
                               }}
                               data={[
@@ -642,9 +660,9 @@ export function PromptManager() {
                               value={assignment.openai_prompt_id?.toString() || ''}
                               onChange={(value) => {
                                 if (value === '') {
-                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, null);
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, null, assignment.gemini_prompt_id);
                                 } else {
-                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, parseInt(value));
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, parseInt(value), assignment.gemini_prompt_id);
                                 }
                               }}
                               data={[
@@ -665,13 +683,97 @@ export function PromptManager() {
                             )}
                           </Table.Td>
                           <Table.Td>
+                            <Select
+                              placeholder="Select Gemini prompt version"
+                              value={assignment.gemini_prompt_id?.toString() || ''}
+                              onChange={(value) => {
+                                if (value === '') {
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, assignment.openai_prompt_id, null);
+                                } else {
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, assignment.openai_prompt_id, parseInt(value));
+                                }
+                              }}
+                              data={[
+                                { value: '', label: 'Use default (active)' },
+                                ...prompts
+                                  .filter(p => p.provider === 'gemini')
+                                  .map(p => ({
+                                    value: p.id.toString(),
+                                    label: `v${p.version} ${p.is_active ? '(active)' : ''}`
+                                  }))
+                              ]}
+                              size="sm"
+                            />
+                            {assignment.gemini_version && (
+                              <Badge size="xs" color="orange" mt={4}>
+                                v{assignment.gemini_version}
+                              </Badge>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            <Select
+                              placeholder="Select Vertex prompt version"
+                              value={assignment.vertex_prompt_id?.toString() || ''}
+                              onChange={(value) => {
+                                if (value === '') {
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, assignment.openai_prompt_id, assignment.gemini_prompt_id, null, assignment.openrouter_prompt_id);
+                                } else {
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, assignment.openai_prompt_id, assignment.gemini_prompt_id, parseInt(value), assignment.openrouter_prompt_id);
+                                }
+                              }}
+                              data={[
+                                { value: '', label: 'Use default (active)' },
+                                ...prompts
+                                  .filter(p => p.provider === 'vertex')
+                                  .map(p => ({
+                                    value: p.id.toString(),
+                                    label: `v${p.version} ${p.is_active ? '(active)' : ''}`
+                                  }))
+                              ]}
+                              size="sm"
+                            />
+                            {assignment.vertex_version && (
+                              <Badge size="xs" color="grape" mt={4}>
+                                v{assignment.vertex_version}
+                              </Badge>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            <Select
+                              placeholder="Select OpenRouter prompt version"
+                              value={assignment.openrouter_prompt_id?.toString() || ''}
+                              onChange={(value) => {
+                                if (value === '') {
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, assignment.openai_prompt_id, assignment.gemini_prompt_id, assignment.vertex_prompt_id, null);
+                                } else {
+                                  updateTemplateAssignment(template.id, assignment.lemur_prompt_id, assignment.openai_prompt_id, assignment.gemini_prompt_id, assignment.vertex_prompt_id, parseInt(value));
+                                }
+                              }}
+                              data={[
+                                { value: '', label: 'Use default (active)' },
+                                ...prompts
+                                  .filter(p => p.provider === 'openrouter')
+                                  .map(p => ({
+                                    value: p.id.toString(),
+                                    label: `v${p.version} ${p.is_active ? '(active)' : ''}`
+                                  }))
+                              ]}
+                              size="sm"
+                            />
+                            {assignment.openrouter_version && (
+                              <Badge size="xs" color="indigo" mt={4}>
+                                v{assignment.openrouter_version}
+                              </Badge>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
                             <Group gap="xs">
                               <Tooltip label="Clear all assignments">
                                 <ActionIcon
                                   variant="subtle"
                                   color="red"
                                   size="sm"
-                                  onClick={() => updateTemplateAssignment(template.id, null, null)}
+                                  onClick={() => updateTemplateAssignment(template.id, null, null, null, null, null)}
                                 >
                                   <IconX size={14} />
                                 </ActionIcon>

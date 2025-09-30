@@ -3,7 +3,7 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export interface Prompt {
   id: number;
-  provider: 'lemur' | 'openai';
+  provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter' | 'vertex' | 'openrouter';
   name: string;
   description?: string;
   prompt_template: string;
@@ -17,7 +17,7 @@ export interface Prompt {
 export interface PromptHistory {
   id: number;
   prompt_id: number;
-  provider: 'lemur' | 'openai';
+  provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter' | 'vertex' | 'openrouter';
   name: string;
   prompt_template: string;
   version: number;
@@ -60,7 +60,7 @@ export class PromptManager {
   /**
    * Get template-specific prompt or fallback to active default
    */
-  async getTemplatePrompt(templateId: number, provider: 'lemur' | 'openai'): Promise<Prompt | null> {
+  async getTemplatePrompt(templateId: number, provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter' | 'vertex' | 'openrouter'): Promise<Prompt | null> {
     try {
       // First check if template has a specific prompt assigned
       const [templateRows] = await pool.query<RowDataPacket[]>(
@@ -90,7 +90,7 @@ export class PromptManager {
   /**
    * Get the active prompt for a provider and name
    */
-  async getActivePrompt(provider: 'lemur' | 'openai', name: string): Promise<Prompt | null> {
+  async getActivePrompt(provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter' | 'vertex' | 'openrouter', name: string): Promise<Prompt | null> {
     try {
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT * FROM prompts
@@ -114,7 +114,7 @@ export class PromptManager {
   /**
    * Get a specific version of a prompt
    */
-  async getPromptVersion(provider: 'lemur' | 'openai', name: string, version: number): Promise<Prompt | null> {
+  async getPromptVersion(provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name: string, version: number): Promise<Prompt | null> {
     try {
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT * FROM prompts
@@ -133,7 +133,7 @@ export class PromptManager {
   /**
    * Get all versions of a prompt
    */
-  async getPromptVersions(provider: 'lemur' | 'openai', name: string): Promise<Prompt[]> {
+  async getPromptVersions(provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter', name: string): Promise<Prompt[]> {
     try {
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT * FROM prompts
@@ -152,7 +152,7 @@ export class PromptManager {
   /**
    * Get all prompts for a provider
    */
-  async getProviderPrompts(provider: 'lemur' | 'openai'): Promise<Prompt[]> {
+  async getProviderPrompts(provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter'): Promise<Prompt[]> {
     try {
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT * FROM prompts
@@ -172,7 +172,7 @@ export class PromptManager {
    * Create a new version of a prompt
    */
   async createPromptVersion(
-    provider: 'lemur' | 'openai',
+    provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter',
     name: string,
     promptTemplate: string,
     description: string,
@@ -200,7 +200,7 @@ export class PromptManager {
    * Revert to a previous version
    */
   async revertToVersion(
-    provider: 'lemur' | 'openai',
+    provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter',
     name: string,
     version: number,
     revertedBy: string
@@ -441,7 +441,7 @@ export class PromptManager {
   /**
    * Export prompts to JSON for backup
    */
-  async exportPrompts(provider?: 'lemur' | 'openai'): Promise<string> {
+  async exportPrompts(provider?: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter'): Promise<string> {
     try {
       let query = 'SELECT * FROM prompts';
       const params: any[] = [];

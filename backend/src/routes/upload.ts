@@ -92,18 +92,19 @@ router.post('/direct',
     console.log('📤 Upload Debug - req.body keys:', Object.keys(req.body));
     console.log('📤 Upload Debug - req.body values:', Object.values(req.body));
     
-    const { teacherId, schoolId, className, subject, grade, duration, notes } = req.body;
+    const { teacherId, schoolId, className, subject, grade, duration, notes, templateId } = req.body;
     console.log('📤 Upload Debug - Extracted form data:', {
-      teacherId, schoolId, className, subject, grade, duration, notes
+      teacherId, schoolId, className, subject, grade, duration, notes, templateId
     });
     console.log('📤 Upload Debug - Form data types:', {
-      teacherId: typeof teacherId, 
-      schoolId: typeof schoolId, 
-      className: typeof className, 
-      subject: typeof subject, 
-      grade: typeof grade, 
-      duration: typeof duration, 
-      notes: typeof notes
+      teacherId: typeof teacherId,
+      schoolId: typeof schoolId,
+      className: typeof className,
+      subject: typeof subject,
+      grade: typeof grade,
+      duration: typeof duration,
+      notes: typeof notes,
+      templateId: typeof templateId
     });
 
     if (!teacherId || !schoolId) {
@@ -157,17 +158,18 @@ router.post('/direct',
     const processedGrade = grade && grade.trim() !== '' ? grade.trim() : null;
     const processedDuration = duration && !isNaN(parseInt(duration)) ? parseInt(duration) : null;
     const processedNotes = notes && notes.trim() !== '' ? notes.trim() : null;
-    
+    const processedTemplateId = templateId && !isNaN(parseInt(templateId)) ? parseInt(templateId) : null;
+
     console.log('📤 Upload Debug - Processed form data for DB:', {
-      processedClassName, processedSubject, processedGrade, processedDuration, processedNotes
+      processedClassName, processedSubject, processedGrade, processedDuration, processedNotes, processedTemplateId
     });
 
     // Create job record in database (no S3 involved)
     console.log('📤 Upload Debug - Creating database record...');
     await pool.execute<ResultSetHeader>(
-      `INSERT INTO audio_jobs (id, teacher_id, school_id, class_name, subject, grade, class_duration_minutes, notes, file_name, file_size, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
-      [jobId, teacherId, schoolId, processedClassName, processedSubject, processedGrade, processedDuration, processedNotes, req.file.originalname, req.file.size]
+      `INSERT INTO audio_jobs (id, teacher_id, school_id, class_name, subject, grade, class_duration_minutes, notes, template_id, file_name, file_size, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
+      [jobId, teacherId, schoolId, processedClassName, processedSubject, processedGrade, processedDuration, processedNotes, processedTemplateId, req.file.originalname, req.file.size]
     );
     console.log('✅ Upload Debug - Database record created');
 

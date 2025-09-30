@@ -215,15 +215,24 @@ function mergeIntoAggregated(target: any, part: any) {
 }
 
 async function callOpenRouterAndParse(apiKey: string, model: string, prompt: string, temperature: number, maxTokens: number): Promise<any> {
+  // Only use response_format for models that support it (OpenAI models)
+  // Gemini models don't support this parameter and will return 401 if included
+  const supportsJsonMode = model.includes('openai') || model.includes('gpt');
+
+  const requestBody: any = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature,
+    max_tokens: maxTokens
+  };
+
+  if (supportsJsonMode) {
+    requestBody.response_format = { type: 'json_object' };
+  }
+
   const response = await axios.post(
     OPENROUTER_API_URL,
-    {
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature,
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' }
-    },
+    requestBody,
     {
       headers: {
         'Authorization': `Bearer ${apiKey}`,

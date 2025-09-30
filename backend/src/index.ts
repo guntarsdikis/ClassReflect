@@ -19,6 +19,7 @@ import templatesRoutes from './routes/templates';
 import analysisRoutes, { initializeAnalysisRoutes } from './routes/analysis';
 import settingsRoutes, { initializeSettingsRoutes } from './routes/settings';
 import promptsRoutes from './routes/prompts';
+import { initializeCleanupService, stopCleanupService } from './services/analysisCleanup';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -101,6 +102,9 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 
 // Initialize database connection
 initializeDatabase().then(() => {
+  // Initialize cleanup service for stuck analysis jobs
+  initializeCleanupService(pool);
+
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
@@ -110,4 +114,17 @@ initializeDatabase().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT} (without database)`);
   });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  stopCleanupService();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  stopCleanupService();
+  process.exit(0);
 });

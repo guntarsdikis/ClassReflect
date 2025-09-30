@@ -47,6 +47,18 @@ Thumbs.db
 .aws/
 *.pem
 *.key
+*.credentials
+aws-credentials.json
+credentials.json
+
+# API Keys and Secrets (DO NOT COMMIT)
+*api-key*
+*secret-key*
+*apikey*
+secrets.txt
+secrets.json
+.secrets
+.credentials
 
 # Terraform
 *.tfstate
@@ -125,3 +137,5 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 proposal_rockpell_25k.html
+# Claude Code settings with sensitive permissions
+.claude/settings.local.json

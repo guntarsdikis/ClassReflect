@@ -837,6 +837,7 @@ export function PromptManager() {
             <PromptHistory
               promptId={selectedPrompt.id}
               provider={provider}
+              promptName={selectedPrompt.name}
               onClose={() => setHistoryModalOpen(false)}
             />
           )}

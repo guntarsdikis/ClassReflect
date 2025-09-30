@@ -27,11 +27,12 @@ interface HistoryEntry {
 
 interface PromptHistoryProps {
   promptId: number;
-  provider: 'lemur' | 'openai' | 'gemini';
+  provider: 'lemur' | 'openai' | 'gemini' | 'vertex' | 'openrouter';
+  promptName: string;
   onClose: () => void;
 }
 
-export function PromptHistory({ promptId, provider, onClose }: PromptHistoryProps) {
+export function PromptHistory({ promptId, provider, promptName, onClose }: PromptHistoryProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,8 +42,8 @@ export function PromptHistory({ promptId, provider, onClose }: PromptHistoryProp
 
   const fetchHistory = async () => {
     try {
-      const response = await apiClient.get(`/prompts/history/${promptId}`);
-      setHistory(response.data.history || []);
+      const response = await apiClient.get(`/prompts/${provider}/${promptName}/versions`);
+      setHistory(response.data.versions || []);
     } catch (error) {
       console.error('Failed to fetch history:', error);
     } finally {
